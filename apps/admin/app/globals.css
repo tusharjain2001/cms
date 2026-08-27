@@ -1,0 +1,192 @@
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------
+   Pagecraft design tokens — taken verbatim from the Claude Design
+   "Style foundation & states" artboard. Do not hand-pick new colours;
+   add them here first so every screen stays in one system.
+   ------------------------------------------------------------------ */
+@theme {
+  /* Surfaces */
+  --color-canvas: #f6f5f2;
+  --color-surface: #ffffff;
+  --color-rail: #fbfaf8;
+  --color-sunken: #faf9f6;
+
+  /* Lines, from strongest to faintest */
+  --color-line: #e5e3dd;
+  --color-line-mid: #eeece7;
+  --color-line-soft: #f2f0eb;
+  --color-field: #dcd9d2;
+  --color-btn: #d9d6ce;
+  --color-btn-hover: #b9b6ad;
+  --color-grip: #c4c1b9;
+
+  /* Text */
+  --color-ink: #22252b;
+  --color-quiet: #6f737d;
+  --color-muted: #8b8e96;
+  --color-faint: #a9aab0;
+  --color-slate: #4c5058;
+
+  /* Accent */
+  --color-accent: #2b4f9e;
+  --color-accent-dark: #24427f;
+  --color-accent-soft: #eef1f9;
+  --color-accent-tint: #e4e9f4;
+  --color-accent-line: #c9d5ec;
+  --color-accent-line-soft: #b9c6e2;
+  --color-accent-wash: #f5f8fd;
+
+  /* Published (green) */
+  --color-published: #2f7d5b;
+  --color-published-bg: #eaf3ee;
+  --color-published-line: #d7e8de;
+  --color-published-ink: #255f46;
+
+  /* Draft (amber) */
+  --color-draft: #c68a2b;
+  --color-draft-bg: #fbf1e0;
+  --color-draft-ink: #8a5f19;
+
+  /* Destructive (rust) */
+  --color-destructive: #b0402f;
+  --color-destructive-dark: #963627;
+  --color-destructive-bg: #fdf5f4;
+  --color-destructive-line: #e4b7ae;
+  --color-destructive-soft: #fbeceb;
+
+  /* Neutral chips */
+  --color-chip: #f0eee9;
+  --color-chip-hover: #f4f2ee;
+
+  /* Type scale — Karla for words, IBM Plex Mono for paths and keys */
+  --font-sans: Karla, Helvetica, Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --text-screen: 26px;
+  --text-screen--line-height: 32px;
+  --text-screen--letter-spacing: -0.4px;
+  --text-panel: 20px;
+  --text-panel--line-height: 26px;
+  --text-panel--letter-spacing: -0.3px;
+  --text-modal: 18px;
+  --text-modal--line-height: 24px;
+  --text-modal--letter-spacing: -0.2px;
+  --text-card: 15.5px;
+  --text-card--line-height: 22px;
+  --text-body: 14px;
+  --text-body--line-height: 21px;
+  --text-sub: 13.5px;
+  --text-sub--line-height: 19px;
+  --text-label: 13px;
+  --text-label--line-height: 18px;
+  --text-mid: 12.5px;
+  --text-mid--line-height: 18px;
+  --text-helper: 12px;
+  --text-helper--line-height: 17px;
+  --text-micro: 11.5px;
+  --text-micro--line-height: 16px;
+  --text-tiny: 11px;
+  --text-tiny--line-height: 15px;
+
+  /* Motion */
+  --animate-spin-fast: pcSpin 0.7s linear infinite;
+  --animate-rise: pcRise 0.4s ease both;
+  --animate-rise-fast: pcRise 0.2s ease both;
+  --animate-fade: pcFade 0.14s ease both;
+  --animate-pulse-soft: pcPulse 1.4s ease-in-out infinite;
+  --animate-bar: pcBar 2.4s ease-out both;
+}
+
+@keyframes pcSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes pcRise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes pcFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes pcPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+@keyframes pcBar {
+  from {
+    width: 8%;
+  }
+  to {
+    width: 92%;
+  }
+}
+
+@layer base {
+  html,
+  body {
+    height: 100%;
+  }
+  body {
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  ::placeholder {
+    color: var(--color-faint);
+  }
+  textarea {
+    resize: vertical;
+  }
+  /* The design never shows a browser focus ring; every control carries its
+     own accent ring instead (see .pc-focus below). */
+  :focus-visible {
+    outline: none;
+  }
+}
+
+@utility pc-focus {
+  &:focus {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px var(--color-accent-soft);
+  }
+}
+
+@utility pc-hairline {
+  /* The 96px placeholder swatch used wherever a real photo will sit. */
+  background: repeating-linear-gradient(
+    135deg,
+    #e9e4da,
+    #e9e4da 7px,
+    #fbfaf8 7px,
+    #fbfaf8 14px
+  );
+}
+
+@utility pc-hairline-wide {
+  background: repeating-linear-gradient(
+    135deg,
+    #f1efe9,
+    #f1efe9 8px,
+    #fbfaf8 8px,
+    #fbfaf8 16px
+  );
+}

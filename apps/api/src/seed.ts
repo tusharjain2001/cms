@@ -1,0 +1,100 @@
+import { connectDb, disconnectDb } from "./db.js";
+import { env } from "./config/env.js";
+import { User, hashPassword } from "./models/user.js";
+import { Project, newApiKey } from "./models/project.js";
+import { Page, newSectionId } from "./models/page.js";
+import { defaultContent, getSectionType, sectionTypeNames } from "@pagecraft/shared";
+
+/**
+ * Creates the first developer account and a demo website.
+ * Safe to re-run: it never overwrites an existing account.
+ *
+ *   cd apps/api && npm run seed
+ */
+async function main() {
+  const email = (process.env.SEED_EMAIL ?? "").toLowerCase().trim();
+  const password = process.env.SEED_PASSWORD ?? "";
+  const name = process.env.SEED_NAME ?? "Developer";
+
+  if (!email || !password) {
+    console.error("Set SEED_EMAIL and SEED_PASSWORD in apps/api/.env first.");
+    process.exit(1);
+  }
+  if (password.length < 8) {
+    console.error("SEED_PASSWORD must be at least 8 characters.");
+    process.exit(1);
+  }
+
+  await connectDb(env.MONGODB_URI);
+
+  let user = await User.findOne({ email });
+  if (user) {
+    console.log(`Developer account already exists: ${email}`);
+  } else {
+    user = await User.create({
+      email,
+      name,
+      role: "admin",
+      passwordHash: await hashPassword(password),
+      projectIds: [],
+    });
+    console.log(`Created developer account: ${email}`);
+  }
+
+  let project = await Project.findOne({ slug: "demo" });
+  if (project) {
+    console.log("Demo website already exists.");
+  } else {
+    project = await Project.create({
+      name: "Demo Website",
+      slug: "demo",
+      domain: "example.com",
+      apiKey: newApiKey(),
+      allowedSectionTypes: sectionTypeNames(),
+    });
+    console.log(`Created demo website with key ${project.apiKey}`);
+  }
+
+  // A home page with one filled-in hero, so there is something to look at.
+  const existingHome = await Page.findOne({ projectId: project._id, slug: "" });
+  if (existingHome) {
+    console.log("Demo home page already exists.");
+  } else {
+    const hero = getSectionType("hero")!;
+    const section = {
+      id: newSectionId(),
+      type: "hero",
+      name: "Main Banner",
+      order: 0,
+      visible: true,
+      content: {
+        ...defaultContent(hero),
+        heading: "Your words, your website",
+        subheading: "Edit everything on this page from the Pagecraft dashboard.",
+      },
+    };
+
+    await Page.create({
+      projectId: project._id,
+      slug: "",
+      title: "Home",
+      order: 0,
+      status: "draft",
+      draftDirty: true,
+      sections: [],
+      draftSections: [section],
+    });
+    console.log("Created a demo Home page with a hero section.");
+  }
+
+  console.log(`\nSign in at the dashboard with ${email}`);
+  console.log(`Public content key for this website: ${project.apiKey}`);
+
+  await disconnectDb();
+}
+
+main().catch(async (err) => {
+  console.error(err);
+  await disconnectDb();
+  process.exit(1);
+});

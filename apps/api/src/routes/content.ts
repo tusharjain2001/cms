@@ -1,0 +1,103 @@
+import { Router } from "express";
+import { Page, toPublicPageDTO } from "../models/page.js";
+import { requireApiKey } from "../middleware/api-key.js";
+import { notFound, ok } from "../lib/respond.js";
+import { verifyPreviewToken } from "../lib/tokens.js";
+
+/**
+ * The read-only API a client's website calls.
+ *
+ * Published content only, never drafts (except through a signed, 30-minute
+ * preview token for one specific page), and never anything belonging to
+ * another project.
+ */
+const router = Router();
+router.use(requireApiKey);
+
+/** Cached at the CDN, which is what keeps a plain React site fast. */
+function cacheable(res: import("express").Response) {
+  res.set("Cache-Control", "public, s-maxage=60, stale-while-revalidate=600");
+}
+
+/** Navigation-ready list: every published page, in menu order. */
+router.get("/pages", async (req, res, next) => {
+  try {
+    const pages = await Page.find({ projectId: req.project!._id, status: "published" }).sort({
+      order: 1,
+    });
+
+    cacheable(res);
+    return ok(
+      res,
+      pages.map((p) => ({
+        slug: p.slug,
+        title: p.title,
+        order: p.order,
+        seo: {
+          metaTitle: p.seo?.metaTitle || undefined,
+          metaDescription: p.seo?.metaDescription || undefined,
+        },
+      }))
+    );
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * One page with its ordered, visible sections.
+ * `?preview=<token>` swaps in the draft so the client can check their work.
+ */
+router.get("/pages/:slug", async (req, res, next) => {
+  try {
+    const slug = req.params.slug === "index" ? "" : req.params.slug;
+    const preview = typeof req.query.preview === "string" ? req.query.preview : undefined;
+
+    let usePreview = false;
+    if (preview) {
+      try {
+        const { pageId } = verifyPreviewToken(preview);
+        const page = await Page.findById(pageId);
+        // The token must belong to this project AND this page.
+        if (page && page.projectId.toString() === req.project!._id.toString() && page.slug === slug) {
+          usePreview = true;
+        }
+      } catch {
+        usePreview = false;
+      }
+    }
+
+    const filter = usePreview
+      ? { projectId: req.project!._id, slug }
+      : { projectId: req.project!._id, slug, status: "published" as const };
+
+    const page = await Page.findOne(filter);
+    if (!page) throw notFound("There is no published page at that address.");
+
+    // A preview must never be cached — it is one person checking a draft.
+    if (usePreview) res.set("Cache-Control", "no-store");
+    else cacheable(res);
+
+    return ok(res, { ...toPublicPageDTO(page, usePreview), preview: usePreview });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** Convenience for the home page, whose slug is empty. */
+router.get("/home", async (req, res, next) => {
+  try {
+    const page = await Page.findOne({
+      projectId: req.project!._id,
+      slug: "",
+      status: "published",
+    });
+    if (!page) throw notFound("There is no published home page.");
+    cacheable(res);
+    return ok(res, { ...toPublicPageDTO(page), preview: false });
+  } catch (err) {
+    next(err);
+  }
+});
+
+export default router;
