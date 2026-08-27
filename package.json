@@ -5,18 +5,19 @@
   "description": "Headless CMS for client websites built in React / Next.js",
   "workspaces": [
     "packages/*",
-    "apps/*",
-    "examples/*"
+    "apps/*"
   ],
   "scripts": {
     "shared": "npm run build --workspace @pagecraft/shared && npm run build --workspace @pagecraft/sdk",
+    "dev": "npm run shared && concurrently -n api,admin -c blue,magenta --kill-others-on-fail \"npm run dev --workspace @pagecraft/api\" \"npm run dev --workspace @pagecraft/admin\"",
     "dev:api": "npm run shared && npm run dev --workspace @pagecraft/api",
     "dev:admin": "npm run dev --workspace @pagecraft/admin",
     "build": "npm run shared && npm run build --workspace @pagecraft/api && npm run build --workspace @pagecraft/admin",
     "test": "npm run shared && npm run test --workspaces --if-present",
     "typecheck": "npm run shared && npm run typecheck --workspaces --if-present",
-    "seed": "npm run shared && npm run seed --workspace @pagecraft/api",
-    "dev:demo": "npm run shared && npm run dev --workspace @pagecraft/demo-site",
-    "build:demo": "npm run shared && npm run build --workspace @pagecraft/demo-site"
+    "seed": "npm run shared && npm run seed --workspace @pagecraft/api"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
   }
 }

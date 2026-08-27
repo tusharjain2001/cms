@@ -71,7 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAccessToken(null);
       setUser(null);
       setStatus("signedOut");
-      router.push("/");
+      router.push("/login");
     });
     return () => setSessionLostHandler(null);
   }, [router]);
@@ -132,7 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAccessToken(null);
     setUser(null);
     setStatus("signedOut");
-    router.push("/");
+    router.push("/login");
   }, [router]);
 
   const value = useMemo<Auth>(

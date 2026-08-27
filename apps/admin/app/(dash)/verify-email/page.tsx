@@ -71,7 +71,7 @@ function VerifyEmail() {
       title="That link did not work"
       sub="Confirmation links expire after 24 hours, and each one can only be used once."
       footer={
-        <Link href="/" className={authLink}>
+        <Link href="/login" className={authLink}>
           Back to sign in
         </Link>
       }

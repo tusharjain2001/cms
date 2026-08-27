@@ -1,13 +1,19 @@
 import type { Metadata } from "next";
-import { AuthProvider } from "@/lib/auth";
-import { StoreProvider } from "@/lib/store";
-import { MediaProvider } from "@/lib/media";
-import { AppChrome } from "@/components/app-chrome";
 import "./globals.css";
 
+/**
+ * The root layout is deliberately bare.
+ *
+ * One Next app serves both the public landing page at `/` and the signed-in
+ * dashboard, and the two have nothing in common but the design tokens. The
+ * session, store and media providers live in `app/(dash)/layout.tsx` instead,
+ * so a stranger loading the landing page does not download the dashboard's
+ * state management or fire an auth refresh they have no session for.
+ */
+
 export const metadata: Metadata = {
-  title: "Pagecraft",
-  description: "Edit the words and photos on your website.",
+  title: { default: "Pagecraft", template: "%s · Pagecraft" },
+  description: "A content-only CMS for websites built in React and Next.js.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -21,16 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
         />
       </head>
-      <body>
-        <AuthProvider>
-          <StoreProvider>
-            <MediaProvider>
-              {children}
-              <AppChrome />
-            </MediaProvider>
-          </StoreProvider>
-        </AuthProvider>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

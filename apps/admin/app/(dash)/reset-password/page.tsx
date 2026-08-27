@@ -66,7 +66,7 @@ function ResetPassword() {
       title="Choose a new password"
       sub="Everywhere you are currently signed in will be signed out."
       footer={
-        <Link href="/" className={authLink}>
+        <Link href="/login" className={authLink}>
           Back to sign in
         </Link>
       }

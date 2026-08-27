@@ -48,7 +48,7 @@ export default function ForgotPasswordPage() {
           </>
         }
         footer={
-          <Link href="/" className={authLink}>
+          <Link href="/login" className={authLink}>
             Back to sign in
           </Link>
         }
@@ -61,7 +61,7 @@ export default function ForgotPasswordPage() {
       title="Reset your password"
       sub="Enter the address you signed up with and we will email you a link."
       footer={
-        <Link href="/" className={authLink}>
+        <Link href="/login" className={authLink}>
           Back to sign in
         </Link>
       }

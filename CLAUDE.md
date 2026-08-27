@@ -22,6 +22,8 @@ One instance serves many websites: each site is a **project** with its own API k
 
 ## Confirmed tech decisions (do not re-ask)
 
+- **This repo contains the CMS and nothing else.** Client websites are built in their own separate folders and repos — never here, not even as an example. A demo site once lived in `examples/` and was deliberately deleted. Do not scaffold, re-add, or "just for testing" create a client website inside this repo; the recipe for building one lives under "The website recipe" below, and that is where it stays.
+- **One Next.js app serves both the public landing page and the dashboard** (`apps/admin`). There is no separate marketing site; that was tried and removed.
 - **TypeScript everywhere**, strict mode
 - **Express + Mongoose + MongoDB Atlas** for the API
 - **Next.js (App Router) + Tailwind CSS v4** for the admin dashboard
@@ -39,27 +41,26 @@ cms/
 ├── package.json            # npm workspaces + TS project references
 ├── apps/
 │   ├── api/                # Express + TS + Mongoose REST API          (BUILT)
-│   └── admin/              # Next.js + Tailwind + TS admin dashboard   (BUILT, live API)
-├── packages/
-│   ├── shared/             # section registry, Zod schemas, wire types (BUILT)
-│   └── sdk/                # tiny package client websites install      (BUILT)
-└── examples/
-    └── demo-site/          # Next.js site proving the end-to-end flow  (BUILT)
+│   └── admin/              # Next.js: landing page + admin dashboard    (BUILT, live API)
+└── packages/
+    ├── shared/             # section registry, Zod schemas, wire types (BUILT)
+    └── sdk/                # tiny package client websites install      (BUILT)
 ```
 
 `packages/shared` is a **build-first** package: it compiles to `dist/` and both other packages consume its types through a TypeScript project reference. Any script that touches it runs `npm run shared` first — that is why the root scripts are chained rather than using `--workspaces` alone.
+
+**Always run npm from the repo root, never from inside a workspace folder.** Running `npm install` inside `apps/admin` makes npm treat it as a standalone project and write it a private `package-lock.json`; Next then finds two lockfiles, cannot tell which marks the project root, and warns that it guessed. There must be exactly one lockfile, at the root. To add a package to one workspace, use `npm install <pkg> --workspace @pagecraft/admin` **from the root**. If the warning reappears, delete the stray lockfile rather than setting `outputFileTracingRoot` — that only silences the symptom and leaves two lockfiles drifting apart.
 
 ### Commands (run from the repo root)
 
 | Command | What it does |
 |---|---|
 | `npm install` | Installs everything and builds `packages/shared` via its `prepare` script |
-| `npm run dev:api` | Rebuilds shared, then starts the API on :4000 with watch |
-| `npm run dev:admin` | Starts the dashboard on :3000 |
+| **`npm run dev`** | **The usual one.** Rebuilds shared, then runs the API (:4000) and the dashboard (:3000) together, output prefixed `[api]` / `[admin]` |
+| `npm run dev:api` | Just the API on :4000, with watch |
+| `npm run dev:admin` | Just the dashboard on :3000 |
 | `npm test` | 141 tests: registry/validation (15), API integration against a real in-memory MongoDB (105 — including self-service accounts and a contract test that walks the dashboard's exact request sequence), and SDK (21) |
 | `npm run build` | Builds shared → sdk → api → admin |
-| `npm run build:demo` | Builds the example website (needs `examples/demo-site/.env.local` and a reachable CMS) |
-| `npm run dev:demo` | Runs the example website on :3200 |
 | `npm run typecheck` | Type-checks every workspace |
 | `npm run seed` | Creates the first developer account and a demo website |
 
@@ -181,7 +182,7 @@ Where things live:
 | `components/media-picker.tsx` | The modal `pick()` opens. |
 | `app/(app)/foundation` | Live style guide — palette, type, parts, skeletons, phone layouts. Keep it current. |
 
-Routes — signed out: `/` (sign in) · `/signup` · `/verify-email?token=` · `/forgot-password` · `/reset-password?token=`. Signed in: `/projects` → `/projects/[projectId]/pages` → `/projects/[projectId]/pages/[pageId]` (editor) → `/projects/[projectId]/media` → `/projects/[projectId]/settings` → `/foundation`.
+Routes — public: `/` (the landing page) · `/pricing` · `/login` · `/signup` · `/verify-email?token=` · `/forgot-password` · `/reset-password?token=`. Signed in: `/projects` → `/projects/[projectId]/pages` → `/projects/[projectId]/pages/[pageId]` (editor) → `/projects/[projectId]/media` → `/projects/[projectId]/settings` → `/foundation`.
 
 **Owner-only UI is gated on `project.role`, never on the user.** Website settings appear when `s.project?.role === "owner"`. There is no such thing as a globally privileged user in the dashboard.
 
@@ -208,6 +209,66 @@ Screens: Sign up → confirm email → Sign in → Projects (someone invited to 
 
 Drafts autosave (debounced). Publish is the single action that pushes content live.
 
+## Landing page (`apps/admin/app/page.tsx`) — BUILT
+
+The public front page, implemented from the Claude Design "Landing Page" artboard. **It lives in the same Next app as the dashboard — one website, one domain, one deploy.** There is deliberately no separate marketing app.
+
+The route layout is the whole trick:
+
+```
+app/
+├── layout.tsx          <html>, fonts, tokens. NO providers.
+├── page.tsx            /  — the landing page
+└── (dash)/             route group: never appears in a URL
+    ├── layout.tsx      AuthProvider > StoreProvider > MediaProvider + AppChrome
+    ├── login/          /login  — sign in
+    ├── signup/ verify-email/ forgot-password/ reset-password/
+    └── (app)/          the signed-in shell: sidebar + /projects/…
+```
+
+**The root layout is bare on purpose.** Session, store and media providers sit in `(dash)/layout.tsx`, not at the root, so the landing page carries none of the dashboard's state management and never fires an auth refresh for a visitor who has no session. Measured: the landing page loads 5 JS chunks, `/login` loads 10. It is a server component throughout and Next prerenders it to static HTML, so search engines get the real text.
+
+**`(dash)` covers both the sign-in screens and the dashboard**, in one provider tree. They must share session state — splitting them would remount `AuthProvider` between typing a password and landing on `/projects`, forcing a second refresh mid-flow.
+
+| Path | What it is |
+|---|---|
+| `app/page.tsx` | The whole page. Bands: hero → editor mock → stats → how it works → can't/can → section types → for developers → comparison → testimonials → FAQ → closing CTA. Its own `metadata` overrides the root title template. |
+| `components/landing/editor-mock.tsx` | The product screenshot, in markup rather than a PNG — it stays sharp, weighs nothing, and cannot silently go stale when the real editor changes. `aria-hidden`: it is decorative, and the surrounding copy carries the meaning. |
+| `components/landing/section-types.tsx` | The nine cards. **Mirrors `SECTION_REGISTRY`** — add a section type there, add it here. |
+| `lib/links.ts` | Every destination the landing page points at. Plain relative paths, since it is all one origin. |
+
+**`/` is the landing page, so signing in is at `/login`.** Anything that sends a signed-out user back to sign in — `signOut`, the lost-session handler in `lib/auth.tsx`, the `(app)` layout's guard — points at `/login`, not `/`. Sending them to `/` would drop them on a marketing page.
+
+**A link with no destination renders as text, not as a dead link.** `lib/links.ts` marks unwritten pages with the `TODO` sentinel and `MaybeLink` renders those as muted text. Docs, SDK reference, self-hosting guide, GitHub, status and privacy are all still sentinels. Fill a value in and it becomes a real link everywhere it appears, with no other edit. Note that `MaybeLink` owns its own colour: pass it shape classes only, or two competing `text-*` utilities end up on the placeholder and stylesheet order decides which one shows.
+
+## Pricing (`apps/admin/app/pricing/page.tsx`) — PAGE BUILT, PRODUCT BEHIND IT IS NOT
+
+**The business model — decided, do not re-derive.** *One account is one website, and the website's **owner** pays for it.* The developer who built the site does not hold the account; the owner shares their sign-in, which is the same decision recorded under "One account per website, shared by hand" in the roadmap. Two plans, separated only by how big the site is:
+
+| | Starter | Business |
+|---|---|---|
+| Price | $9 / mo ($90 yr) | $19 / mo ($190 yr) |
+| Pages | up to 10 | unlimited |
+| Media | 5 GB | 50 GB |
+| Support | email | email, 1 working day |
+
+Plus a 14-day trial with no card, $2 per extra 10 GB, and $180 for a bespoke section type.
+
+**Why the plans differ on page count and media, and nothing else.** The alternative model — the developer holds one account with many client websites, priced by how many — is the stronger business (fewer, stickier, higher-value customers) and is what the data model was originally shaped for. It was **considered and rejected**, because it requires invites so each client gets a login scoped to their own site; without those, one developer's clients could all edit each other's websites. Given the shared-login decision, two levers are simply unavailable:
+
+- **Not number of editors** — one shared sign-in means there is nobody to count.
+- **Not number of websites** — an account only ever has one.
+
+If invites are ever built, revisit this: per-developer pricing becomes possible and is worth more.
+
+`components/landing/pricing-plans.tsx` is the **only** `"use client"` component on any public page — the monthly/yearly toggle needs state, and isolating it keeps the table, add-ons and FAQ server-rendered. Note the audience shift: the landing page speaks to whoever *builds* the site, the pricing page to whoever *pays*.
+
+**⚠ Nothing on that page is enforced.** There is no billing, no Stripe, no trial clock, no page cap and no media metering. A new signup today gets unlimited websites, unlimited pages, unlimited media, forever. Before this goes in front of anyone who can pay, at minimum: a page cap per project, media metering, a trial expiry, and Stripe. Until then the page is a design artefact, not an offer.
+
+Three claims elsewhere were corrected to match this model — the landing page's comparison row, its hero fine print, and a FAQ answer all used to promise free self-hosting, which is not on offer (the repo has no licence and is unpublished).
+
+
+
 ## SDK (`packages/sdk`) & site integration — BUILT
 
 What a client website installs. Two entry points so a non-React site never pulls in React:
@@ -216,14 +277,16 @@ What a client website installs. Two entry points so a non-React site never pulls
 - **`@pagecraft/sdk`** also exports the image helpers — `cmsImageUrl`, `cmsSrcSet`, `imageProps` — which rewrite a Cloudinary URL to ask for a resized, modern-format copy. And `checkRevalidateRequest(body, secret)`, which validates the publish webhook with a constant-time secret comparison and strips path traversal.
 - **`@pagecraft/sdk/react`** — `<SectionRenderer sections components fallback />`. You map section types to your own components; a type with no component renders nothing rather than crashing a live page.
 
-### The website recipe (see `examples/demo-site`)
+### The website recipe
+
+This is the pattern for each client website, which lives in **its own repo** — this one holds only the CMS. A worked example previously sat in `examples/demo-site`; it was removed on purpose, so these four steps are now the reference.
 
 1. `lib/cms.ts` — one client, `fetchOptions: { cache: "force-cache" }`.
 2. `app/[[...slug]]/page.tsx` — a catch-all with `dynamic = "force-static"` and `generateStaticParams()` from `getPages()`, rendering `<SectionRenderer>`. **Pages the client adds after the build still work**: Next generates them on first request, so a new page needs no deploy.
 3. `app/api/revalidate/route.ts` — about fifteen lines: `checkRevalidateRequest`, then `revalidatePath` for each path plus `revalidatePath("/", "layout")` so the navigation refreshes too.
 4. `components/sections/index.tsx` — **your design, in code**. One component per section type. Nothing about layout, colour or spacing ever comes from the CMS.
 
-A CMS outage must not fail a deploy: the demo's page catches `CmsError` with status `0`, warns in the build log and renders a holding page that regenerates on the next publish. Any other error (bad key, 500) still fails the build, because that is a real misconfiguration.
+A CMS outage must not fail a deploy: catch `CmsError` with status `0` in the catch-all page, warn in the build log, and render a holding page that regenerates on the next publish. Any other error (bad key, 500) should still fail the build, because that is a real misconfiguration you want to hear about.
 
 **Plain React (Vite) recipe**: same client, no `fetchOptions`; fetch at runtime and let the CDN cache headers do the work. Edits appear on the next page load instead of instantly.
 
@@ -233,7 +296,7 @@ A CMS outage must not fail a deploy: the demo's page catches `CmsError` with sta
 2. **Content engine** — ✅ **DONE.** Page and section CRUD with registry validation, draft/publish separation, revalidate webhook, preview tokens, public content API. *Milestone met: full content lifecycle via REST.*
 3. **Admin dashboard** — ✅ **DONE.** Every screen wired to the live API: real login and session, registry-driven forms, autosave, publish with per-field errors, preview tokens. *Milestone met: a non-technical user can build and publish a page.*
 4. **Media** — ✅ **DONE.** Cloudinary signed uploads (direct from the browser), per-project library with alt text and delete, a picker modal wired into the `image` and `file` fields, and URL-based thumbnails.
-5. **SDK + demo site** — ✅ **DONE.** SDK with client, image helpers, webhook validator and `SectionRenderer`; a full demo Next.js site with nine section components. *Milestone met and verified: edit in CMS → live page updates automatically.*
+5. **SDK** — ✅ **DONE.** SDK with client, image helpers, webhook validator and `SectionRenderer`. *Milestone met and verified at the time with a full demo Next.js site: edit in CMS → live page updates automatically.* That demo site has since been **deleted** — this repo holds the CMS only, and client websites live in their own repos. The recipe it demonstrated is written out under "The website recipe" above; the SDK's own 21 tests still cover the client, image helpers and webhook validator against a stub API.
 6. **Open signup** — ✅ **DONE.** The pivot from "one developer's private tool" to a product anyone can use: per-website ownership replacing global roles, self-service signup with emailed confirmation, forgotten-password rescue, session invalidation on password change, SMTP mail, and rate limiting on every signed-out endpoint. *Milestone met: a stranger creates an account, confirms it, builds a website, and sees nobody else's.*
 7. **Launch** — ⬅ **NEXT.**
    - Rate limiting on the **public content API** (the signed-out auth routes are already covered).
@@ -250,11 +313,11 @@ Two consequences of sharing one account that follow from the auth design above, 
 ## Deployment (note: Vercel Hobby forbids commercial use — client work is commercial)
 
 - **CMS backend (Express)**: **Render** (decided) always-on Node service at `api.<domain>` (free instance sleeps after idle — fine for dev; use the ~$7/mo Starter once real clients are live so dashboards/publish webhooks don't hit cold starts). Railway is the equivalent alternative. Not Vercel serverless — a CMS API wants a persistent server + pooled Mongo connection.
-- **CMS dashboard (Next.js)**: **Cloudflare Pages** (decided) at `admin.<domain>` — free, commercial use allowed, unlimited bandwidth. Root directory `apps/admin`. Because the dashboard is Next.js rather than a plain static bundle, deploy it through `@opennextjs/cloudflare` (Cloudflare's Next.js adapter) — the ISR caveats that rule Cloudflare out for *client sites* don't apply here, since the dashboard is entirely client-rendered behind a login and fetches everything from the API at runtime.
+- **CMS dashboard + landing page (Next.js, one app)**: **Cloudflare Pages** (decided). One deploy serves the public landing page at `/` and the dashboard behind it, so it can sit at the apex `<domain>` rather than `admin.<domain>` — free, commercial use allowed, unlimited bandwidth. Root directory `apps/admin`. Because this is Next.js rather than a plain static bundle, deploy it through `@opennextjs/cloudflare` (Cloudflare's Next.js adapter) — the ISR caveats that rule Cloudflare out for *client sites* don't apply here: the landing page is prerendered static, and everything behind the login is client-rendered and fetches from the API at runtime.
 - **Client websites (Next.js, need ISR + on-demand revalidation)**: Netlify free tier to start; move to a single Vercel Pro account ($20/mo flat, unlimited projects) as client count grows. Avoid Vercel Hobby (non-commercial only) and Cloudflare Pages (ISR caveats). Self-hosted `next start` on Render/VPS also fully supports ISR.
 - **Data**: MongoDB Atlas M0 (free, 512 MB — content JSON is tiny; no media in Mongo) + Cloudinary free tier (media originals + CDN + URL transforms).
 - **Email**: any SMTP mailbox on the CMS's own domain. Zoho Mail's free plan is the tidiest fit; Gmail needs an App Password and has low daily limits. Set `MAIL_FROM` to an address at a domain you control and publish SPF and DKIM records for it — without them, confirmation links go straight to spam and nobody can finish signing up. Since the whole product now depends on delivering that one email, treat it as infrastructure, not a nicety.
-- **`APP_URL`** must be the dashboard's public address (`https://admin.<domain>`), because every emailed link is built from it. Getting this wrong sends new users to localhost.
+- **`APP_URL`** must be the dashboard's public address (`https://<domain>`), because every emailed link is built from it. Getting this wrong sends new users to localhost.
 - Same monorepo deploys everywhere: each platform points at its app's root directory (`apps/api`, `apps/admin`).
 - Rate limiting is in-memory and therefore **per instance**. That is right for one always-on Render service; if this ever scales to several instances, `middleware/rate-limit.ts` is the only piece that needs Redis — nothing else in the API keeps state.
 

@@ -65,7 +65,7 @@ export default function SignupPage() {
         footer={
           <>
             Already confirmed?{" "}
-            <Link href="/" className={authLink}>
+            <Link href="/login" className={authLink}>
               Sign in
             </Link>
           </>
@@ -109,7 +109,7 @@ export default function SignupPage() {
       footer={
         <>
           Already have an account?{" "}
-          <Link href="/" className={authLink}>
+          <Link href="/login" className={authLink}>
             Sign in
           </Link>
         </>

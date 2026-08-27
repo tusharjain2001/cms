@@ -16,7 +16,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [drawer, setDrawer] = useState(false);
 
   useEffect(() => {
-    if (status === "signedOut") router.replace("/");
+    if (status === "signedOut") router.replace("/login");
   }, [status, router]);
 
   if (status !== "signedIn") {

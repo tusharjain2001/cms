@@ -1,4 +1,6 @@
 import "dotenv/config";
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 
 /**
@@ -42,9 +44,42 @@ const schema = z.object({
 const parsed = schema.safeParse(process.env);
 
 if (!parsed.success) {
+  /**
+   * This is the first thing anyone sees when the API will not start, and it
+   * runs inside `npm run dev` where it competes with the dashboard's output —
+   * so it says exactly what to do rather than something generic. It also
+   * distinguishes "there is no .env" from "there is one but a value is blank",
+   * because telling someone to create a file they already have sends them
+   * looking in the wrong place.
+   */
+  const envPath = fileURLToPath(new URL("../../.env", import.meta.url));
+  const hasEnvFile = existsSync(envPath);
+
   const lines = parsed.error.issues.map((i) => `  - ${i.path.join(".")}: ${i.message}`);
-  console.error("Invalid environment configuration:\n" + lines.join("\n"));
-  console.error("\nCopy apps/api/.env.example to apps/api/.env and fill it in.");
+  console.error("\n" + "─".repeat(64));
+  console.error("The Pagecraft API cannot start — its configuration is incomplete.\n");
+  console.error(lines.join("\n"));
+
+  if (hasEnvFile) {
+    console.error(`\nFill the missing value(s) in:\n  ${envPath}`);
+    if (parsed.error.issues.some((i) => i.path[0] === "MONGODB_URI")) {
+      console.error(
+        "\nMONGODB_URI is your database connection string. A free MongoDB Atlas\n" +
+          "cluster takes about five minutes: https://www.mongodb.com/cloud/atlas/register\n" +
+          "It looks like:  mongodb+srv://user:password@cluster0.xxxxx.mongodb.net/pagecraft"
+      );
+    }
+  } else {
+    console.error("\nThere is no .env file yet. Create one:");
+    console.error("  cp apps/api/.env.example apps/api/.env");
+    console.error("…then fill it in.");
+  }
+
+  console.error(
+    "\nUntil this is fixed the dashboard will load but cannot sign anyone in —\n" +
+      'it will say "Could not reach the CMS".'
+  );
+  console.error("─".repeat(64) + "\n");
   process.exit(1);
 }
 
