@@ -463,3 +463,34 @@ describe("public content api", () => {
     assert.deepEqual(res.json.data, [], "a key only ever sees its own project");
   });
 });
+
+/* --------------------------------------------------- rate limiting the public api */
+
+describe("public content api rate limit", () => {
+  it("throttles a flood from one source before it can hammer the database", async () => {
+    const { resetRateLimits } = await import("./middleware/rate-limit.js");
+    resetRateLimits();
+
+    const LIMIT = 120; // must match the max in routes/content.ts
+
+    // The first request both counts as one and advertises the limit.
+    const first = await api("/api/content/pages", { key: apiKey });
+    assert.equal(first.status, 200);
+    assert.equal(first.headers.get("ratelimit-limit"), String(LIMIT));
+
+    // LIMIT more requests take the count to LIMIT+1; exactly one is refused.
+    const rest = await Promise.all(
+      Array.from({ length: LIMIT }, () => api("/api/content/pages", { key: apiKey }))
+    );
+    const blocked = rest.filter((r) => r.status === 429);
+    assert.equal(blocked.length, 1, "one request past the limit is refused");
+    assert.equal(blocked[0].json.success, false);
+    assert.match(blocked[0].json.error, /too many requests/i);
+
+    // The limiter runs before the key check, so even a bad key is throttled.
+    const badKeyWhileBlocked = await api("/api/content/pages", { key: "pk_live_nope" });
+    assert.equal(badKeyWhileBlocked.status, 429, "throttled before requireApiKey");
+
+    resetRateLimits(); // leave no state behind for anything that runs after.
+  });
+});

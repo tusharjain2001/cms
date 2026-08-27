@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { Page, toPublicPageDTO } from "../models/page.js";
 import { requireApiKey } from "../middleware/api-key.js";
+import { rateLimit } from "../middleware/rate-limit.js";
 import { notFound, ok } from "../lib/respond.js";
 import { verifyPreviewToken } from "../lib/tokens.js";
 
@@ -12,6 +13,20 @@ import { verifyPreviewToken } from "../lib/tokens.js";
  * another project.
  */
 const router = Router();
+
+// The one surface the whole internet can reach. Throttle per IP *before* the
+// key lookup, so a flood of bogus keys can't hammer the database. In-memory and
+// per-instance, like the auth limiters — see middleware/rate-limit.ts.
+// ponytail: fixed 120/min per IP; raise `max` if a large static-site build
+// legitimately bursts past it (real sites are CDN-cached, so origin hits stay low).
+router.use(
+  rateLimit({
+    max: 120,
+    windowMs: 60 * 1000,
+    message: "Too many requests. Please slow down and try again shortly.",
+  })
+);
+
 router.use(requireApiKey);
 
 /** Cached at the CDN, which is what keeps a plain React site fast. */

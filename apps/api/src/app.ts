@@ -17,6 +17,12 @@ import contentRoutes from "./routes/content.js";
 export function createApp() {
   const app = express();
 
+  // In production the API sits behind nginx on the same host, so the socket
+  // address is always 127.0.0.1. Trust the loopback proxy's X-Forwarded-For so
+  // req.ip is the real client — every IP-based rate limiter depends on it.
+  // "loopback" only, so a public client cannot spoof its way past the limiter.
+  app.set("trust proxy", "loopback");
+
   app.use(
     cors({
       origin: allowedOrigins,
