@@ -5,11 +5,12 @@ import { after, before, describe, it } from "node:test";
 import { MongoMemoryServer } from "mongodb-memory-server";
 
 /**
- * Phase 4: the media library and Cloudinary signing.
+ * Phase 4 (now on Cloudflare R2): the media library and presigned uploads.
  *
- * Uploads themselves go browser → Cloudinary, so what matters on this side is
- * that the signature is right, the secret never leaks, and one client's
- * library is sealed off from another's.
+ * Uploads go browser → R2 via a short-lived presigned PUT, so what matters on
+ * this side is that the presign is scoped to the right tenant prefix, the R2
+ * secret never leaks, one client's library is sealed off from another's, and
+ * the delivery/transform helpers build the capped, cacheable CDN URLs.
  */
 
 let mongo: MongoMemoryServer;
@@ -22,9 +23,14 @@ let clientToken = "";
 let projectA = "";
 let projectB = "";
 
-const CLOUD = "demo-cloud";
-const KEY = "123456789012345";
-const SECRET = "test-cloudinary-secret";
+const ACCOUNT = "testaccount123";
+const ACCESS_KEY = "test-access-key-id";
+const SECRET = "test-r2-secret-access-key";
+const BUCKET = "pagecraft-media";
+const CDN = "https://cdn.mypagecraft.com";
+const SIGNING_KEY = "test-url-signing-key";
+
+const hexHash = (s: string) => createHash("sha256").update(s).digest("hex");
 
 before(async () => {
   mongo = await MongoMemoryServer.create();
@@ -32,10 +38,12 @@ before(async () => {
   process.env.MONGODB_URI = mongo.getUri("pagecraft_media");
   process.env.JWT_ACCESS_SECRET = "media-test-access-secret";
   process.env.JWT_REFRESH_SECRET = "media-test-refresh-secret";
-  process.env.CLOUDINARY_CLOUD_NAME = CLOUD;
-  process.env.CLOUDINARY_API_KEY = KEY;
-  process.env.CLOUDINARY_API_SECRET = SECRET;
-  process.env.CLOUDINARY_FOLDER = "pagecraft";
+  process.env.R2_ACCOUNT_ID = ACCOUNT;
+  process.env.R2_ACCESS_KEY_ID = ACCESS_KEY;
+  process.env.R2_SECRET_ACCESS_KEY = SECRET;
+  process.env.R2_BUCKET = BUCKET;
+  process.env.R2_PUBLIC_BASE_URL = CDN;
+  process.env.R2_URL_SIGNING_KEY = SIGNING_KEY;
 
   const { connectDb, disconnectDb } = await import("./db.js");
   const { createApp } = await import("./app.js");
@@ -115,70 +123,89 @@ async function call(
   return { status: res.status, json: (await res.json()) as any };
 }
 
-const assetUrl = (project: string, name: string) =>
-  `https://res.cloudinary.com/${CLOUD}/image/upload/v1/pagecraft/${project}/${name}`;
+/* ------------------------------------------------------------ upload signing */
 
-describe("upload signing", () => {
-  it("signs exactly the way Cloudinary verifies", async () => {
+describe("presigned upload", () => {
+  it("presigns a PUT scoped to this website's prefix", async () => {
+    const contentHash = hexHash("counter-morning");
     const res = await call(`/api/projects/${projectA}/media/sign`, {
       method: "POST",
       token: adminToken,
-      body: { resourceType: "image" },
+      body: { contentHash, contentType: "image/jpeg", resourceType: "image", ext: "jpg" },
     });
     assert.equal(res.status, 200);
     const t = res.json.data;
 
-    // Recompute independently: sorted `k=v&k=v` + secret, SHA-1.
-    const expected = createHash("sha1")
-      .update(`folder=${t.folder}&timestamp=${t.timestamp}${SECRET}`)
-      .digest("hex");
-    assert.equal(t.signature, expected);
+    assert.equal(t.key, `${projectA}/${contentHash}.jpg`, "key = <tenantId>/<contentHash>.ext");
+    assert.equal(t.publicUrl, `${CDN}/${projectA}/${contentHash}.jpg`);
+    // A real S3v4 presigned PUT against the R2 endpoint.
+    assert.match(t.uploadUrl, new RegExp(`^https://${ACCOUNT}\\.r2\\.cloudflarestorage\\.com/`));
+    assert.match(t.uploadUrl, /X-Amz-Signature=/);
+    assert.ok(t.uploadUrl.includes(`${projectA}/${contentHash}.jpg`), "presign targets the key");
   });
 
-  it("scopes the upload folder to this website", async () => {
+  it("tells the browser the immutable cache headers it must send", async () => {
     const res = await call(`/api/projects/${projectA}/media/sign`, {
       method: "POST",
       token: adminToken,
-      body: {},
+      body: { contentHash: hexHash("x"), contentType: "image/png" },
     });
-    assert.equal(res.json.data.folder, `pagecraft/${projectA}`);
-    assert.match(res.json.data.uploadUrl, new RegExp(`/v1_1/${CLOUD}/image/upload$`));
+    assert.equal(res.json.data.headers["Content-Type"], "image/png");
+    assert.match(res.json.data.headers["Cache-Control"], /immutable/);
+    assert.match(res.json.data.headers["Cache-Control"], /max-age=31536000/);
   });
 
-  it("never sends the api secret to the browser", async () => {
+  it("never sends the R2 secret to the browser", async () => {
     const res = await call(`/api/projects/${projectA}/media/sign`, {
       method: "POST",
       token: adminToken,
-      body: {},
+      body: { contentHash: hexHash("y"), contentType: "image/jpeg" },
     });
     assert.equal(JSON.stringify(res.json).includes(SECRET), false);
+  });
+
+  it("rejects a malformed content hash", async () => {
+    const res = await call(`/api/projects/${projectA}/media/sign`, {
+      method: "POST",
+      token: adminToken,
+      body: { contentHash: "not-a-hash!!", contentType: "image/jpeg" },
+    });
+    assert.equal(res.status, 400);
   });
 
   it("refuses to sign for a website the caller cannot touch", async () => {
     const res = await call(`/api/projects/${projectB}/media/sign`, {
       method: "POST",
       token: clientToken,
-      body: {},
+      body: { contentHash: hexHash("z"), contentType: "image/jpeg" },
     });
     assert.equal(res.status, 403);
   });
 
   it("refuses to sign for anyone signed out", async () => {
-    const res = await call(`/api/projects/${projectA}/media/sign`, { method: "POST", body: {} });
+    const res = await call(`/api/projects/${projectA}/media/sign`, {
+      method: "POST",
+      body: { contentHash: hexHash("z"), contentType: "image/jpeg" },
+    });
     assert.equal(res.status, 401);
   });
 });
 
+/* ------------------------------------------------------------------ library */
+
 describe("the library", () => {
   let mediaId = "";
+  // A function, NOT a const: `projectA` is empty until before() runs, and a
+  // describe body runs at collection time.
+  const keyA = () => `${projectA}/${hexHash("counter-morning")}.jpg`;
 
-  it("registers a file after Cloudinary accepts it", async () => {
+  it("registers a file after R2 accepts it", async () => {
     const res = await call(`/api/projects/${projectA}/media`, {
       method: "POST",
       token: adminToken,
       body: {
-        publicId: `pagecraft/${projectA}/counter-morning`,
-        url: assetUrl(projectA, "counter-morning.jpg"),
+        publicId: keyA(),
+        url: `${CDN}/${keyA()}`,
         format: "jpg",
         width: 2400,
         height: 1350,
@@ -192,22 +219,17 @@ describe("the library", () => {
   });
 
   it("rejects a file that claims to belong to another website", async () => {
+    const stolen = `${projectB}/${hexHash("stolen")}.jpg`;
     const res = await call(`/api/projects/${projectA}/media`, {
       method: "POST",
       token: adminToken,
-      body: {
-        publicId: `pagecraft/${projectB}/stolen`,
-        url: assetUrl(projectB, "stolen.jpg"),
-      },
+      body: { publicId: stolen, url: `${CDN}/${stolen}` },
     });
     assert.equal(res.status, 403);
   });
 
   it("is idempotent, so a retried registration does not duplicate", async () => {
-    const body = {
-      publicId: `pagecraft/${projectA}/counter-morning`,
-      url: assetUrl(projectA, "counter-morning.jpg"),
-    };
+    const body = { publicId: keyA(), url: `${CDN}/${keyA()}` };
     const res = await call(`/api/projects/${projectA}/media`, {
       method: "POST",
       token: adminToken,
@@ -245,13 +267,11 @@ describe("the library", () => {
   });
 
   it("stops a client editing a file from a website they cannot reach", async () => {
+    const rig = `${projectB}/${hexHash("rig")}.jpg`;
     const other = await call(`/api/projects/${projectB}/media`, {
       method: "POST",
       token: adminToken,
-      body: {
-        publicId: `pagecraft/${projectB}/rig`,
-        url: assetUrl(projectB, "rig.jpg"),
-      },
+      body: { publicId: rig, url: `${CDN}/${rig}` },
     });
     const res = await call(`/api/media/${other.json.data.id}`, {
       method: "PATCH",
@@ -265,7 +285,7 @@ describe("the library", () => {
     const res = await call(`/api/media/${mediaId}`, { method: "DELETE", token: adminToken });
     assert.equal(res.status, 200);
     assert.equal(res.json.data.deleted, true);
-    // Cloudinary is unreachable in tests, and the row is removed regardless.
+    // R2 is unreachable/uncredentialed in tests; the row is removed regardless.
     assert.equal(typeof res.json.data.removedFromStorage, "boolean");
 
     const list = await call(`/api/projects/${projectA}/media`, { token: adminToken });
@@ -282,19 +302,64 @@ describe("the library", () => {
   });
 });
 
+/* --------------------------------------------------------- delivery helpers */
+
+describe("CDN delivery + transforms", () => {
+  it("builds a capped, f=auto srcset on the custom domain", async () => {
+    const { srcSet, transformUrl, SRCSET_WIDTHS, publicUrl } = await import("./lib/r2.js");
+    const key = `${projectA}/${hexHash("hero")}.jpg`;
+
+    assert.equal(publicUrl(key), `${CDN}/${key}`);
+
+    const one = transformUrl(key, 640);
+    assert.match(one, new RegExp(`^${CDN}/cdn-cgi/image/`));
+    assert.match(one, /f=auto/);
+    assert.match(one, /w=640/);
+    assert.ok(one.endsWith(key), "the key is the transform source");
+
+    const set = srcSet(key);
+    const entries = set.split(", ");
+    assert.equal(entries.length, SRCSET_WIDTHS.length, "srcset is capped to the width list");
+    assert.ok(entries.every((e) => e.includes("/cdn-cgi/image/") && e.includes("f=auto")));
+  });
+});
+
+/* ---------------------------------------------------- private signed media */
+
+describe("private media tokens", () => {
+  it("signs a URL the worker can verify, and rejects tamper + expiry", async () => {
+    const { signedPrivateUrl, verifyPrivateUrl } = await import("./lib/r2.js");
+    const key = `${projectA}/${hexHash("secret-doc")}.pdf`;
+
+    const url = signedPrivateUrl(key, 3600);
+    assert.ok(url, "a signing key is configured, so a URL is produced");
+    const u = new URL(url!);
+    const exp = Number(u.searchParams.get("exp"));
+    const sig = u.searchParams.get("sig")!;
+
+    assert.equal(verifyPrivateUrl(key, exp, sig), true, "valid token verifies");
+    assert.equal(verifyPrivateUrl(key, exp, sig.replace(/.$/, "0")), false, "tampered sig fails");
+    assert.equal(verifyPrivateUrl(key, 1, sig), false, "expired token fails");
+    assert.equal(verifyPrivateUrl(`${projectB}/other`, exp, sig), false, "wrong key fails");
+  });
+});
+
+/* --------------------------------------------------- section content valid */
+
 describe("image content still validates", () => {
   it("accepts a picked photo in a section, and rejects a malformed one", async () => {
     const { validateSectionContent, defaultContent, getSectionType } = await import(
       "@pagecraft/shared"
     );
     const hero = getSectionType("hero")!;
+    const key = `${projectA}/${hexHash("counter-morning")}.jpg`;
 
     const good = validateSectionContent("hero", {
       ...defaultContent(hero),
       heading: "Hi",
       backgroundImage: {
-        publicId: `pagecraft/${projectA}/counter-morning`,
-        url: assetUrl(projectA, "counter-morning.jpg"),
+        publicId: key,
+        url: `${CDN}/${key}`,
         width: 2400,
         height: 1350,
         alt: "Sourdough cooling",

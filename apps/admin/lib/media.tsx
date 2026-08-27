@@ -16,9 +16,10 @@ import type { FileValue, ImageValue, MediaDTO } from "./dto";
 /**
  * The media library, and the picker that image and file fields open.
  *
- * Uploads go BROWSER → CLOUDINARY directly, using a short-lived signature from
- * our API. A client's 8MB phone photo never touches the CMS server, which
- * keeps the API small and cheap to host.
+ * Uploads go BROWSER → CLOUDFLARE R2 directly, using a short-lived presigned
+ * PUT from our API. A client's 8MB phone photo never touches the CMS server,
+ * which keeps the API small and cheap to host. Files are delivered from the R2
+ * custom domain through Cloudflare Image Transformations (see `thumb`).
  */
 
 export interface UploadJob {
@@ -50,42 +51,53 @@ interface MediaCtx {
 const MediaContext = createContext<MediaCtx | null>(null);
 
 interface Ticket {
-  cloudName: string;
-  apiKey: string;
-  timestamp: number;
-  folder: string;
-  signature: string;
   uploadUrl: string;
+  key: string;
+  publicUrl: string;
+  headers: Record<string, string>;
+}
+
+/** SHA-256 (hex) of the file, so the object key is content-addressed. */
+async function sha256Hex(file: File): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+/** Natural pixel size, so a picked image keeps its aspect ratio. 0 for non-images. */
+async function imageDims(file: File): Promise<{ width: number; height: number }> {
+  if (!file.type.startsWith("image/")) return { width: 0, height: 0 };
+  try {
+    const bitmap = await createImageBitmap(file);
+    const dims = { width: bitmap.width, height: bitmap.height };
+    bitmap.close?.();
+    return dims;
+  } catch {
+    return { width: 0, height: 0 };
+  }
 }
 
 /** XHR rather than fetch, because only XHR reports upload progress. */
-function putToCloudinary(
+function putToR2(
   file: File,
   ticket: Ticket,
   onProgress: (percent: number) => void
-): Promise<Record<string, unknown>> {
+): Promise<void> {
   return new Promise((resolve, reject) => {
-    const form = new FormData();
-    form.append("file", file);
-    form.append("api_key", ticket.apiKey);
-    form.append("timestamp", String(ticket.timestamp));
-    form.append("folder", ticket.folder);
-    form.append("signature", ticket.signature);
-
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", ticket.uploadUrl);
+    xhr.open("PUT", ticket.uploadUrl);
+    // The presign covers these exact headers — the PUT fails without them.
+    for (const [k, v] of Object.entries(ticket.headers)) xhr.setRequestHeader(k, v);
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
     };
     xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        resolve(JSON.parse(xhr.responseText));
-      } else {
-        reject(new Error("The photo service refused that file."));
-      }
+      if (xhr.status >= 200 && xhr.status < 300) resolve();
+      else reject(new Error("The storage service refused that file."));
     };
-    xhr.onerror = () => reject(new Error("The upload could not reach the photo service."));
-    xhr.send(form);
+    xhr.onerror = () => reject(new Error("The upload could not reach the storage service."));
+    xhr.send(file);
   });
 }
 
@@ -133,25 +145,33 @@ export function MediaProvider({ children }: { children: ReactNode }) {
         setUploads((u) => [...u, job]);
 
         try {
+          const [contentHash, dims] = await Promise.all([sha256Hex(file), imageDims(file)]);
+          const ext = file.name.includes(".") ? file.name.split(".").pop() : undefined;
+
           const ticket = await api<Ticket>(`/api/projects/${projectId}/media/sign`, {
             method: "POST",
-            body: { resourceType: kind },
+            body: {
+              contentHash,
+              contentType: file.type || "application/octet-stream",
+              resourceType: kind,
+              ext,
+            },
           });
 
-          const result = await putToCloudinary(file, ticket, (percent) =>
+          await putToR2(file, ticket, (percent) =>
             setUploads((u) => u.map((j) => (j.id === job.id ? { ...j, percent } : j)))
           );
 
           const registered = await api<MediaDTO>(`/api/projects/${projectId}/media`, {
             method: "POST",
             body: {
-              publicId: String(result.public_id ?? ""),
-              url: String(result.secure_url ?? result.url ?? ""),
+              publicId: ticket.key,
+              url: ticket.publicUrl,
               resourceType: kind,
-              format: String(result.format ?? ""),
-              width: Number(result.width ?? 0),
-              height: Number(result.height ?? 0),
-              bytes: Number(result.bytes ?? 0),
+              format: ext ?? "",
+              width: dims.width,
+              height: dims.height,
+              bytes: file.size,
               originalName: file.name,
             },
           });
@@ -276,16 +296,17 @@ export const toFileValue = (m: MediaDTO): FileValue => ({
 });
 
 /**
- * Asks Cloudinary for a smaller, modern-format copy at display time.
- * `f_auto,q_auto` alone typically saves 70–80% on a client's phone photo.
+ * Asks Cloudflare Image Transformations for a smaller, modern-format copy at
+ * display time. `f=auto` serves AVIF/WebP where supported; the origin object is
+ * untouched. Builds `<cdn>/cdn-cgi/image/<opts>/<key>` from the stored URL.
  */
 export function thumb(url: string, width = 400): string {
-  const marker = "/upload/";
-  const at = url.indexOf(marker);
-  if (at === -1) return url;
-  return `${url.slice(0, at + marker.length)}f_auto,q_auto,w_${width},c_limit/${url.slice(
-    at + marker.length
-  )}`;
+  try {
+    const u = new URL(url);
+    return `${u.origin}/cdn-cgi/image/f=auto,q=75,w=${width},fit=scale-down${u.pathname}`;
+  } catch {
+    return url;
+  }
 }
 
 export { API_URL };

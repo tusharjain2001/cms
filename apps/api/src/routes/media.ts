@@ -6,38 +6,45 @@ import { Project } from "../models/project.js";
 import { requireAuth, requireProjectAccess } from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
 import { badRequest, forbidden, notFound, ok } from "../lib/respond.js";
-import {
-  cloudinaryConfigured,
-  createUploadTicket,
-  destroyAsset,
-} from "../lib/cloudinary.js";
+import { createUploadTicket, destroyObject, r2Configured } from "../lib/r2.js";
 
 const router = Router();
 
 const NOT_SET_UP =
-  "Photo uploads are not set up yet. Add your Cloudinary keys to the API's .env file.";
+  "Photo uploads are not set up yet. Add your Cloudflare R2 keys to the API's .env file.";
 
 /* ------------------------------------------------------------------ upload */
 
 const signSchema = z.object({
+  /** SHA-256 (hex) of the file, so the object key is content-addressed. */
+  contentHash: z.string().regex(/^[a-f0-9]{8,64}$/i, "contentHash must be a hex digest"),
+  contentType: z.string().min(1).max(120),
   resourceType: z.enum(["image", "raw"]).default("image"),
+  ext: z.string().max(8).optional(),
 });
 
 /**
- * Hands the browser a one-shot permit to upload straight to Cloudinary.
+ * Hands the browser a one-shot presigned PUT so it uploads straight to R2.
  * The file never passes through this API, which keeps big phone photos off
- * the server entirely.
+ * the server entirely. The object key is `<projectId>/<contentHash>`, so one
+ * client's upload can never land in another's prefix.
  */
 router.post(
   "/projects/:projectId/media/sign",
   requireAuth,
   requireProjectAccess,
   validateBody(signSchema),
-  (req, res, next) => {
+  async (req, res, next) => {
     try {
-      if (!cloudinaryConfigured()) throw badRequest(NOT_SET_UP);
-      const { resourceType } = req.body as z.infer<typeof signSchema>;
-      return ok(res, createUploadTicket(req.project!._id.toString(), resourceType));
+      if (!r2Configured()) throw badRequest(NOT_SET_UP);
+      const { contentHash, contentType, ext } = req.body as z.infer<typeof signSchema>;
+      const ticket = await createUploadTicket({
+        projectId: req.project!._id.toString(),
+        contentHash,
+        contentType,
+        ext,
+      });
+      return ok(res, ticket);
     } catch (err) {
       next(err);
     }
@@ -56,9 +63,9 @@ const registerSchema = z.object({
 });
 
 /**
- * Called after Cloudinary accepts the upload, to put the file in this
- * project's library. The folder is checked against the project so a tampered
- * request cannot register someone else's asset.
+ * Called after R2 accepts the upload, to put the file in this project's
+ * library. The object key is checked against the project so a tampered request
+ * cannot register someone else's asset.
  */
 router.post(
   "/projects/:projectId/media",
@@ -96,7 +103,7 @@ router.get(
       const items = await Media.find({ projectId: req.project!._id }).sort({ createdAt: -1 });
       return ok(res, {
         items: items.map(toMediaDTO),
-        uploadsEnabled: cloudinaryConfigured(),
+        uploadsEnabled: r2Configured(),
       });
     } catch (err) {
       next(err);
@@ -148,11 +155,11 @@ router.patch(
 router.delete("/media/:mediaId", requireAuth, async (req, res, next) => {
   try {
     const item = await loadMedia(req);
-    const removed = await destroyAsset(item.publicId, item.resourceType as "image" | "raw");
+    const removed = await destroyObject(item.publicId);
     await item.deleteOne();
     return ok(res, {
       deleted: true,
-      // Honest about the case where Cloudinary did not confirm.
+      // Honest about the case where R2 did not confirm the delete.
       removedFromStorage: removed,
     });
   } catch (err) {

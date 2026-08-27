@@ -33,12 +33,17 @@ const schema = z.object({
     .transform((v) => (v === undefined ? undefined : v === "true")),
   MAIL_FROM: z.string().default("Pagecraft <no-reply@localhost>"),
 
-  // Cloudinary is optional: without it the CMS runs fine, and the media
-  // endpoints explain that uploads are not set up yet rather than failing.
-  CLOUDINARY_CLOUD_NAME: z.string().optional(),
-  CLOUDINARY_API_KEY: z.string().optional(),
-  CLOUDINARY_API_SECRET: z.string().optional(),
-  CLOUDINARY_FOLDER: z.string().default("pagecraft"),
+  // Cloudflare R2 (S3-compatible) is the media backbone, and is optional the
+  // same way: without these the CMS runs fine, uploads are switched off, and
+  // the dashboard explains what is missing rather than showing a broken button.
+  R2_ACCOUNT_ID: z.string().optional(),
+  R2_ACCESS_KEY_ID: z.string().optional(),
+  R2_SECRET_ACCESS_KEY: z.string().optional(),
+  R2_BUCKET: z.string().optional(),
+  /** The R2 Custom Domain, e.g. https://cdn.mypagecraft.com — never the r2.dev host. */
+  R2_PUBLIC_BASE_URL: z.string().optional(),
+  /** HMAC secret for signed private-media URLs (validated by a CF Worker). Optional. */
+  R2_URL_SIGNING_KEY: z.string().optional(),
 });
 
 const parsed = schema.safeParse(process.env);

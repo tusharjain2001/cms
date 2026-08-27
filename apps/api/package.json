@@ -12,6 +12,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1120.0",
+    "@aws-sdk/s3-request-presigner": "^3.1120.0",
     "@pagecraft/shared": "*",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.7",

@@ -58,7 +58,7 @@ export default function MediaScreen() {
             if (!files?.length) return;
             const images = Array.from(files);
             e.target.value = "";
-            // PDFs go to Cloudinary's "raw" bucket, photos to "image".
+            // "raw" for PDFs, "image" for photos — the kind is stored on the media row.
             const pdfs = images.filter((f) => f.type === "application/pdf");
             const pics = images.filter((f) => f.type !== "application/pdf");
             if (pics.length) await m.uploadFiles(pics, "image");

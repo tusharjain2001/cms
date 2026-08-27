@@ -2,9 +2,10 @@ import { Schema, model, type HydratedDocument, type InferSchemaType } from "mong
 import type { MediaDTO } from "@pagecraft/shared";
 
 /**
- * The per-project media library. Cloudinary holds the actual bytes; this holds
- * what the dashboard needs to show a grid and what a section stores when a
- * client picks a photo.
+ * The per-project media library. Cloudflare R2 holds the actual bytes; this
+ * holds what the dashboard needs to show a grid and what a section stores when
+ * a client picks a photo. `publicId` is the R2 object key (`<projectId>/<hash>`)
+ * and `url` is its CDN custom-domain URL.
  */
 
 const mediaSchema = new Schema(
