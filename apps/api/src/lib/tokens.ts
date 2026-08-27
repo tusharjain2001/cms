@@ -1,11 +1,18 @@
 import jwt, { type SignOptions } from "jsonwebtoken";
 import type { Response } from "express";
 import { env, isProd } from "../config/env.js";
-import type { Role } from "@pagecraft/shared";
 
+/**
+ * `sv` is the account's session version. Both token kinds carry it and both are
+ * checked against the stored value, so changing a password logs every other
+ * device out at once instead of leaving stolen sessions alive until they expire.
+ *
+ * There is deliberately no role in here: what a user may do depends on the
+ * website they are touching, and is looked up per request.
+ */
 export interface AccessClaims {
   sub: string;
-  role: Role;
+  sv: number;
 }
 
 export const REFRESH_COOKIE = "pc_refresh";
@@ -16,8 +23,8 @@ export function signAccessToken(claims: AccessClaims): string {
   } as SignOptions);
 }
 
-export function signRefreshToken(userId: string): string {
-  return jwt.sign({ sub: userId }, env.JWT_REFRESH_SECRET, {
+export function signRefreshToken(userId: string, sessionVersion: number): string {
+  return jwt.sign({ sub: userId, sv: sessionVersion }, env.JWT_REFRESH_SECRET, {
     expiresIn: env.REFRESH_TOKEN_TTL,
   } as SignOptions);
 }
@@ -26,8 +33,8 @@ export function verifyAccessToken(token: string): AccessClaims {
   return jwt.verify(token, env.JWT_ACCESS_SECRET) as AccessClaims;
 }
 
-export function verifyRefreshToken(token: string): { sub: string } {
-  return jwt.verify(token, env.JWT_REFRESH_SECRET) as { sub: string };
+export function verifyRefreshToken(token: string): { sub: string; sv: number } {
+  return jwt.verify(token, env.JWT_REFRESH_SECRET) as { sub: string; sv: number };
 }
 
 /**

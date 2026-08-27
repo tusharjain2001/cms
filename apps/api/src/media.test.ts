@@ -47,7 +47,7 @@ before(async () => {
   await User.create({
     email: "dev@example.com",
     name: "Dev",
-    role: "admin",
+    emailVerifiedAt: new Date(),
     passwordHash: await hashPassword("correct-horse"),
     projectIds: [],
   });
@@ -77,12 +77,12 @@ before(async () => {
     })
   ).json.data.id;
 
-  // A client with access to project A only.
+  // An invited editor with access to project A only — the developer's client.
   const { User: U, hashPassword: hp } = await import("./models/user.js");
   await U.create({
     email: "priya@example.com",
     name: "Priya",
-    role: "client",
+    emailVerifiedAt: new Date(),
     passwordHash: await hp("client-pass"),
     projectIds: [projectA],
   });

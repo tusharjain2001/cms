@@ -44,7 +44,7 @@ before(async () => {
   await User.create({
     email: "maya@studio.test",
     name: "Maya Kessler",
-    role: "admin",
+    emailVerifiedAt: new Date(),
     passwordHash: await hashPassword("open-sesame"),
     projectIds: [],
   });
@@ -101,7 +101,7 @@ describe("the dashboard's journey", () => {
     assert.equal(res.status, 200);
     // Exactly the fields AuthProvider destructures.
     assert.ok(res.json.data.accessToken);
-    assert.equal(res.json.data.user.role, "admin");
+    assert.equal(res.json.data.user.emailVerified, true);
     assert.equal(typeof res.json.data.user.name, "string");
     accessToken = res.json.data.accessToken;
   });

@@ -14,6 +14,22 @@ const schema = z.object({
   ACCESS_TOKEN_TTL: z.string().default("15m"),
   REFRESH_TOKEN_TTL: z.string().default("30d"),
   ADMIN_ORIGIN: z.string().default("http://localhost:3000"),
+  /** Where the dashboard lives, used to build links inside emails. */
+  APP_URL: z.string().default("http://localhost:3000"),
+
+  // Email is optional in the same way Cloudinary is: without it the CMS runs,
+  // but signing up cannot complete, so the API says so in plain English and
+  // prints the link it would have sent to the server log for local work.
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().int().positive().default(587),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASSWORD: z.string().optional(),
+  /** Blank means "decide from the port": 465 is implicit TLS, 587 is STARTTLS. */
+  SMTP_SECURE: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v === "true")),
+  MAIL_FROM: z.string().default("Pagecraft <no-reply@localhost>"),
 
   // Cloudinary is optional: without it the CMS runs fine, and the media
   // endpoints explain that uploads are not set up yet rather than failing.
@@ -37,3 +53,6 @@ export const env = parsed.data;
 export const allowedOrigins = env.ADMIN_ORIGIN.split(",").map((o) => o.trim()).filter(Boolean);
 
 export const isProd = env.NODE_ENV === "production";
+
+/** Without a host and credentials there is nowhere to send a verification link. */
+export const emailEnabled = Boolean(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASSWORD);

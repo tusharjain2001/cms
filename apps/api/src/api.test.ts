@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { after, before, describe, it } from "node:test";
+import { after, before, beforeEach, describe, it } from "node:test";
 import type { Server } from "node:http";
 import { MongoMemoryServer } from "mongodb-memory-server";
 
@@ -7,12 +7,16 @@ import { MongoMemoryServer } from "mongodb-memory-server";
  * End-to-end check of the Phase 1 milestone: sign in, then create and manage a
  * client website over REST. Runs against a real MongoDB started in memory, so
  * the models, indexes and access rules are all genuinely exercised.
+ *
+ * Since anyone can sign up, the tests below care most about one thing: that two
+ * unrelated accounts cannot see or touch each other's websites.
  */
 
 let mongo: MongoMemoryServer;
 let server: Server;
 let baseUrl: string;
 let disconnect: () => Promise<void>;
+let resetRateLimits: () => void;
 
 // Config is read at import time, so the environment must be set up first.
 before(async () => {
@@ -27,22 +31,40 @@ before(async () => {
   const { connectDb, disconnectDb } = await import("./db.js");
   const { createApp } = await import("./app.js");
   const { User, hashPassword } = await import("./models/user.js");
+  ({ resetRateLimits } = await import("./middleware/rate-limit.js"));
 
   await connectDb(process.env.MONGODB_URI);
   disconnect = disconnectDb;
 
+  // Two ordinary, unrelated accounts — the everyday case now that signup is
+  // open — plus the one platform administrator, who is created by seeding.
   await User.create({
     email: "dev@example.com",
     name: "Dev",
-    role: "admin",
+    emailVerifiedAt: new Date(),
     passwordHash: await hashPassword("correct-horse"),
     projectIds: [],
   });
   await User.create({
     email: "client@example.com",
     name: "Client",
-    role: "client",
+    emailVerifiedAt: new Date(),
     passwordHash: await hashPassword("client-pass"),
+    projectIds: [],
+  });
+  await User.create({
+    email: "boss@example.com",
+    name: "Boss",
+    emailVerifiedAt: new Date(),
+    isPlatformAdmin: true,
+    passwordHash: await hashPassword("boss-pass"),
+    projectIds: [],
+  });
+  await User.create({
+    email: "unconfirmed@example.com",
+    name: "Unconfirmed",
+    emailVerifiedAt: null,
+    passwordHash: await hashPassword("never-clicked"),
     projectIds: [],
   });
 
@@ -57,6 +79,11 @@ after(async () => {
   await disconnect?.();
   await mongo?.stop();
 });
+
+// The suite signs in far more often than a person would, and tripping the
+// brute-force limiter mid-run would make failures look like access bugs.
+// The limiter has its own tests, which opt out of this.
+beforeEach(() => resetRateLimits?.());
 
 /* ------------------------------------------------------------------ helpers */
 
@@ -113,7 +140,7 @@ describe("auth", () => {
     const res = await login("dev@example.com", "correct-horse");
     assert.equal(res.status, 200);
     assert.equal(res.json.data.user.email, "dev@example.com");
-    assert.equal(res.json.data.user.role, "admin");
+    assert.equal(res.json.data.user.emailVerified, true);
     assert.ok(res.json.data.accessToken.length > 20);
     assert.match(res.setCookie ?? "", /pc_refresh=/);
     assert.match(res.setCookie ?? "", /HttpOnly/i);
@@ -136,16 +163,35 @@ describe("auth", () => {
     const res = await api("/api/auth/refresh", { method: "POST" });
     assert.equal(res.status, 401);
   });
+
+  it("refuses to sign in until the email address is confirmed", async () => {
+    const res = await login("unconfirmed@example.com", "never-clicked");
+    assert.equal(res.status, 401);
+    // Tagged so the dashboard can offer a "resend" button instead of guessing
+    // from the wording.
+    assert.equal(res.json.code, "email_not_verified");
+    assert.equal(res.setCookie, null);
+  });
+
+  it("checks the password before mentioning verification, so this cannot find accounts", async () => {
+    const wrongPassword = await login("unconfirmed@example.com", "not-the-password");
+    // Identical to any other bad sign-in: revealing "that account exists but is
+    // unverified" would tell a stranger the address is registered here.
+    assert.match(wrongPassword.json.error, /do not match/);
+    assert.equal(wrongPassword.json.code, undefined);
+  });
 });
 
 describe("projects", () => {
-  let adminToken: string;
+  let devToken: string;
   let clientToken: string;
+  let bossToken: string;
   let projectId: string;
 
   before(async () => {
-    adminToken = (await login("dev@example.com", "correct-horse")).json.data.accessToken;
+    devToken = (await login("dev@example.com", "correct-horse")).json.data.accessToken;
     clientToken = (await login("client@example.com", "client-pass")).json.data.accessToken;
+    bossToken = (await login("boss@example.com", "boss-pass")).json.data.accessToken;
   });
 
   it("requires a token", async () => {
@@ -156,7 +202,7 @@ describe("projects", () => {
   it("creates a website and mints a public api key", async () => {
     const res = await api("/api/projects", {
       method: "POST",
-      token: adminToken,
+      token: devToken,
       body: { name: "Rosewater Bakehouse", domain: "rosewaterbakehouse.com" },
     });
     assert.equal(res.status, 201);
@@ -170,10 +216,10 @@ describe("projects", () => {
   it("never leaks the revalidate secret", async () => {
     await api(`/api/projects/${projectId}`, {
       method: "PATCH",
-      token: adminToken,
+      token: devToken,
       body: { revalidateSecret: "whsec_topsecret" },
     });
-    const res = await api(`/api/projects/${projectId}`, { token: adminToken });
+    const res = await api(`/api/projects/${projectId}`, { token: devToken });
     assert.equal(res.json.data.hasRevalidateSecret, true);
     assert.equal(JSON.stringify(res.json).includes("whsec_topsecret"), false);
   });
@@ -181,19 +227,21 @@ describe("projects", () => {
   it("rejects a section type the registry does not know", async () => {
     const res = await api(`/api/projects/${projectId}`, {
       method: "PATCH",
-      token: adminToken,
+      token: devToken,
       body: { allowedSectionTypes: ["hero", "not-a-real-section"] },
     });
     assert.equal(res.status, 400);
   });
 
-  it("lists the website for the developer", async () => {
-    const res = await api("/api/projects", { token: adminToken });
+  it("lists the website for the account that created it, marked as owned", async () => {
+    const res = await api("/api/projects", { token: devToken });
     assert.equal(res.status, 200);
     assert.equal(res.json.data.length, 1);
+    assert.equal(res.json.data[0].role, "owner");
+    assert.equal(res.json.data[0].ownerName, "Dev");
   });
 
-  it("hides other people's websites from a client", async () => {
+  it("hides one account's website from every other account", async () => {
     const list = await api("/api/projects", { token: clientToken });
     assert.deepEqual(list.json.data, []);
 
@@ -201,37 +249,77 @@ describe("projects", () => {
     assert.equal(direct.status, 403);
   });
 
-  it("stops a client creating a website", async () => {
-    const res = await api("/api/projects", {
+  it("lets any confirmed account create its own website without seeing anyone else's", async () => {
+    const created = await api("/api/projects", {
       method: "POST",
       token: clientToken,
-      body: { name: "Sneaky Site" },
+      body: { name: "Second Account Site" },
+    });
+    assert.equal(created.status, 201);
+    assert.equal(created.json.data.role, "owner");
+
+    // The decisive check: creating a website reveals nothing about the CMS's
+    // other tenants.
+    const mine = await api("/api/projects", { token: clientToken });
+    assert.equal(mine.json.data.length, 1);
+    assert.equal(mine.json.data[0].name, "Second Account Site");
+  });
+
+  it("stops an unconfirmed account creating anything", async () => {
+    const { User } = await import("./models/user.js");
+    const { signAccessToken } = await import("./lib/tokens.js");
+    const pending = (await User.findOne({ email: "unconfirmed@example.com" }))!;
+
+    // Signing in is already blocked, so mint a token directly: this proves the
+    // second line of defence holds even for a token issued some other way.
+    const token = signAccessToken({ sub: pending._id.toString(), sv: pending.sessionVersion });
+    const res = await api("/api/projects", {
+      method: "POST",
+      token,
+      body: { name: "Unconfirmed Site" },
     });
     assert.equal(res.status, 403);
   });
 
+  it("lets two different accounts use the same website address", async () => {
+    // Slugs are unique per owner, not globally: one account taking "portfolio"
+    // must not stop everyone else from using the word.
+    const res = await api("/api/projects", {
+      method: "POST",
+      token: bossToken,
+      body: { name: "Rosewater Bakehouse" },
+    });
+    assert.equal(res.status, 201);
+    assert.equal(res.json.data.slug, "rosewater-bakehouse");
+  });
+
+  it("shows the platform administrator every website", async () => {
+    const res = await api("/api/projects", { token: bossToken });
+    assert.ok(res.json.data.length >= 3, "the instance owner can see across accounts");
+  });
+
   it("rotates the api key", async () => {
-    const before = await api(`/api/projects/${projectId}`, { token: adminToken });
+    const before = await api(`/api/projects/${projectId}`, { token: devToken });
     const after = await api(`/api/projects/${projectId}/rotate-key`, {
       method: "POST",
-      token: adminToken,
+      token: devToken,
     });
     assert.equal(after.status, 200);
     assert.notEqual(after.json.data.apiKey, before.json.data.apiKey);
   });
 
-  it("refuses a duplicate slug with a readable message", async () => {
+  it("refuses a duplicate slug within one account, with a readable message", async () => {
     const res = await api("/api/projects", {
       method: "POST",
-      token: adminToken,
+      token: devToken,
       body: { name: "Rosewater Bakehouse" },
     });
     assert.equal(res.status, 409);
-    assert.match(res.json.error, /already taken/);
+    assert.match(res.json.error, /already have a website/);
   });
 
   it("returns 404 for a website that does not exist", async () => {
-    const res = await api("/api/projects/000000000000000000000000", { token: adminToken });
+    const res = await api("/api/projects/000000000000000000000000", { token: devToken });
     assert.equal(res.status, 404);
   });
 });

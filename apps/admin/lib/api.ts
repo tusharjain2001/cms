@@ -16,11 +16,20 @@ export interface ApiIssue {
   message: string;
 }
 
+/** Matches `ApiErrorCode` in @pagecraft/shared. */
+export type ApiCode = "email_not_verified" | "email_not_configured";
+
 export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
-    public issues: ApiIssue[] = []
+    public issues: ApiIssue[] = [],
+    /**
+     * Set only where the UI has to branch on the reason rather than just show
+     * the message — an unconfirmed sign-in needs a "resend" button, not a
+     * sentence. Matching on the English text would break on the first reword.
+     */
+    public code?: ApiCode
   ) {
     super(message);
     this.name = "ApiError";
@@ -76,12 +85,12 @@ export async function api<T>(path: string, opts: Options = {}): Promise<T> {
 
   const payload = (await res.json().catch(() => null)) as
     | { success: true; data: T }
-    | { success: false; error: string; issues?: ApiIssue[] }
+    | { success: false; error: string; issues?: ApiIssue[]; code?: ApiCode }
     | null;
 
   if (!payload) throw new ApiError(res.status, "The CMS sent back something unexpected.");
   if (!payload.success) {
-    throw new ApiError(res.status, payload.error, payload.issues ?? []);
+    throw new ApiError(res.status, payload.error, payload.issues ?? [], payload.code);
   }
   return payload.data;
 }

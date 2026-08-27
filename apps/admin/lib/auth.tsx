@@ -15,13 +15,23 @@ import type { UserDTO } from "./dto";
 
 type Status = "loading" | "signedIn" | "signedOut";
 
+type Session = { user: UserDTO; accessToken: string };
+
 interface Auth {
   status: Status;
   user: UserDTO | null;
-  /** True for the developer, false for a client who only edits their own site. */
-  isDev: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  /**
+   * Anyone can create an account. Nothing comes back but a promise that an
+   * email is on its way — no session, because the address is not confirmed yet.
+   */
+  signUp: (name: string, email: string, password: string) => Promise<void>;
+  resendVerification: (email: string) => Promise<void>;
+  /** Clicking the emailed link both confirms the address and signs them in. */
+  verifyEmail: (token: string) => Promise<void>;
+  forgotPassword: (email: string) => Promise<void>;
+  resetPassword: (token: string, password: string) => Promise<void>;
 }
 
 const AuthContext = createContext<Auth | null>(null);
@@ -66,15 +76,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => setSessionLostHandler(null);
   }, [router]);
 
-  const signIn = useCallback(async (email: string, password: string) => {
-    const data = await api<{ user: UserDTO; accessToken: string }>("/api/auth/login", {
-      method: "POST",
-      body: { email, password },
-    });
+  /** Everything that hands back a session lands here, so it is stored one way. */
+  const adopt = useCallback((data: Session) => {
     setAccessToken(data.accessToken);
     setUser(data.user);
     setStatus("signedIn");
   }, []);
+
+  const signIn = useCallback(
+    async (email: string, password: string) => {
+      adopt(
+        await api<Session>("/api/auth/login", { method: "POST", body: { email, password } })
+      );
+    },
+    [adopt]
+  );
+
+  const signUp = useCallback(async (name: string, email: string, password: string) => {
+    await api("/api/auth/signup", { method: "POST", body: { name, email, password } });
+  }, []);
+
+  const resendVerification = useCallback(async (email: string) => {
+    await api("/api/auth/resend-verification", { method: "POST", body: { email } });
+  }, []);
+
+  const verifyEmail = useCallback(
+    async (token: string) => {
+      adopt(await api<Session>("/api/auth/verify-email", { method: "POST", body: { token } }));
+    },
+    [adopt]
+  );
+
+  const forgotPassword = useCallback(async (email: string) => {
+    await api("/api/auth/forgot-password", { method: "POST", body: { email } });
+  }, []);
+
+  const resetPassword = useCallback(
+    async (token: string, password: string) => {
+      adopt(
+        await api<Session>("/api/auth/reset-password", {
+          method: "POST",
+          body: { token, password },
+        })
+      );
+    },
+    [adopt]
+  );
 
   const signOut = useCallback(async () => {
     try {
@@ -89,8 +136,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [router]);
 
   const value = useMemo<Auth>(
-    () => ({ status, user, isDev: user?.role === "admin", signIn, signOut }),
-    [status, user, signIn, signOut]
+    () => ({
+      status,
+      user,
+      signIn,
+      signOut,
+      signUp,
+      resendVerification,
+      verifyEmail,
+      forgotPassword,
+      resetPassword,
+    }),
+    [
+      status,
+      user,
+      signIn,
+      signOut,
+      signUp,
+      resendVerification,
+      verifyEmail,
+      forgotPassword,
+      resetPassword,
+    ]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

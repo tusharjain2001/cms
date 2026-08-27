@@ -14,7 +14,7 @@ export function errorHandler(
   _next: NextFunction
 ) {
   if (err instanceof HttpError) {
-    return fail(res, err.status, err.message, err.issues);
+    return fail(res, err.status, err.message, err.issues, err.code);
   }
 
   // Duplicate key — the only Mongo error worth translating for a human.

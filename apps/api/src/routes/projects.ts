@@ -1,11 +1,16 @@
 import { Router } from "express";
 import { z } from "zod";
 import { isKnownSectionType, sectionTypeNames } from "@pagecraft/shared";
-import { Project, newApiKey, toProjectDTO } from "../models/project.js";
+import { Project, describeProject, describeProjects, newApiKey } from "../models/project.js";
 import { User } from "../models/user.js";
-import { requireAdmin, requireAuth, requireProjectAccess } from "../middleware/auth.js";
+import {
+  requireAuth,
+  requireProjectAccess,
+  requireProjectOwner,
+  requireVerified,
+} from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
-import { badRequest, ok } from "../lib/respond.js";
+import { badRequest, conflict, ok } from "../lib/respond.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -34,25 +39,40 @@ const updateSchema = z.object({
   allowedSectionTypes: sectionTypeList.optional(),
 });
 
-/** Admins see every client website; clients see only their own. */
+/**
+ * The websites this account owns, plus any it has been invited to — and
+ * nothing else. Every account is its own world; the platform admin (whoever
+ * runs this instance) is the one exception.
+ */
 router.get("/", async (req, res, next) => {
   try {
     const user = req.user!;
-    const filter = user.role === "admin" ? {} : { _id: { $in: user.projectIds } };
+    const filter = user.isPlatformAdmin
+      ? {}
+      : { $or: [{ ownerId: user._id }, { _id: { $in: user.projectIds } }] };
+
     const projects = await Project.find(filter).sort({ createdAt: -1 });
-    return ok(res, projects.map(toProjectDTO));
+    return ok(res, await describeProjects(projects, user));
   } catch (err) {
     next(err);
   }
 });
 
-router.post("/", requireAdmin, validateBody(createSchema), async (req, res, next) => {
+/** Anyone with a confirmed account may create a website; they own what they create. */
+router.post("/", requireVerified, validateBody(createSchema), async (req, res, next) => {
   try {
+    const user = req.user!;
     const body = req.body as z.infer<typeof createSchema>;
     const slug = slugify(body.slug || body.name);
     if (!slug) throw badRequest("That name cannot be turned into a web address.");
 
+    // Checked here so the message names the website rather than the index.
+    if (await Project.exists({ ownerId: user._id, slug })) {
+      throw conflict("You already have a website with that address.");
+    }
+
     const project = await Project.create({
+      ownerId: user._id,
       name: body.name,
       slug,
       domain: body.domain,
@@ -60,32 +80,38 @@ router.post("/", requireAdmin, validateBody(createSchema), async (req, res, next
       allowedSectionTypes: body.allowedSectionTypes ?? sectionTypeNames(),
     });
 
-    return ok(res, toProjectDTO(project), 201);
+    return ok(res, await describeProject(project, user), 201);
   } catch (err) {
     next(err);
   }
 });
 
-router.get("/:projectId", requireProjectAccess, (req, res) => ok(res, toProjectDTO(req.project!)));
+router.get("/:projectId", requireProjectAccess, async (req, res, next) => {
+  try {
+    return ok(res, await describeProject(req.project!, req.user!));
+  } catch (err) {
+    next(err);
+  }
+});
 
 router.patch(
   "/:projectId",
   requireProjectAccess,
-  requireAdmin,
+  requireProjectOwner,
   validateBody(updateSchema),
   async (req, res, next) => {
     try {
       const project = req.project!;
       Object.assign(project, req.body as z.infer<typeof updateSchema>);
       await project.save();
-      return ok(res, toProjectDTO(project));
+      return ok(res, await describeProject(project, req.user!));
     } catch (err) {
       next(err);
     }
   }
 );
 
-router.delete("/:projectId", requireProjectAccess, requireAdmin, async (req, res, next) => {
+router.delete("/:projectId", requireProjectAccess, requireProjectOwner, async (req, res, next) => {
   try {
     const project = req.project!;
     await project.deleteOne();
@@ -98,15 +124,20 @@ router.delete("/:projectId", requireProjectAccess, requireAdmin, async (req, res
 });
 
 /** Old key keeps working until the client site is redeployed with the new one. */
-router.post("/:projectId/rotate-key", requireProjectAccess, requireAdmin, async (req, res, next) => {
-  try {
-    const project = req.project!;
-    project.apiKey = newApiKey();
-    await project.save();
-    return ok(res, toProjectDTO(project));
-  } catch (err) {
-    next(err);
+router.post(
+  "/:projectId/rotate-key",
+  requireProjectAccess,
+  requireProjectOwner,
+  async (req, res, next) => {
+    try {
+      const project = req.project!;
+      project.apiKey = newApiKey();
+      await project.save();
+      return ok(res, await describeProject(project, req.user!));
+    } catch (err) {
+      next(err);
+    }
   }
-});
+);
 
 export default router;

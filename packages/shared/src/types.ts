@@ -6,7 +6,16 @@ import type { SectionContent } from "./fields.js";
  * them at the edge of the API so `_id` never leaks into client code.
  */
 
-export type Role = "admin" | "client";
+/**
+ * A user's relationship to ONE website — not a global power level.
+ *
+ * `owner` is whoever created the website (normally the developer): they alone
+ * can change its settings, API key and who else has access. `editor` is someone
+ * they invited (normally the client): they edit and publish content, nothing
+ * more. The same person can own one website and merely edit another, which is
+ * why this never lives on the user record.
+ */
+export type ProjectRole = "owner" | "editor";
 export type PageStatus = "draft" | "published";
 
 export interface SectionDTO {
@@ -61,6 +70,10 @@ export interface ProjectDTO {
   hasRevalidateSecret: boolean;
   allowedSectionTypes: string[];
   createdAt: string;
+  /** This signed-in user's relationship to this website. */
+  role: ProjectRole;
+  /** Who owns it — shown to an editor so they know who to ask. */
+  ownerName: string;
 }
 
 /** One file in a project's media library. */
@@ -82,11 +95,40 @@ export interface UserDTO {
   id: string;
   email: string;
   name: string;
-  role: Role;
+  /**
+   * Anyone can sign up, so an unverified account exists but cannot sign in.
+   * The dashboard only ever sees this as `true`; it is here for completeness.
+   */
+  emailVerified: boolean;
+  /** Reserved for whoever runs this CMS instance. Never granted by signing up. */
+  isPlatformAdmin: boolean;
   projectIds: string[];
 }
+
+/** One person with access to a website, listed on the Settings screen. */
+export interface ProjectMemberDTO {
+  id: string;
+  email: string;
+  name: string;
+  role: ProjectRole;
+  /** False while an invited person has not finished signing up. */
+  active: boolean;
+  addedAt: string;
+}
+
+/**
+ * A machine-readable tag on the errors the dashboard must react to rather than
+ * merely display. Matching on the English message would break the first time
+ * anyone rewords it.
+ */
+export type ApiErrorCode = "email_not_verified" | "email_not_configured";
 
 /** Every API response uses this envelope. */
 export type ApiResponse<T> =
   | { success: true; data: T }
-  | { success: false; error: string; issues?: { path: string; message: string }[] };
+  | {
+      success: false;
+      error: string;
+      code?: ApiErrorCode;
+      issues?: { path: string; message: string }[];
+    };

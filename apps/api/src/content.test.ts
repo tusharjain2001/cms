@@ -41,7 +41,7 @@ before(async () => {
   await User.create({
     email: "dev@example.com",
     name: "Dev",
-    role: "admin",
+    emailVerifiedAt: new Date(),
     passwordHash: await hashPassword("correct-horse"),
     projectIds: [],
   });

@@ -112,14 +112,18 @@ async function loadMedia(req: Parameters<typeof requireAuth>[0]) {
   const item = await Media.findById(id);
   if (!item) throw notFound("That file is not in your library.");
 
+  // Access follows the website the file belongs to — owning it, or having been
+  // added to it. A media id from another account's library must not resolve.
   const user = req.user!;
-  if (user.role !== "admin") {
-    const allowed = user.projectIds.some((pid) => pid.toString() === item.projectId.toString());
-    if (!allowed) throw forbidden("You do not have access to that file.");
-  } else {
-    const project = await Project.findById(item.projectId);
-    if (!project) throw notFound("That file is not in your library.");
-  }
+  const project = await Project.findById(item.projectId);
+  if (!project) throw notFound("That file is not in your library.");
+
+  const allowed =
+    user.isPlatformAdmin ||
+    project.ownerId.toString() === user._id.toString() ||
+    user.projectIds.some((pid) => pid.toString() === project._id.toString());
+
+  if (!allowed) throw forbidden("You do not have access to that file.");
   return item;
 }
 

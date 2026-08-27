@@ -6,10 +6,16 @@ import { Page, newSectionId } from "./models/page.js";
 import { defaultContent, getSectionType, sectionTypeNames } from "@pagecraft/shared";
 
 /**
- * Creates the first developer account and a demo website.
+ * Creates the platform administrator — you, whoever runs this CMS — and a demo
+ * website to look at.
+ *
+ * This is the ONLY way an account gets `isPlatformAdmin`, and the only way one
+ * gets created without confirming an email address. Everybody else signs up
+ * through the dashboard like any other user.
+ *
  * Safe to re-run: it never overwrites an existing account.
  *
- *   cd apps/api && npm run seed
+ *   npm run seed
  */
 async function main() {
   const email = (process.env.SEED_EMAIL ?? "").toLowerCase().trim();
@@ -29,23 +35,26 @@ async function main() {
 
   let user = await User.findOne({ email });
   if (user) {
-    console.log(`Developer account already exists: ${email}`);
+    console.log(`Account already exists: ${email}`);
   } else {
     user = await User.create({
       email,
       name,
-      role: "admin",
+      isPlatformAdmin: true,
+      // Seeded by hand at the console, so there is nothing to prove by email.
+      emailVerifiedAt: new Date(),
       passwordHash: await hashPassword(password),
       projectIds: [],
     });
-    console.log(`Created developer account: ${email}`);
+    console.log(`Created platform administrator: ${email}`);
   }
 
-  let project = await Project.findOne({ slug: "demo" });
+  let project = await Project.findOne({ ownerId: user._id, slug: "demo" });
   if (project) {
     console.log("Demo website already exists.");
   } else {
     project = await Project.create({
+      ownerId: user._id,
       name: "Demo Website",
       slug: "demo",
       domain: "example.com",

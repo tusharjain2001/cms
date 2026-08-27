@@ -11,18 +11,21 @@ const initials = (name: string) =>
 
 export default function ProjectsPage() {
   const s = useStore();
-  const { isDev } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const [domain, setDomain] = useState("");
 
-  // A client has exactly one website — take them straight into it.
+  /**
+   * Someone invited to exactly one website — the usual shape for a client — is
+   * taken straight into it. Anyone who owns a website stays here, because
+   * choosing between them (and adding another) is the point of this screen.
+   */
+  const onlyInvited = s.projects.length === 1 && s.projects[0].role === "editor";
   useEffect(() => {
-    if (!isDev && s.projects.length === 1) {
-      router.replace(`/projects/${s.projects[0].id}/pages`);
-    }
-  }, [isDev, s.projects, router]);
+    if (onlyInvited) router.replace(`/projects/${s.projects[0].id}/pages`);
+  }, [onlyInvited, s.projects, router]);
 
   const open = (id: string) => {
     s.setProjectId(id);
@@ -42,36 +45,24 @@ export default function ProjectsPage() {
   return (
     <div className="max-w-[1180px] px-6 py-10 lg:px-11">
       <PageHeader
-        title={isDev ? "Client websites" : "Your websites"}
-        sub={
-          isDev
-            ? "Every website you build and maintain. Clients only ever see their own."
-            : "Choose a website to edit."
-        }
+        title="Your websites"
+        sub="Websites you own, and any you have been invited to edit."
         action={
-          isDev ? (
-            <Button variant="primary" onClick={() => setCreating(true)}>
-              + New website
-            </Button>
-          ) : undefined
+          <Button variant="primary" onClick={() => setCreating(true)}>
+            + New website
+          </Button>
         }
       />
 
       {s.projects.length === 0 ? (
         <EmptyState
           icon="◫"
-          title="No websites yet"
-          body={
-            isDev
-              ? "Create your first client website. You will get a public key to drop into their React or Next.js project."
-              : "Your web developer has not given you access to a website yet."
-          }
+          title={`Welcome, ${user?.name?.split(" ")[0] ?? "there"}`}
+          body="Create your first website and you will get a public key to drop into your React or Next.js project. If someone has invited you to edit theirs, it will appear here instead."
           action={
-            isDev ? (
-              <Button variant="primary" onClick={() => setCreating(true)}>
-                + New website
-              </Button>
-            ) : undefined
+            <Button variant="primary" onClick={() => setCreating(true)}>
+              + New website
+            </Button>
           }
         />
       ) : (
@@ -98,7 +89,11 @@ export default function ProjectsPage() {
               <PhotoTile wide label="homepage screenshot" className="my-4 h-24" />
 
               <div className="flex items-center justify-between text-mid text-quiet">
-                <span className="font-mono">{p.apiKey.slice(0, 16)}…</span>
+                {p.role === "owner" ? (
+                  <span className="font-mono">{p.apiKey.slice(0, 16)}…</span>
+                ) : (
+                  <span>Shared by {p.ownerName}</span>
+                )}
                 <span>{p.allowedSectionTypes.length} section types</span>
               </div>
             </button>
@@ -108,7 +103,7 @@ export default function ProjectsPage() {
 
       <Modal open={creating} onClose={() => setCreating(false)}>
         <div className="p-6">
-          <h2 className="text-modal font-bold">New client website</h2>
+          <h2 className="text-modal font-bold">New website</h2>
           <p className="mt-1 mb-5 text-label text-quiet">
             You can change any of this later in settings.
           </p>

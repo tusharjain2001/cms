@@ -49,11 +49,18 @@ function NavLink({
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const s = useStore();
-  const { user, isDev, signOut } = useAuth();
+  const { user, signOut } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const base = `/projects/${s.projectId}`;
+
+  /**
+   * Owning a website is per website, not per person: the same account can own
+   * one and merely have been invited to edit another. Settings belong to the
+   * owner alone, so this is recomputed from whichever website is open.
+   */
+  const isOwner = s.project?.role === "owner";
 
   return (
     <div className="flex h-full w-[236px] shrink-0 flex-col gap-[18px] border-r border-line bg-rail px-3.5 py-4">
@@ -106,36 +113,30 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                 <span className="min-w-0 flex-1 truncate text-mid font-medium">{p.name}</span>
               </button>
             ))}
-            {isDev && (
-              <>
-                <div className="my-1.5 h-px bg-line-mid" />
-                <Link
-                  href="/projects"
-                  onClick={() => {
-                    setSwitcherOpen(false);
-                    onNavigate?.();
-                  }}
-                  className="block rounded-[7px] p-2 text-mid font-semibold text-accent hover:bg-chip-hover"
-                >
-                  All client websites
-                </Link>
-              </>
-            )}
+            <div className="my-1.5 h-px bg-line-mid" />
+            <Link
+              href="/projects"
+              onClick={() => {
+                setSwitcherOpen(false);
+                onNavigate?.();
+              }}
+              className="block rounded-[7px] p-2 text-mid font-semibold text-accent hover:bg-chip-hover"
+            >
+              All your websites
+            </Link>
           </div>
         )}
       </div>
 
       <nav className="flex flex-col gap-[3px]">
-        {isDev && (
-          <NavLink
-            href="/projects"
-            icon="◫"
-            active={pathname === "/projects"}
-            onNavigate={onNavigate}
-          >
-            Client websites
-          </NavLink>
-        )}
+        <NavLink
+          href="/projects"
+          icon="◫"
+          active={pathname === "/projects"}
+          onNavigate={onNavigate}
+        >
+          Your websites
+        </NavLink>
         <NavLink
           href={`${base}/pages`}
           icon="▤"
@@ -152,7 +153,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         >
           Photos &amp; files
         </NavLink>
-        {isDev && (
+        {isOwner && (
           <NavLink
             href={`${base}/settings`}
             icon="⚙"
@@ -181,7 +182,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           </span>
           <span className="min-w-0 flex-1">
             <span className="block truncate text-mid font-semibold">{user?.name ?? ""}</span>
-            <span className="block text-micro text-muted">{isDev ? "Developer" : "Client"}</span>
+            <span className="block truncate text-micro text-muted">{user?.email ?? ""}</span>
           </span>
         </div>
 
