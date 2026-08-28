@@ -22,6 +22,30 @@ import type { FileValue, ImageValue, MediaDTO } from "./dto";
  * custom domain through Cloudflare Image Transformations (see `thumb`).
  */
 
+/**
+ * What the API will actually store, mirrored from `ALLOWED_UPLOAD_TYPES` in
+ * `apps/api/src/routes/media.ts`. The server is the real gate — this exists so a
+ * client is told before their photo travels, not after.
+ *
+ * `image/*` is deliberately not used: it includes SVG, which is a document that
+ * can carry script and which the API refuses. Offering it in the file dialog
+ * only teaches clients to pick files that come back rejected.
+ */
+export const ALLOWED_IMAGE_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/avif",
+] as const;
+
+/** `accept` for the image picker and for the library's own upload button. */
+export const IMAGE_ACCEPT = ALLOWED_IMAGE_TYPES.join(",");
+export const FILE_ACCEPT = ".pdf,application/pdf";
+export const MEDIA_ACCEPT = `${IMAGE_ACCEPT},${FILE_ACCEPT}`;
+
+const ALLOWED_UPLOAD_TYPES = new Set<string>([...ALLOWED_IMAGE_TYPES, "application/pdf"]);
+
 export interface UploadJob {
   id: number;
   name: string;
@@ -201,6 +225,15 @@ export function MediaProvider({ children }: { children: ReactNode }) {
         setUploads((u) => [...u, job]);
 
         try {
+          // Checked here too, so a client who reached past the file dialog's
+          // filter hears about it immediately rather than after the upload.
+          const type = (file.type || "").split(";")[0]!.trim().toLowerCase();
+          if (!ALLOWED_UPLOAD_TYPES.has(type)) {
+            throw new Error(
+              "That kind of file cannot be uploaded. Use a JPG, PNG, GIF, WebP, AVIF or PDF."
+            );
+          }
+
           const [contentHash, dims] = await Promise.all([sha256Hex(file), imageDims(file)]);
           const ext = file.name.includes(".") ? file.name.split(".").pop() : undefined;
 

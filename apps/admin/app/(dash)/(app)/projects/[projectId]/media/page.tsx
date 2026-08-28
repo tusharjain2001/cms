@@ -2,7 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { thumb, useMedia } from "@/lib/media";
+import { MEDIA_ACCEPT, thumb, useMedia } from "@/lib/media";
 import { useStore } from "@/lib/store";
 import {
   Button,
@@ -51,7 +51,7 @@ export default function MediaScreen() {
           ref={fileInput}
           type="file"
           multiple
-          accept="image/*,.pdf"
+          accept={MEDIA_ACCEPT}
           className="hidden"
           onChange={async (e) => {
             const files = e.target.files;

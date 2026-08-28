@@ -321,6 +321,19 @@ describe("media tools", () => {
     assert.equal(api.uploads.at(-1)!.contentType, "application/pdf");
   });
 
+  it("does not guess a type the CMS refuses, so an SVG is turned away", async () => {
+    // SVG is a document that can carry script, and the media domain serves it
+    // inline — the API refuses it, so mapping the extension here would only
+    // manufacture a confident guess that fails.
+    const dir = await mkdtemp(join(tmpdir(), "pagecraft-mcp-"));
+    const file = join(dir, "logo.svg");
+    await writeFile(file, Buffer.from("<svg xmlns='http://www.w3.org/2000/svg'><script/></svg>"));
+
+    const before = api.uploads.length;
+    await assert.rejects(run("pagecraft_upload_media", { filePath: file }), /cannot be uploaded/i);
+    assert.equal(api.uploads.length, before, "nothing should have reached storage");
+  });
+
   it("sets alt text and deletes a file", async () => {
     const updated = (await run("pagecraft_update_media_alt", { mediaId: MEDIA_ID, alt: "A logo" })) as {
       alt: string;

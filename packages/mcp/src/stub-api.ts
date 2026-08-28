@@ -12,6 +12,16 @@ import { createServer, type Server } from "node:http";
  * It is not exported from the package's entry point.
  */
 
+/** Mirrors `ALLOWED_UPLOAD_TYPES` in the API — notably without SVG. */
+const STORABLE_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/avif",
+  "application/pdf",
+]);
+
 export const API_KEY = "pk_test_key";
 export const EMAIL = "owner@example.test";
 export const PASSWORD = "correct horse battery staple";
@@ -229,6 +239,14 @@ export async function startStubApi(): Promise<StubApi> {
         return ok({ items: [MEDIA], uploadsEnabled: true });
       }
       if (path === `/api/projects/${PROJECT_ID}/media/sign` && method === "POST") {
+        // The real API vets the type at signing time, because the presign fixes
+        // the Content-Type the PUT must carry. Enforced here too, so a tool that
+        // guesses a type the CMS refuses fails in the tests rather than in
+        // somebody's library.
+        const contentType = String(body?.contentType ?? "").split(";")[0]!.trim().toLowerCase();
+        if (!STORABLE_TYPES.has(contentType)) {
+          return fail(400, `Files of type "${contentType || "unknown"}" cannot be uploaded.`);
+        }
         const key = `${PROJECT_ID}/${String(body?.contentHash ?? "").slice(0, 64)}${body?.ext ? `.${body.ext}` : ""}`;
         return ok({
           uploadUrl: `${baseUrl}/storage/${key}?signature=stub`,

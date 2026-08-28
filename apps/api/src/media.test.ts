@@ -182,6 +182,39 @@ describe("presigned upload", () => {
     assert.equal(res.status, 403);
   });
 
+  it("refuses to sign for a type that must never be stored", async () => {
+    // The presign fixes the Content-Type the PUT must carry, so signing is the
+    // only moment this can be decided — after the ticket is issued R2 accepts
+    // those bytes whatever we think of them. text/html and JS on the media
+    // domain would be stored XSS; an SVG is a document that can carry script
+    // and is served inline, so it is refused for the same reason.
+    for (const contentType of [
+      "text/html",
+      "application/javascript",
+      "text/javascript",
+      "image/svg+xml",
+      "application/octet-stream",
+    ]) {
+      const res = await call(`/api/projects/${projectA}/media/sign`, {
+        method: "POST",
+        token: adminToken,
+        body: { contentHash: hexHash(contentType), contentType, ext: "bin" },
+      });
+      assert.equal(res.status, 400, `${contentType} should not be signed for`);
+      assert.match(res.json.error, /cannot be uploaded/i);
+    }
+  });
+
+  it("signs for a type with parameters, storing the bare type", async () => {
+    const res = await call(`/api/projects/${projectA}/media/sign`, {
+      method: "POST",
+      token: adminToken,
+      body: { contentHash: hexHash("params"), contentType: "IMAGE/PNG; charset=binary" },
+    });
+    assert.equal(res.status, 200);
+    assert.equal(res.json.data.headers["Content-Type"], "image/png");
+  });
+
   it("refuses to sign for anyone signed out", async () => {
     const res = await call(`/api/projects/${projectA}/media/sign`, {
       method: "POST",
