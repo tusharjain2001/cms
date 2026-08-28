@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { env } from "../config/env.js";
@@ -39,7 +39,7 @@ function client(): S3Client {
   if (!_client) {
     _client = new S3Client({
       region: "auto",
-      endpoint: `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+      endpoint: env.R2_ENDPOINT || `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
       credentials: {
         accessKeyId: env.R2_ACCESS_KEY_ID ?? "",
         secretAccessKey: env.R2_SECRET_ACCESS_KEY ?? "",
@@ -116,6 +116,49 @@ export async function createUploadTicket(opts: {
     publicUrl: publicUrl(key),
     headers: { "Content-Type": opts.contentType, "Cache-Control": IMMUTABLE_CACHE },
   };
+}
+
+/** SHA-256 (hex) of bytes the server actually holds — never a client's claim. */
+export function hashBytes(body: Buffer): string {
+  return createHash("sha256").update(body).digest("hex");
+}
+
+/**
+ * Uploads bytes to R2 from the server.
+ *
+ * This is the *fallback* path, not the north star. Direct browser → R2 via
+ * `createUploadTicket` stays the intended route, because it keeps big phone
+ * photos off this box entirely. But a presigned PUT is a cross-origin request,
+ * so it only works once the bucket carries a CORS rule — and setting that needs
+ * a Cloudflare token with bucket-admin scope, which the API's object-scoped R2
+ * credential does not have. Until that rule exists the browser PUT dies in
+ * preflight ("CORS not configured for this bucket"), and uploads are simply
+ * broken with no app-level signal.
+ *
+ * So the proxy route exists to keep the product working. Delete it — or leave
+ * it purely as a retry for locked-down corporate networks — once this is set on
+ * the bucket:
+ *
+ *   [{ "AllowedOrigins": ["https://<dashboard-domain>"],
+ *      "AllowedMethods": ["PUT"],
+ *      "AllowedHeaders": ["content-type", "cache-control"],
+ *      "MaxAgeSeconds": 3600 }]
+ */
+export async function putObject(opts: {
+  key: string;
+  body: Buffer;
+  contentType: string;
+}): Promise<void> {
+  await client().send(
+    new PutObjectCommand({
+      Bucket: env.R2_BUCKET,
+      Key: opts.key,
+      Body: opts.body,
+      ContentType: opts.contentType,
+      CacheControl: IMMUTABLE_CACHE,
+    }),
+    { abortSignal: AbortSignal.timeout(60_000) }
+  );
 }
 
 /** Removes the object so deleting from the library is real. */

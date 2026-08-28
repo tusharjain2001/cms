@@ -101,6 +101,62 @@ function putToR2(
   });
 }
 
+/**
+ * Fallback: push the file through our own API, which then writes it to R2.
+ *
+ * The direct PUT above is a cross-origin request, so it only succeeds once the
+ * R2 bucket carries a CORS rule allowing this origin. Until it does, the
+ * browser kills the request in preflight and `putToR2` rejects — from here that
+ * is indistinguishable from a flaky network, which is exactly why this is a
+ * retry rather than a replacement. The direct path stays first.
+ *
+ * Nothing about the destination is sent from here: the server hashes the bytes
+ * it receives and prefixes the key with the project from the URL, so a tampered
+ * request cannot choose where the object lands.
+ */
+function proxyUpload(
+  file: File,
+  projectId: string,
+  kind: PickKind,
+  dims: { width: number; height: number },
+  ext: string | undefined,
+  onProgress: (percent: number) => void
+): Promise<MediaDTO> {
+  const query = new URLSearchParams({
+    resourceType: kind,
+    originalName: file.name,
+    width: String(dims.width),
+    height: String(dims.height),
+  });
+  if (ext) query.set("ext", ext);
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${API_URL}/api/projects/${projectId}/media/upload?${query}`);
+    xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+    xhr.setRequestHeader("Authorization", `Bearer ${getAccessToken() ?? ""}`);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = () => {
+      // The API answers in the standard envelope; a 413 from nginx does not, so
+      // fall back to a plain message rather than throwing on the JSON parse.
+      let payload: { success?: boolean; data?: MediaDTO; error?: string } | null = null;
+      try {
+        payload = JSON.parse(xhr.responseText);
+      } catch {
+        payload = null;
+      }
+      if (xhr.status >= 200 && xhr.status < 300 && payload?.data) resolve(payload.data);
+      else if (xhr.status === 413)
+        reject(new Error("That file is too large. Please upload a file under 15MB."));
+      else reject(new Error(payload?.error ?? "That file could not be uploaded."));
+    };
+    xhr.onerror = () => reject(new Error("The upload could not reach the server."));
+    xhr.send(file);
+  });
+}
+
 export function MediaProvider({ children }: { children: ReactNode }) {
   const s = useStore();
   const [items, setItems] = useState<MediaDTO[]>([]);
@@ -148,6 +204,9 @@ export function MediaProvider({ children }: { children: ReactNode }) {
           const [contentHash, dims] = await Promise.all([sha256Hex(file), imageDims(file)]);
           const ext = file.name.includes(".") ? file.name.split(".").pop() : undefined;
 
+          const onProgress = (percent: number) =>
+            setUploads((u) => u.map((j) => (j.id === job.id ? { ...j, percent } : j)));
+
           const ticket = await api<Ticket>(`/api/projects/${projectId}/media/sign`, {
             method: "POST",
             body: {
@@ -158,23 +217,32 @@ export function MediaProvider({ children }: { children: ReactNode }) {
             },
           });
 
-          await putToR2(file, ticket, (percent) =>
-            setUploads((u) => u.map((j) => (j.id === job.id ? { ...j, percent } : j)))
-          );
+          let registered: MediaDTO;
+          try {
+            await putToR2(file, ticket, onProgress);
 
-          const registered = await api<MediaDTO>(`/api/projects/${projectId}/media`, {
-            method: "POST",
-            body: {
-              publicId: ticket.key,
-              url: ticket.publicUrl,
-              resourceType: kind,
-              format: ext ?? "",
-              width: dims.width,
-              height: dims.height,
-              bytes: file.size,
-              originalName: file.name,
-            },
-          });
+            registered = await api<MediaDTO>(`/api/projects/${projectId}/media`, {
+              method: "POST",
+              body: {
+                publicId: ticket.key,
+                url: ticket.publicUrl,
+                resourceType: kind,
+                format: ext ?? "",
+                width: dims.width,
+                height: dims.height,
+                bytes: file.size,
+                originalName: file.name,
+              },
+            });
+          } catch {
+            // The direct PUT is blocked whenever the bucket has no CORS rule for
+            // this origin, and a blocked preflight looks exactly like a network
+            // failure from script. Rather than tell the client their photo
+            // failed, retry through our own API — the slower path, but one that
+            // is not subject to CORS at all.
+            onProgress(0);
+            registered = await proxyUpload(file, projectId, kind, dims, ext, onProgress);
+          }
 
           added.push(registered);
           setItems((current) => [registered, ...current.filter((i) => i.id !== registered.id)]);

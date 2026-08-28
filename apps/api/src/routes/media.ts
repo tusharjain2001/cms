@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, raw } from "express";
 import { Types } from "mongoose";
 import { z } from "zod";
 import { Media, toMediaDTO } from "../models/media.js";
@@ -6,7 +6,15 @@ import { Project } from "../models/project.js";
 import { requireAuth, requireProjectAccess } from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
 import { badRequest, forbidden, notFound, ok } from "../lib/respond.js";
-import { createUploadTicket, destroyObject, r2Configured } from "../lib/r2.js";
+import {
+  createUploadTicket,
+  destroyObject,
+  hashBytes,
+  objectKey,
+  publicUrl,
+  putObject,
+  r2Configured,
+} from "../lib/r2.js";
 
 const router = Router();
 
@@ -45,6 +53,118 @@ router.post(
         ext,
       });
       return ok(res, ticket);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/* ---------------------------------------------------- proxy upload fallback */
+
+/**
+ * The most a client may push through this server in one request.
+ *
+ * Deliberately smaller than what direct-to-R2 tolerates: these bytes occupy an
+ * Express worker and the box's memory for the whole upload, which the presigned
+ * path never does.
+ *
+ * NOTE FOR DEPLOYS: nginx caps the request body independently. `client_max_body_size`
+ * on the API server block must be at least this, or nginx returns its own HTML
+ * 413 and the friendly JSON error below is never reached.
+ */
+export const MAX_PROXY_UPLOAD_BYTES = 15 * 1024 * 1024;
+
+/**
+ * What may be stored. An allowlist rather than a blocklist: anything not named
+ * here is refused, so a new dangerous type is safe by default.
+ *
+ * `text/html` and every JavaScript spelling are absent on purpose. Media is
+ * served from the CDN domain under this project's own prefix, and a stored HTML
+ * or JS file there is a script someone else's browser will run.
+ */
+const ALLOWED_UPLOAD_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/avif",
+  "image/svg+xml",
+  "application/pdf",
+]);
+
+const uploadQuerySchema = z.object({
+  resourceType: z.enum(["image", "raw"]).default("image"),
+  ext: z.string().max(8).optional(),
+  originalName: z.string().max(300).default(""),
+  width: z.coerce.number().int().nonnegative().max(100_000).default(0),
+  height: z.coerce.number().int().nonnegative().max(100_000).default(0),
+});
+
+/**
+ * Uploads a file *through* the API instead of straight to R2.
+ *
+ * This is the fallback for the presigned PUT, which cannot work until the R2
+ * bucket carries a CORS rule (see the long note on `putObject`). The dashboard
+ * tries direct-to-R2 first and only lands here when that fails, so the good path
+ * stays the default and this costs nothing when the bucket is configured.
+ *
+ * Two things make it safe to accept raw bytes from a signed-in client:
+ *
+ *  - The object key is derived from a hash **this server computes over the bytes
+ *    it received**, never from a hash the client supplied. A client cannot aim
+ *    the write at a key of its choosing.
+ *  - The key is prefixed with `req.project._id`, resolved by `requireProjectAccess`
+ *    from the URL — so the write lands in the caller's own tenant prefix by
+ *    construction, not by trusting anything in the request body.
+ */
+router.post(
+  "/projects/:projectId/media/upload",
+  requireAuth,
+  requireProjectAccess,
+  raw({ type: "*/*", limit: MAX_PROXY_UPLOAD_BYTES }),
+  async (req, res, next) => {
+    try {
+      if (!r2Configured()) throw badRequest(NOT_SET_UP);
+
+      const body = req.body;
+      if (!Buffer.isBuffer(body) || body.length === 0) {
+        throw badRequest("That upload arrived empty. Please try the file again.");
+      }
+
+      const contentType = (req.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
+      if (!ALLOWED_UPLOAD_TYPES.has(contentType)) {
+        throw badRequest(`Files of type "${contentType || "unknown"}" cannot be uploaded.`);
+      }
+
+      const parsed = uploadQuerySchema.safeParse(req.query);
+      if (!parsed.success) throw badRequest("That upload's details were not valid.");
+      const meta = parsed.data;
+
+      const projectId = req.project!._id.toString();
+      // Hashed here, from the bytes actually received — the client's claim about
+      // its own file is never what decides where the object lands.
+      const key = objectKey(projectId, hashBytes(body), meta.ext);
+
+      await putObject({ key, body, contentType });
+
+      // Same idempotency as the direct path: a retried upload of identical bytes
+      // resolves to the identical key, so it must return the existing row rather
+      // than duplicate the library entry.
+      const existing = await Media.findOne({ projectId: req.project!._id, publicId: key });
+      if (existing) return ok(res, toMediaDTO(existing));
+
+      const created = await Media.create({
+        projectId: req.project!._id,
+        publicId: key,
+        url: publicUrl(key),
+        resourceType: meta.resourceType,
+        format: meta.ext ?? "",
+        width: meta.width,
+        height: meta.height,
+        bytes: body.length,
+        originalName: meta.originalName,
+      });
+      return ok(res, toMediaDTO(created), 201);
     } catch (err) {
       next(err);
     }

@@ -17,6 +17,13 @@ export function errorHandler(
     return fail(res, err.status, err.message, err.issues, err.code);
   }
 
+  // body-parser rejects an over-sized body before any route sees it, and throws
+  // rather than answering. Left alone it surfaces as a bare 500 "Something went
+  // wrong", which tells someone uploading a large photo nothing useful.
+  if (typeof err === "object" && err !== null && (err as { type?: string }).type === "entity.too.large") {
+    return fail(res, 413, "That file is too large. Please upload a file under 15MB.");
+  }
+
   // Duplicate key — the only Mongo error worth translating for a human.
   if (typeof err === "object" && err !== null && (err as { code?: number }).code === 11000) {
     const field = Object.keys((err as { keyPattern?: object }).keyPattern ?? {})[0] ?? "value";

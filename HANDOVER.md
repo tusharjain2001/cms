@@ -94,13 +94,18 @@ page.
 | Group | State |
 |---|---|
 | `MONGODB_URI`, both JWT secrets, `APP_URL`, `ADMIN_ORIGIN` | ✅ filled in |
-| `SMTP_HOST` / `SMTP_USER` / `SMTP_PASSWORD` | ⬜ **empty** |
-| `R2_*` (5 vars: account, key id, secret, bucket, public base URL) | ⬜ **empty** |
+| `SMTP_HOST` / `SMTP_USER` / `SMTP_PASSWORD` | ✅ filled in |
+| `R2_*` (5 vars: account, key id, secret, bucket, public base URL) | ✅ filled in |
+| `SEED_EMAIL` / `SEED_PASSWORD` | ⬜ **emptied after seeding** |
 
-`apps/admin/.env.local` does not exist and does not need to — the dashboard
-defaults to `http://localhost:4000`. Copy `.env.example` only if the API moves.
+On this server `apps/admin/.env.local` **does** exist and sets
+`NEXT_PUBLIC_API_URL=https://api.mypagecraft.com`. It is a *build-time* value, so
+changing it means rebuilding the dashboard, not just restarting it. On a fresh
+machine you can skip the file entirely — the dashboard defaults to
+`http://localhost:4000`.
 
-**Both blanks are safe.** They are optional in the same way:
+**Both are optional**, and worth knowing for a fresh checkout where they are
+blank:
 
 - **Without SMTP** the CMS boots and everything works, but *signing up is
   refused* with `email_not_configured`. The seeded account signs in normally,
@@ -111,8 +116,63 @@ defaults to `http://localhost:4000`. Copy `.env.example` only if the API moves.
   upload button. Media uploaded under the previous Cloudinary backbone keeps
   working — those URLs are stored as-is and the SDK still rewrites them.
 
-Sign-in credentials are `SEED_EMAIL` / `SEED_PASSWORD` in `apps/api/.env`.
-`.env` is gitignored and its values are not repeated here on purpose.
+Sign-in credentials were `SEED_EMAIL` / `SEED_PASSWORD` in `apps/api/.env`, but
+**both are now blank on this server** — the seeded account exists in Mongo and
+its password is no longer recoverable from the config. If you need back in, use
+"Forgot password" (SMTP is configured, so the email will arrive), or re-seed with
+a fresh address. `.env` is gitignored and its values are not repeated here on
+purpose.
+
+### ⚠ Media on the live server: two things need a Cloudflare admin
+
+The R2 credential in `apps/api/.env` is **object-scoped**. It can read, write and
+delete objects — verified — but it cannot touch bucket-level settings. Two
+consequences are live right now, and neither can be fixed from this repo or this
+server. Both need somebody signed in to the Cloudflare dashboard.
+
+**1. The bucket has no CORS rule, so browsers cannot upload straight to R2.**
+A presigned PUT is cross-origin, so the browser sends a preflight first, and R2
+answers it `403 Unauthorized — CORS not configured for this bucket`. Attempting
+`GetBucketCors` with the API's own credential returns `403 AccessDenied`, which
+is how we know the token cannot set it either.
+
+Set this on the `pagecraft-media` bucket (R2 → bucket → Settings → CORS policy):
+
+```json
+[{ "AllowedOrigins": ["https://mypagecraft.com"],
+   "AllowedMethods": ["PUT"],
+   "AllowedHeaders": ["content-type", "cache-control"],
+   "MaxAgeSeconds": 3600 }]
+```
+
+Until then uploads still work, because the dashboard falls back to
+`POST /api/projects/:projectId/media/upload`, which streams the bytes through the
+API and writes them server-side. That fallback is a **workaround, not the
+design**: every megabyte now crosses this box, which is exactly what the
+presigned path existed to avoid. Once the rule above is in place the direct PUT
+succeeds again and the fallback goes quiet on its own — no code change, no
+deploy. Keep it afterwards only as a retry for locked-down networks.
+
+Note `client_max_body_size` on the API's nginx server block was raised 4m → 16m
+to accommodate it. It must stay at or above `MAX_PROXY_UPLOAD_BYTES` in
+`apps/api/src/routes/media.ts`, or nginx returns its own HTML 413 and the
+friendly JSON error never reaches the client.
+
+**2. `media.mypagecraft.com` is not connected to the bucket, so uploaded files
+do not display.** `R2_PUBLIC_BASE_URL` points there, but the DNS record resolves
+to *this VPS*, which has no route and no certificate for that name — a browser
+loading a thumbnail gets `ERR_CERT_COMMON_NAME_INVALID`. All 11 media rows are
+affected, so this predates the upload work and is not caused by it.
+
+The fix is to attach it as an **R2 custom domain** (R2 → bucket → Settings →
+Public access → Custom domain), which also gives the Image Transformations that
+`transformUrl` and the SDK's `cmsSrcSet` build `/cdn-cgi/image/...` URLs against.
+Cloudflare issues the certificate and repoints DNS itself. Do **not** switch
+`R2_PUBLIC_BASE_URL` to the `r2.dev` host as a shortcut — it is uncached, bills
+every view as a Class-B op, and has no transform service, so every generated
+thumbnail URL would 404.
+
+Until that domain is connected, uploading works but the picture stays blank.
 
 ### The seeded "Demo Website"
 

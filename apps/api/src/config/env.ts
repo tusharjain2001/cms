@@ -44,6 +44,13 @@ const schema = z.object({
   R2_PUBLIC_BASE_URL: z.string().optional(),
   /** HMAC secret for signed private-media URLs (validated by a CF Worker). Optional. */
   R2_URL_SIGNING_KEY: z.string().optional(),
+  /**
+   * Overrides the S3 endpoint, which is otherwise derived from the account id.
+   * Leave unset in production — it exists so the tests can point the same client
+   * at a local stub, and so a self-hoster can aim at MinIO or another
+   * S3-compatible store.
+   */
+  R2_ENDPOINT: z.string().optional(),
 });
 
 const parsed = schema.safeParse(process.env);

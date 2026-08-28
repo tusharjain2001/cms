@@ -328,6 +328,15 @@ Tests run every handler against `src/stub-api.ts` — a stand-in that enforces t
 7. **Launch** — ⬅ **IN PROGRESS.**
    - ✅ Rate limiting on the **public content API** — 120 requests per minute per IP, applied before the key lookup so a flood of bogus keys never reaches Mongo. The signed-out auth routes were already covered.
    - ✅ Media re-based on **Cloudflare R2** (replacing Cloudinary) behind the same endpoints.
+   - ✅ A **proxy upload fallback** (`POST /api/projects/:projectId/media/upload`), because the
+     live bucket carries no CORS rule and the browser's presigned PUT dies in preflight. The
+     dashboard tries direct-to-R2 first and only drops to it on failure, so it costs nothing
+     once the rule exists. Direct-to-R2 stays the north star — see the Cloudflare notes in
+     HANDOVER; the object key is a hash the *server* takes of the bytes it received, so
+     accepting raw uploads does not let a client choose where the object lands.
+   - ⬜ **Two Cloudflare-admin jobs remain, and media does not display until the second is done**:
+     the bucket CORS rule, and connecting `media.mypagecraft.com` as an R2 custom domain (its
+     DNS currently points at the VPS, so every stored media URL is unreachable).
    - ⬜ Per-account limits — a public signup form with no cap on websites is an open-ended bill on the Atlas and Render tiers below.
    - ⬜ SEO fields surfaced in the dashboard, and the deployment run-through.
 
