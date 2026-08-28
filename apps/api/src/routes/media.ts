@@ -5,6 +5,7 @@ import { Media, toMediaDTO } from "../models/media.js";
 import { Project } from "../models/project.js";
 import { requireAuth, requireProjectAccess } from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
+import { byUserId, rateLimit } from "../middleware/rate-limit.js";
 import { badRequest, forbidden, notFound, ok } from "../lib/respond.js";
 import {
   createUploadTicket,
@@ -23,6 +24,45 @@ const NOT_SET_UP =
 
 /* ------------------------------------------------------------------ upload */
 
+/**
+ * What may be stored, whichever way the bytes arrive.
+ *
+ * An allowlist rather than a blocklist: anything not named here is refused, so
+ * a new dangerous type is safe by default. Both upload paths check it — the
+ * presigned PUT commits to a `Content-Type` at signing time, so signing is
+ * exactly where that decision has to be made.
+ *
+ * Absent on purpose:
+ *
+ *  - `text/html` and every JavaScript spelling. Media is served from the CDN
+ *    domain under this project's own prefix, and a stored HTML or JS file there
+ *    is a script someone else's browser will run.
+ *  - `image/svg+xml`. An SVG *is* a document: it can carry `<script>` and
+ *    foreign objects, and a browser navigating to one executes them on the
+ *    media domain, same-origin with every other file there. It is only safe
+ *    served with `Content-Disposition: attachment` or from a sandboxed origin,
+ *    and R2 serves neither — so it stays out until the delivery side can.
+ */
+const ALLOWED_UPLOAD_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/avif",
+  "application/pdf",
+]);
+
+/** Normalises a header or field value to a bare, comparable MIME type. */
+function normaliseType(value: string): string {
+  return value.split(";")[0]!.trim().toLowerCase();
+}
+
+function assertUploadable(contentType: string): void {
+  if (!ALLOWED_UPLOAD_TYPES.has(contentType)) {
+    throw badRequest(`Files of type "${contentType || "unknown"}" cannot be uploaded.`);
+  }
+}
+
 const signSchema = z.object({
   /** SHA-256 (hex) of the file, so the object key is content-addressed. */
   contentHash: z.string().regex(/^[a-f0-9]{8,64}$/i, "contentHash must be a hex digest"),
@@ -36,6 +76,10 @@ const signSchema = z.object({
  * The file never passes through this API, which keeps big phone photos off
  * the server entirely. The object key is `<projectId>/<contentHash>`, so one
  * client's upload can never land in another's prefix.
+ *
+ * The presigned URL fixes the `Content-Type` the PUT must send, so this is the
+ * only moment the type can be vetted — once the ticket is out, R2 accepts those
+ * bytes with no further say from us. Hence the same allowlist as the proxy path.
  */
 router.post(
   "/projects/:projectId/media/sign",
@@ -46,10 +90,12 @@ router.post(
     try {
       if (!r2Configured()) throw badRequest(NOT_SET_UP);
       const { contentHash, contentType, ext } = req.body as z.infer<typeof signSchema>;
+      const type = normaliseType(contentType);
+      assertUploadable(type);
       const ticket = await createUploadTicket({
         projectId: req.project!._id.toString(),
         contentHash,
-        contentType,
+        contentType: type,
         ext,
       });
       return ok(res, ticket);
@@ -75,22 +121,25 @@ router.post(
 export const MAX_PROXY_UPLOAD_BYTES = 15 * 1024 * 1024;
 
 /**
- * What may be stored. An allowlist rather than a blocklist: anything not named
- * here is refused, so a new dangerous type is safe by default.
+ * How much a single account may push through this server, however many websites
+ * it owns.
  *
- * `text/html` and every JavaScript spelling are absent on purpose. Media is
- * served from the CDN domain under this project's own prefix, and a stored HTML
- * or JS file there is a script someone else's browser will run.
+ * Every other limiter here counts per method+path, which would be a hole on this
+ * route: `:projectId` is in the path and an account can create projects freely,
+ * so a per-path bucket would reset with each new website. Keyed on the account
+ * instead, and mounted *after* `requireProjectAccess` but *before* the body
+ * parser, so a refused caller never gets to spend 15MB of this box's memory.
+ *
+ * 60 files in 10 minutes is far above a person filling a media library and far
+ * below anything that could be used to store or serve bulk data through us.
  */
-const ALLOWED_UPLOAD_TYPES = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/gif",
-  "image/webp",
-  "image/avif",
-  "image/svg+xml",
-  "application/pdf",
-]);
+const proxyUploadLimit = rateLimit({
+  max: 60,
+  windowMs: 10 * 60_000,
+  scope: "media-proxy-upload",
+  keyOn: byUserId,
+  message: "That is a lot of uploads at once. Please wait a few minutes and try again.",
+});
 
 const uploadQuerySchema = z.object({
   resourceType: z.enum(["image", "raw"]).default("image"),
@@ -121,6 +170,7 @@ router.post(
   "/projects/:projectId/media/upload",
   requireAuth,
   requireProjectAccess,
+  proxyUploadLimit,
   raw({ type: "*/*", limit: MAX_PROXY_UPLOAD_BYTES }),
   async (req, res, next) => {
     try {
@@ -131,10 +181,8 @@ router.post(
         throw badRequest("That upload arrived empty. Please try the file again.");
       }
 
-      const contentType = (req.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
-      if (!ALLOWED_UPLOAD_TYPES.has(contentType)) {
-        throw badRequest(`Files of type "${contentType || "unknown"}" cannot be uploaded.`);
-      }
+      const contentType = normaliseType(req.get("content-type") ?? "");
+      assertUploadable(contentType);
 
       const parsed = uploadQuerySchema.safeParse(req.query);
       if (!parsed.success) throw badRequest("That upload's details were not valid.");

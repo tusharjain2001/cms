@@ -36,8 +36,8 @@ read-only, so anything that writes signs in as an account** — there is no
 scoped machine token yet, and inventing one in the MCP server rather than the
 API would be the wrong place.
 
-**248 tests pass**: registry/validation 15 · API integration against a real
-in-memory MongoDB 113 · SDK 43 · MCP server 77.
+**263 tests pass**: registry/validation 15 · API integration against a real
+in-memory MongoDB 127 · SDK 43 · MCP server 78.
 
 ### What is deliberately NOT built
 
@@ -82,7 +82,7 @@ page.
 | `npm run dev` | **the usual one** — both apps together |
 | `npm run dev:api` | just the API, with watch |
 | `npm run dev:admin` | just the dashboard |
-| `npm test` | all 248 tests |
+| `npm test` | all 263 tests |
 | `npm run typecheck` | every workspace |
 | `npm run build` | shared → sdk → mcp → api → admin |
 | `npm run seed` | creates the platform-admin account + a demo website |
@@ -123,14 +123,14 @@ its password is no longer recoverable from the config. If you need back in, use
 a fresh address. `.env` is gitignored and its values are not repeated here on
 purpose.
 
-### ⚠ Media on the live server: two things need a Cloudflare admin
+### ⚠ Media on the live server: one Cloudflare job left
 
 The R2 credential in `apps/api/.env` is **object-scoped**. It can read, write and
-delete objects — verified — but it cannot touch bucket-level settings. Two
-consequences are live right now, and neither can be fixed from this repo or this
-server. Both need somebody signed in to the Cloudflare dashboard.
+delete objects — verified — but it cannot touch bucket-level settings. One
+consequence is still live, and it cannot be fixed from this repo or this server;
+it needs somebody signed in to the Cloudflare dashboard.
 
-**1. The bucket has no CORS rule, so browsers cannot upload straight to R2.**
+**The bucket has no CORS rule, so browsers cannot upload straight to R2.**
 A presigned PUT is cross-origin, so the browser sends a preflight first, and R2
 answers it `403 Unauthorized — CORS not configured for this bucket`. Attempting
 `GetBucketCors` with the API's own credential returns `403 AccessDenied`, which
@@ -156,23 +156,25 @@ deploy. Keep it afterwards only as a retry for locked-down networks.
 Note `client_max_body_size` on the API's nginx server block was raised 4m → 16m
 to accommodate it. It must stay at or above `MAX_PROXY_UPLOAD_BYTES` in
 `apps/api/src/routes/media.ts`, or nginx returns its own HTML 413 and the
-friendly JSON error never reaches the client.
+friendly JSON error never reaches the client. The proxy route also carries its
+own limit — 60 uploads per 10 minutes **per account**, not per website — so one
+signed-in client cannot use this box as a file server.
 
-**2. `media.mypagecraft.com` is not connected to the bucket, so uploaded files
-do not display.** `R2_PUBLIC_BASE_URL` points there, but the DNS record resolves
-to *this VPS*, which has no route and no certificate for that name — a browser
-loading a thumbnail gets `ERR_CERT_COMMON_NAME_INVALID`. All 11 media rows are
-affected, so this predates the upload work and is not caused by it.
+**Verifying the CORS rule needs the R2 account id**, which lives only in
+`/opt/pagecraft/apps/api/.env` (root-owned, mode 600). From an unprivileged
+shell there is no way to probe it; check it from the Cloudflare dashboard, or
+simply watch a dashboard upload in devtools — a preflight `403` means the rule
+is still missing and the fallback is carrying the load.
 
-The fix is to attach it as an **R2 custom domain** (R2 → bucket → Settings →
-Public access → Custom domain), which also gives the Image Transformations that
-`transformUrl` and the SDK's `cmsSrcSet` build `/cdn-cgi/image/...` URLs against.
-Cloudflare issues the certificate and repoints DNS itself. Do **not** switch
-`R2_PUBLIC_BASE_URL` to the `r2.dev` host as a shortcut — it is uncached, bills
-every view as a Class-B op, and has no transform service, so every generated
-thumbnail URL would 404.
-
-Until that domain is connected, uploading works but the picture stays blank.
+**`media.mypagecraft.com` is connected and serving.** ✅ Fixed since the last
+handover, and verified live on 28 August 2026: a stored object returns `200`
+with `cache-control: public, max-age=31536000, immutable`, and its
+`/cdn-cgi/image/f=auto,w=320,fit=scale-down/...` transform returns `200
+image/jpeg` from Cloudflare — so R2's custom domain *and* Image Transformations
+are both live, which is what `transformUrl` and the SDK's `cmsSrcSet` build
+against. Do **not** switch `R2_PUBLIC_BASE_URL` to the `r2.dev` host: it is
+uncached, bills every view as a Class-B op, and has no transform service, so
+every generated thumbnail URL would 404.
 
 ### The seeded "Demo Website"
 
@@ -188,7 +190,72 @@ it is a good first thing to see for yourself.
 
 ---
 
-## 3. Things that will bite you
+## 3. Where it actually runs
+
+Everything is on **one VPS**, behind nginx, kept alive by pm2 running **as
+root**. Nothing is on Render or Cloudflare Pages yet — CLAUDE.md's deployment
+section is the *plan*, this is the *fact*.
+
+| Address | nginx → | Process | What it is |
+|---|---|---|---|
+| `https://mypagecraft.com` (+ `www`) | `127.0.0.1:3000` | `next start -H 127.0.0.1 -p 3000` in `/opt/pagecraft/apps/admin` | landing page at `/`, dashboard behind it |
+| `https://api.mypagecraft.com` | `127.0.0.1:4000` | `node /opt/pagecraft/apps/api/dist/index.js` | the Express API |
+| `https://demo.mypagecraft.com` | `127.0.0.1:3100` | `next start -p 3100` | the demo **client website** — see below |
+| `https://media.mypagecraft.com` | *(not this box)* | — | Cloudflare R2 custom domain, serving media |
+
+- **Deployed source lives in `/opt/pagecraft`, which is not a git repo.** It was
+  copied file-by-file from this repo. It keeps exactly one deliberate difference:
+  `apps/api/src/index.ts` binds to `127.0.0.1` so only nginx can reach the API.
+  That is deploy-time hardening applied by `deploy2.sh`, not drift — expect it,
+  and do not "fix" it back.
+- `/opt/pagecraft/deploy1.sh`, `deploy2.sh`, `deploy3.sh` are the run-book that
+  built this: install/build, pm2 + reboot persistence (`pm2 save`, `pm2 startup
+  systemd -u root`), then nginx + ufw (only 22/80/443 open). TLS is certbot, and
+  its lines are in `/etc/nginx/sites-available/pagecraft`.
+- The nginx sites are `pagecraft` (apex + api) and `pagecraft-demo` (the demo
+  site, additive — it touches neither of the other blocks). `*.mypagecraft.com`
+  already resolves here, so a new subdomain needs a server block and a certbot
+  run, not a DNS change.
+
+### `demo.mypagecraft.com` — the demo client website
+
+It is a **real client website consuming this CMS through the public content
+API**, and it is deliberately **not in this repo** (see *No client website in
+this repo* above). Its pages render CMS content and its images come from
+`media.mypagecraft.com/cdn-cgi/image/...`, which is the whole promise working
+end to end in production — the best smoke test there is: load it, publish a
+change in the dashboard, reload.
+
+Its source lives on this box outside `/opt/pagecraft` and is readable only by
+root, so an unprivileged session cannot inspect or redeploy it. If you need to
+change it, you need root; if you need to *verify* it, `curl` it.
+
+### Deploying, and what blocks it
+
+`pm2` runs under root (`/root/.pm2`), and `/opt/pagecraft` is root-owned. **From
+the `coder` account there is no deploy path**: no sudo, no write access, no pm2
+list. A session without root can push to GitHub and stop there, and should say
+so plainly rather than implying the live site was updated.
+
+With root, the shape is: copy the built tree into `/opt/pagecraft` (keeping the
+`127.0.0.1` bind), then `pm2 restart pagecraft-api pagecraft-admin`. The
+dashboard needs a **rebuild**, not just a restart, whenever
+`NEXT_PUBLIC_API_URL` changes — it is baked in at build time.
+
+### ⚠ The checkout at `/home/coder/projects/pagecraft` is partly root-owned
+
+A previous root-run deploy left `node_modules/`, every `dist/`,
+`apps/admin/.next/`, `packages/mcp/src/`, `CLAUDE.md`, `HANDOVER.md`,
+`PHASE1D_REPORT.md` and about a third of `.git/objects/` owned by root. The
+practical effect: as `coder`, `npm install`, `npm test`, `npm run build` and even
+`git commit` all fail there with `EACCES`. This session worked around it by
+cloning to a scratch directory, verifying there and pushing from there. **Fix it
+properly with one root command** — `chown -R coder:coder
+/home/coder/projects/pagecraft` — and the workaround stops being needed.
+
+---
+
+## 4. Things that will bite you
 
 Each of these cost real time already.
 
@@ -216,7 +283,7 @@ running or its config is incomplete. Check the `[api]` output, not the browser.
 
 ---
 
-## 4. Ground rules for whoever picks this up
+## 5. Ground rules for whoever picks this up
 
 Full reasoning is in CLAUDE.md; these are the ones easiest to break by accident.
 
@@ -246,7 +313,7 @@ Full reasoning is in CLAUDE.md; these are the ones easiest to break by accident.
 
 ---
 
-## 5. Next up — Phase 7, Launch
+## 6. Next up — Phase 7, Launch
 
 Two are done. In the order I would do the rest:
 
@@ -265,10 +332,11 @@ Two are done. In the order I would do the rest:
    and a page cap per project.
 2. **Surface the SEO fields** (`metaTitle`, `metaDescription`, `ogImage`) in the
    dashboard — they exist on the page model and nothing edits them.
-3. **Deployment run-through:** API → Render (~$7/mo Starter once real clients are
-   live, so publish webhooks do not hit cold starts); dashboard + landing →
-   Cloudflare Pages via `@opennextjs/cloudflare`, root dir `apps/admin`, at the
-   apex domain. `APP_URL` must be the dashboard's public address — every emailed
+3. **Deployment run-through.** Note this is a *migration*, not a first deploy —
+   everything is already live on one VPS under pm2 and nginx (§3). The plan is
+   API → Render (~$7/mo Starter once real clients are live, so publish webhooks
+   do not hit cold starts); dashboard + landing → Cloudflare Pages via
+   `@opennextjs/cloudflare`, root dir `apps/admin`, at the apex domain. `APP_URL` must be the dashboard's public address — every emailed
    link is built from it, and getting it wrong sends new users to localhost.
 4. **SMTP on a real domain**, with SPF and DKIM published. Without them
    confirmation links go to spam and nobody can finish signing up. The entire

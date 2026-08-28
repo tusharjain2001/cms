@@ -252,8 +252,17 @@ describe("proxy upload — who may write where", () => {
 });
 
 describe("proxy upload — what may be stored", () => {
-  it("refuses HTML and JavaScript, which would be stored XSS on the CDN domain", async () => {
-    for (const contentType of ["text/html", "application/javascript", "text/javascript"]) {
+  it("refuses HTML, JavaScript and SVG, which would be stored XSS on the CDN domain", async () => {
+    // An SVG belongs in this list, not with the images: it is a document that
+    // can carry <script>, and the media domain serves it inline and same-origin
+    // with every other file there.
+    for (const contentType of [
+      "text/html",
+      "application/javascript",
+      "text/javascript",
+      "image/svg+xml",
+      "application/octet-stream",
+    ]) {
       const res = await upload(
         `/api/projects/${projectA}/media/upload?ext=html`,
         Buffer.from("<script>alert(1)</script>"),
@@ -290,5 +299,71 @@ describe("proxy upload — what may be stored", () => {
     });
     assert.equal(res.status, 413);
     assert.match(res.json.error, /too large/i);
+  });
+});
+
+/**
+ * The proxy path is the one place a signed-in client can spend this server's
+ * memory and bandwidth, so it carries its own limit. What matters is what the
+ * bucket is keyed on: every other limiter counts per method+path, and `:projectId`
+ * sits in this path, so a per-path bucket would hand out a fresh allowance with
+ * each new website — and an account may create those freely.
+ */
+describe("proxy upload — the per-account limit", () => {
+  it("counts one budget per account, however many websites it uploads to", async () => {
+    const { resetRateLimits } = await import("./middleware/rate-limit.js");
+    resetRateLimits();
+
+    // Alternating between two websites the same account owns. If the bucket
+    // were keyed on the path, this would never run out.
+    let refusedAt = 0;
+    for (let i = 0; i < 62 && refusedAt === 0; i += 1) {
+      const project = i % 2 === 0 ? projectA : projectB;
+      const res = await upload(
+        `/api/projects/${project}/media/upload?ext=png`,
+        Buffer.from(`limit-${i}`),
+        { token: ownerToken, contentType: "image/png" }
+      );
+      if (res.status === 429) {
+        refusedAt = i;
+        assert.match(res.json.error, /wait a few minutes/i);
+      }
+    }
+    assert.equal(refusedAt, 60, "the 61st upload of the window is refused");
+
+    // ...and the refusal is per account, not per box: a different signed-in
+    // person is unaffected, which is what proves the key is the user.
+    const other = await upload(`/api/projects/${projectA}/media/upload?ext=png`, Buffer.from("priya-limit"), {
+      token: editorToken,
+      contentType: "image/png",
+    });
+    assert.equal(other.status, 201);
+
+    resetRateLimits();
+  });
+
+  it("refuses before reading the body, so a blocked caller costs no memory", async () => {
+    const { resetRateLimits } = await import("./middleware/rate-limit.js");
+    resetRateLimits();
+
+    for (let i = 0; i < 60; i += 1) {
+      await upload(`/api/projects/${projectA}/media/upload?ext=png`, Buffer.from(`fill-${i}`), {
+        token: ownerToken,
+        contentType: "image/png",
+      });
+    }
+
+    // Over the body-parser's 15MB cap. A 429 rather than a 413 means the
+    // limiter turned it away before a byte was buffered.
+    const before = r2Objects.size;
+    const res = await upload(
+      `/api/projects/${projectA}/media/upload?ext=jpg`,
+      Buffer.alloc(16 * 1024 * 1024, 0x41),
+      { token: ownerToken }
+    );
+    assert.equal(res.status, 429);
+    assert.equal(r2Objects.size, before);
+
+    resetRateLimits();
   });
 });

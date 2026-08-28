@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { useMedia, thumb } from "@/lib/media";
+import { FILE_ACCEPT, IMAGE_ACCEPT, useMedia, thumb } from "@/lib/media";
 import { Button, Modal, PhotoTile, cx } from "./ui";
 
 /**
@@ -45,7 +45,7 @@ export function MediaPicker() {
               ref={fileInput}
               type="file"
               multiple
-              accept={isImage ? "image/*" : ".pdf,application/pdf"}
+              accept={isImage ? IMAGE_ACCEPT : FILE_ACCEPT}
               className="hidden"
               onChange={async (e) => {
                 const files = e.target.files;

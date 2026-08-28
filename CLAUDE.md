@@ -60,7 +60,7 @@ cms/
 | **`npm run dev`** | **The usual one.** Rebuilds shared, then runs the API (:4000) and the dashboard (:3000) together, output prefixed `[api]` / `[admin]` |
 | `npm run dev:api` | Just the API on :4000, with watch |
 | `npm run dev:admin` | Just the dashboard on :3000 |
-| `npm test` | 248 tests: registry/validation (15), API integration against a real in-memory MongoDB (113 — including self-service accounts and a contract test that walks the dashboard's exact request sequence), SDK (43) and MCP server (77, against a stub API — no live keys) |
+| `npm test` | 263 tests: registry/validation (15), API integration against a real in-memory MongoDB (127 — including self-service accounts and a contract test that walks the dashboard's exact request sequence), SDK (43) and MCP server (78, against a stub API — no live keys) |
 | `npm run build` | Builds shared → sdk → mcp → api → admin |
 | `npm run typecheck` | Type-checks every workspace |
 | `npm run seed` | Creates the first developer account and a demo website |
@@ -158,6 +158,10 @@ Two mounting details worth remembering: the page router takes the broad `/api` p
 - `POST /api/projects/:projectId/media` → register what R2 accepted. Rejects a `publicId` outside this project's prefix, and is idempotent so a retried registration does not duplicate. `width`/`height` default to `0` — the library genuinely does not know the size of an SVG or a raw file, which is why `imageProps` omits those attributes rather than emitting `width="0"`.
 - `GET /api/projects/:projectId/media` → `{ items, uploadsEnabled }`
 - `PATCH /api/media/:mediaId` (alt text) · `DELETE /api/media/:mediaId` (also deletes the R2 object; reports `removedFromStorage` honestly if storage did not confirm)
+
+**One allowlist decides what may be stored, and both upload paths check it** (`ALLOWED_UPLOAD_TYPES` in `routes/media.ts`): JPEG, PNG, GIF, WebP, AVIF and PDF. The sign route checks it too, and that is not belt-and-braces — a presigned URL fixes the `Content-Type` the PUT must carry, so signing is the last moment anyone gets a say; once the ticket is out R2 stores those bytes. `text/html`, every JavaScript spelling and **`image/svg+xml`** are refused: media is served inline from the CDN domain, and an SVG is a document that can carry `<script>`, so storing one there is a script in the media origin. Allow SVG only if delivery ever serves it `Content-Disposition: attachment` or from a sandboxed host. The dashboard's `accept` attributes and the MCP server's extension→MIME map mirror this list, so neither offers a client a file the API will refuse.
+
+**The proxy route carries its own limit** — 60 uploads per 10 minutes, keyed on the **account** rather than the request path. Everything else here counts per method+path, which would be a hole on a route whose path holds a `:projectId` the caller can mint more of; `rateLimit({ scope })` is what pins the bucket to a fixed name so the key is the user. It is mounted after `requireProjectAccess` and before the body parser, so a refused caller never spends 15MB of the box's memory.
 
 **R2 is optional.** Without the five `R2_*` env vars the CMS runs normally, `uploadsEnabled` is `false`, the sign endpoint returns a plain-English explanation, and the dashboard shows the client what is missing instead of a broken upload button. `lib/r2.ts` holds the whole integration — presigning via `@aws-sdk/client-s3` + `s3-request-presigner`, and `publicUrl`/`transformUrl` for delivery. **Deliver from the R2 custom domain, never the un-cached `r2.dev` host.**
 
@@ -334,9 +338,14 @@ Tests run every handler against `src/stub-api.ts` — a stand-in that enforces t
      once the rule exists. Direct-to-R2 stays the north star — see the Cloudflare notes in
      HANDOVER; the object key is a hash the *server* takes of the bytes it received, so
      accepting raw uploads does not let a client choose where the object lands.
-   - ⬜ **Two Cloudflare-admin jobs remain, and media does not display until the second is done**:
-     the bucket CORS rule, and connecting `media.mypagecraft.com` as an R2 custom domain (its
-     DNS currently points at the VPS, so every stored media URL is unreachable).
+   - ✅ `media.mypagecraft.com` is now connected as an **R2 custom domain** — verified live on
+     28 Aug 2026: a stored object and a `/cdn-cgi/image/...` transform of it both answer `200`
+     from Cloudflare with `cache-control: immutable`. Media displays. (It previously resolved
+     to the VPS, which had no route or certificate for that name.)
+   - ⬜ **One Cloudflare-admin job remains: the bucket CORS rule**, without which the browser's
+     presigned PUT still dies in preflight and every upload takes the proxy fallback. It cannot
+     be checked or set with the API's object-scoped credential — see HANDOVER §2 for the exact
+     policy to paste.
    - ⬜ Per-account limits — a public signup form with no cap on websites is an open-ended bill on the Atlas and Render tiers below.
    - ⬜ SEO fields surfaced in the dashboard, and the deployment run-through.
 

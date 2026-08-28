@@ -379,6 +379,16 @@ const sectionTools: ToolDef[] = [
 /* Media                                                                      */
 /* ------------------------------------------------------------------------- */
 
+/**
+ * Extensions the CMS will store, mirroring `ALLOWED_UPLOAD_TYPES` in the API.
+ *
+ * SVG is absent deliberately, and not merely unmapped: an SVG is a document
+ * that can carry script, and the media domain serves it inline, so the API
+ * refuses it. Mapping it here would only produce a confident guess that the
+ * upload then fails on. Anything unlisted falls through to
+ * `application/octet-stream`, which the API refuses too — the right answer for
+ * a type nobody has decided is safe.
+ */
 const MIME_BY_EXT: Record<string, string> = {
   avif: "image/avif",
   gif: "image/gif",
@@ -386,7 +396,6 @@ const MIME_BY_EXT: Record<string, string> = {
   jpg: "image/jpeg",
   pdf: "application/pdf",
   png: "image/png",
-  svg: "image/svg+xml",
   webp: "image/webp",
 };
 

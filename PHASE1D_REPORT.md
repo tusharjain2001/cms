@@ -5,9 +5,16 @@
 | | |
 |---|---|
 | Source at session start | `507dcfa` Complete Pagecraft onboarding and MCP delivery |
-| Source now | `3fe7a81` Phase 1d: proxy upload fallback for blocked direct-to-R2 uploads |
-| Deployed to `/opt/pagecraft` | `3fe7a81` (copied file-by-file; `/opt/pagecraft` is not a git repo) |
-| Pushed? | **No.** Committed locally only — no push was requested. |
+| Source now | `7d6c3f4` Phase 1d: proxy upload fallback for blocked direct-to-R2 uploads |
+| Deployed to `/opt/pagecraft` | that same tree (copied file-by-file; `/opt/pagecraft` is not a git repo) |
+| Pushed? | **Yes, since.** `7d6c3f4` and the report commit `9421139` are both on `origin/master`. |
+
+> **Note, added later.** This table first named the commit `3fe7a81`, which is
+> no longer reachable from any branch — the commit was rewritten before it was
+> pushed. `7d6c3f4` is the reachable equivalent and carries a byte-identical
+> tree (`git rev-parse 3fe7a81^{tree}` and `7d6c3f4^{tree}` agree), so nothing
+> below changes; only the name of the commit does. If a stale `3fe7a81` shows up
+> in another note, it means the same thing.
 
 `/opt/pagecraft` deliberately keeps one source difference: `apps/api/src/index.ts`
 binds to `127.0.0.1` so only nginx can reach the API. That is a deploy-time
@@ -91,6 +98,7 @@ Raised to `16m` on the API server block only, with a comment tying it to
 ```
 npm test        258 pass / 0 fail   (was 248; +10 new in media-proxy.test.ts)
                   api 123 · mcp 77 · sdk 43 · shared 15
+                  — as of this phase. The follow-up security pass took it to 263.
 npm run typecheck   clean, all 5 workspaces
 npm run build       clean — shared → sdk → mcp → api → admin (14 routes)
 ```
@@ -167,6 +175,14 @@ generated thumbnail URL would 404.
 
 Net position: **a client can now upload a photo and see it in their library, but
 it will not render on their site until B is done.**
+
+> **Update, 28 August 2026 — B is done.** `media.mypagecraft.com` is connected as
+> an R2 custom domain and serving: a stored object answers `200` with
+> `cache-control: public, max-age=31536000, immutable`, and a
+> `/cdn-cgi/image/f=auto,w=320,fit=scale-down/...` transform of it answers `200
+> image/jpeg` from Cloudflare, so Image Transformations are live too. Media
+> renders. **A remains** — the bucket still has no CORS rule, so every upload
+> takes the proxy fallback.
 
 ## 6. Scope notes
 
