@@ -67,6 +67,7 @@ export default function EditorScreen() {
           <Button onClick={() => void s.preview()}>Preview</Button>
           <button
             type="button"
+            data-tour="publish"
             disabled={!s.dirty}
             onClick={() => void s.publish()}
             className={cx(
@@ -160,14 +161,19 @@ export default function EditorScreen() {
                   </p>
                 </div>
 
-                {def.fields.map((field) => (
-                  <FieldView
-                    key={field.key}
-                    def={field}
-                    value={s.draftContent[field.key]}
-                    error={errorFor(field.key)}
-                    onChange={(value) => s.setFieldValue(field.key, value)}
-                  />
+                {def.fields.map((field, i) => (
+                  // The tour spotlights the first field rather than the whole
+                  // panel: a ring around a full-height column is no help to
+                  // anyone. Which field that is comes from the registry, so
+                  // nothing here knows one section type from another.
+                  <div key={field.key} data-tour={i === 0 ? "content-panel" : undefined}>
+                    <FieldView
+                      def={field}
+                      value={s.draftContent[field.key]}
+                      error={errorFor(field.key)}
+                      onChange={(value) => s.setFieldValue(field.key, value)}
+                    />
+                  </div>
                 ))}
               </div>
             </div>

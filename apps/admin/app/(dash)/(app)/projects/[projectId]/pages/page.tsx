@@ -28,7 +28,7 @@ export default function PagesScreen() {
         title={s.project?.name ?? "Pages"}
         sub="Drag the pages to change the order of your website menu."
         action={
-          <Button variant="primary" onClick={() => s.openModal("addpage")}>
+          <Button variant="primary" data-tour="add-page" onClick={() => s.openModal("addpage")}>
             + Add page
           </Button>
         }
@@ -98,7 +98,13 @@ export default function PagesScreen() {
                   </span>
 
                   <div className="flex shrink-0 gap-1">
-                    <Button variant="small" onClick={() => openPage(p.id)}>
+                    <Button
+                      variant="small"
+                      // The tour points at the first row, because that is the
+                      // one it just talked someone through creating.
+                      data-tour={i === 0 ? "page-row" : undefined}
+                      onClick={() => openPage(p.id)}
+                    >
                       Edit
                     </Button>
                     <Button

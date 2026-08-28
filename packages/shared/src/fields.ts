@@ -91,7 +91,8 @@ export type FieldDef =
 /* ------------------------------------------------------------- value shapes */
 
 export interface ImageValue {
-  /** Cloudinary public id, so transforms can be applied at render time. */
+  /** The storage object key (R2 `<projectId>/<hash>`; a Cloudinary public id
+   *  on media predating the migration). Identifies the asset for delete. */
   publicId: string;
   url: string;
   width: number;

@@ -118,6 +118,7 @@ export function SectionList() {
 
       <button
         type="button"
+        data-tour="add-section"
         onClick={() => s.openModal("picker")}
         className="mt-3 w-full cursor-pointer rounded-[9px] border border-dashed border-accent-line-soft bg-accent-wash p-3 text-sub font-semibold text-accent transition-colors hover:border-[#94aad9] hover:bg-[#eef3fc]"
       >

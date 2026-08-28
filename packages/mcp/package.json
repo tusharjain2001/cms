@@ -1,0 +1,40 @@
+{
+  "name": "@pagecraft/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Model Context Protocol server for the Pagecraft CMS API",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "pagecraft-mcp": "./dist/bin.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepare": "tsc -p tsconfig.json",
+    "start": "node dist/bin.js",
+    "dev": "tsx src/bin.ts",
+    "test": "tsx --test src/config.test.ts src/client.test.ts src/tools.test.ts src/server.test.ts",
+    "typecheck": "tsc -p tsconfig.test.json"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@pagecraft/shared": "*",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.0"
+  }
+}

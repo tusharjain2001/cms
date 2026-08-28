@@ -21,7 +21,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "prepare": "tsc -p tsconfig.json",
-    "test": "tsx --test src/client.test.ts",
+    "test": "tsx --test src/client.test.ts src/image.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

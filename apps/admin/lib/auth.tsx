@@ -32,6 +32,13 @@ interface Auth {
   verifyEmail: (token: string) => Promise<void>;
   forgotPassword: (email: string) => Promise<void>;
   resetPassword: (token: string, password: string) => Promise<void>;
+  /**
+   * Marks the first-sign-in tour finished (or asks for it again). Stored on the
+   * account, so it does not replay on another device. The local flag is moved
+   * first: the tour must disappear the moment it is skipped, even if the
+   * request is slow or fails.
+   */
+  setOnboardingComplete: (complete: boolean) => Promise<void>;
 }
 
 const AuthContext = createContext<Auth | null>(null);
@@ -123,6 +130,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [adopt]
   );
 
+  const setOnboardingComplete = useCallback(async (complete: boolean) => {
+    setUser((current) => (current ? { ...current, onboardingComplete: complete } : current));
+    try {
+      const { user: me } = await api<{ user: UserDTO }>("/api/auth/me", {
+        method: "PATCH",
+        body: { onboardingComplete: complete },
+      });
+      setUser(me);
+    } catch {
+      // The tour is not worth interrupting anyone over. It stays dismissed for
+      // this session and the next sign-in will offer it again.
+    }
+  }, []);
+
   const signOut = useCallback(async () => {
     try {
       await api("/api/auth/logout", { method: "POST" });
@@ -146,6 +167,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       verifyEmail,
       forgotPassword,
       resetPassword,
+      setOnboardingComplete,
     }),
     [
       status,
@@ -157,6 +179,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       verifyEmail,
       forgotPassword,
       resetPassword,
+      setOnboardingComplete,
     ]
   );
 

@@ -19,7 +19,7 @@ const schema = z.object({
   /** Where the dashboard lives, used to build links inside emails. */
   APP_URL: z.string().default("http://localhost:3000"),
 
-  // Email is optional in the same way Cloudinary is: without it the CMS runs,
+  // Email is optional in the same way R2 media is: without it the CMS runs,
   // but signing up cannot complete, so the API says so in plain English and
   // prints the link it would have sent to the server log for local work.
   SMTP_HOST: z.string().optional(),

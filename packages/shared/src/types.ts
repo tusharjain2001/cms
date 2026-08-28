@@ -103,6 +103,12 @@ export interface UserDTO {
   /** Reserved for whoever runs this CMS instance. Never granted by signing up. */
   isPlatformAdmin: boolean;
   projectIds: string[];
+  /**
+   * Whether this account has finished (or skipped) the first-sign-in tour.
+   * Kept on the account rather than in the browser so the tour does not replay
+   * on a second device, and so clearing site data does not restart it.
+   */
+  onboardingComplete: boolean;
 }
 
 /** One person with access to a website, listed on the Settings screen. */

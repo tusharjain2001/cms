@@ -182,6 +182,68 @@ describe("auth", () => {
   });
 });
 
+describe("the first-sign-in tour flag", () => {
+  const asClient = async () => (await login("client@example.com", "client-pass")).json.data.accessToken as string;
+
+  it("starts false on an account that has never finished it", async () => {
+    const token = await asClient();
+    const res = await api("/api/auth/me", { token });
+    assert.equal(res.status, 200);
+    assert.equal(res.json.data.user.onboardingComplete, false);
+  });
+
+  it("records completion and answers with the same envelope as GET /me", async () => {
+    const token = await asClient();
+    const patched = await api("/api/auth/me", {
+      method: "PATCH",
+      token,
+      body: { onboardingComplete: true },
+    });
+    assert.equal(patched.status, 200);
+    assert.equal(patched.json.data.user.onboardingComplete, true);
+    // Same shape, so the dashboard can adopt either response.
+    assert.deepEqual(
+      Object.keys(patched.json.data).sort(),
+      Object.keys((await api("/api/auth/me", { token })).json.data).sort()
+    );
+
+    // And it survives a fresh sign-in — the whole point of storing it per
+    // account rather than in the browser.
+    assert.equal(
+      (await api("/api/auth/me", { token: await asClient() })).json.data.user.onboardingComplete,
+      true
+    );
+  });
+
+  it("can be turned back off, so the tour can be asked for again", async () => {
+    const token = await asClient();
+    await api("/api/auth/me", { method: "PATCH", token, body: { onboardingComplete: true } });
+    const off = await api("/api/auth/me", {
+      method: "PATCH",
+      token,
+      body: { onboardingComplete: false },
+    });
+    assert.equal(off.json.data.user.onboardingComplete, false);
+  });
+
+  it("refuses anything but the tour flag, and refuses a stranger outright", async () => {
+    const token = await asClient();
+    assert.equal(
+      (await api("/api/auth/me", { method: "PATCH", token, body: { isPlatformAdmin: true } }))
+        .status,
+      400
+    );
+    // The account is unchanged: nothing that decides access is settable here.
+    assert.equal((await api("/api/auth/me", { token })).json.data.isPlatformAdmin, undefined);
+    assert.equal((await api("/api/auth/me", { token })).json.data.user.isPlatformAdmin, false);
+
+    assert.equal(
+      (await api("/api/auth/me", { method: "PATCH", body: { onboardingComplete: true } })).status,
+      401
+    );
+  });
+});
+
 describe("projects", () => {
   let devToken: string;
   let clientToken: string;

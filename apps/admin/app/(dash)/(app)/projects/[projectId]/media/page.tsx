@@ -67,18 +67,24 @@ export default function MediaScreen() {
         />
 
         {!m.uploadsEnabled ? (
-          <div className="mb-5 rounded-xl border border-draft bg-draft-bg px-5 py-4 text-label text-draft-ink">
+          <div
+            data-tour="uploads-disabled"
+            className="mb-5 rounded-xl border border-draft bg-draft-bg px-5 py-4 text-label text-draft-ink"
+          >
             <p className="font-semibold">Uploads are not switched on yet.</p>
             <p className="mt-1">
-              Add <code className="font-mono">CLOUDINARY_CLOUD_NAME</code>,{" "}
-              <code className="font-mono">CLOUDINARY_API_KEY</code> and{" "}
-              <code className="font-mono">CLOUDINARY_API_SECRET</code> to the API&apos;s{" "}
-              <code className="font-mono">.env</code>, then restart it. The free tier is
-              plenty for client websites.
+              Add <code className="font-mono">R2_ACCOUNT_ID</code>,{" "}
+              <code className="font-mono">R2_ACCESS_KEY_ID</code>,{" "}
+              <code className="font-mono">R2_SECRET_ACCESS_KEY</code>,{" "}
+              <code className="font-mono">R2_BUCKET</code> and{" "}
+              <code className="font-mono">R2_PUBLIC_BASE_URL</code> to the API&apos;s{" "}
+              <code className="font-mono">.env</code>, then restart it. Cloudflare R2&apos;s
+              free tier is plenty for client websites.
             </p>
           </div>
         ) : (
           <div
+            data-tour="media-dropzone"
             onDragOver={(e) => {
               e.preventDefault();
               setDragOver(true);

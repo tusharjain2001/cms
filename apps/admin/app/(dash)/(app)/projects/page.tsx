@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
-import { Button, EmptyState, Input, Modal, ModalActions, PageHeader, PhotoTile } from "@/components/ui";
+import { Button, EmptyState, Input, Modal, ModalActions, PageHeader } from "@/components/ui";
 
 const initials = (name: string) =>
   name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("") || "?";
@@ -48,7 +48,7 @@ export default function ProjectsPage() {
         title="Your websites"
         sub="Websites you own, and any you have been invited to edit."
         action={
-          <Button variant="primary" onClick={() => setCreating(true)}>
+          <Button variant="primary" data-tour="new-website" onClick={() => setCreating(true)}>
             + New website
           </Button>
         }
@@ -86,9 +86,7 @@ export default function ProjectsPage() {
                 </span>
               </div>
 
-              <PhotoTile wide label="homepage screenshot" className="my-4 h-24" />
-
-              <div className="flex items-center justify-between text-mid text-quiet">
+              <div className="mt-4 flex items-center justify-between text-mid text-quiet">
                 {p.role === "owner" ? (
                   <span className="font-mono">{p.apiKey.slice(0, 16)}…</span>
                 ) : (

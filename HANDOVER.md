@@ -20,13 +20,24 @@ Next.js site regenerates itself within seconds with nobody involved.
 | 1 · Foundation — monorepo, registry, auth, project CRUD | ✅ done |
 | 2 · Content engine — pages, sections, draft/publish, public API | ✅ done |
 | 3 · Admin dashboard — every screen on the live API | ✅ done |
-| 4 · Media — Cloudinary signed uploads, library, picker | ✅ done |
+| 4 · Media — presigned direct uploads, library, picker | ✅ done |
 | 5 · SDK — client, image helpers, webhook validator, renderer | ✅ done |
 | 6 · Open signup — self-service accounts, email confirmation, per-website roles | ✅ done |
-| 7 · Launch | ⬅ **next, not started** |
+| 7 · Launch | ⬅ in progress |
+| — · MCP server (`packages/mcp`) — the API as AI-assistant tools | ✅ done |
 
-**141 tests pass**: registry/validation 15 · API integration against a real
-in-memory MongoDB 105 · SDK 21.
+**`packages/mcp` is a package, not a service.** It is `pagecraft-mcp`, an MCP
+server a customer runs on their own machine and points at their Pagecraft API;
+it holds no state and nothing about it is deployed or restarted alongside the
+API and dashboard. Setup, all 26 tools and the known gaps are in
+[`packages/mcp/README.md`](packages/mcp/README.md); the decisions behind it are
+in CLAUDE.md. The one to know before touching it: **a website's API key is
+read-only, so anything that writes signs in as an account** — there is no
+scoped machine token yet, and inventing one in the MCP server rather than the
+API would be the wrong place.
+
+**248 tests pass**: registry/validation 15 · API integration against a real
+in-memory MongoDB 113 · SDK 43 · MCP server 77.
 
 ### What is deliberately NOT built
 
@@ -71,9 +82,9 @@ page.
 | `npm run dev` | **the usual one** — both apps together |
 | `npm run dev:api` | just the API, with watch |
 | `npm run dev:admin` | just the dashboard |
-| `npm test` | all 141 tests |
+| `npm test` | all 248 tests |
 | `npm run typecheck` | every workspace |
-| `npm run build` | shared → sdk → api → admin |
+| `npm run build` | shared → sdk → mcp → api → admin |
 | `npm run seed` | creates the platform-admin account + a demo website |
 
 ### Config on this machine
@@ -84,7 +95,7 @@ page.
 |---|---|
 | `MONGODB_URI`, both JWT secrets, `APP_URL`, `ADMIN_ORIGIN` | ✅ filled in |
 | `SMTP_HOST` / `SMTP_USER` / `SMTP_PASSWORD` | ⬜ **empty** |
-| `CLOUDINARY_*` (3 vars) | ⬜ **empty** |
+| `R2_*` (5 vars: account, key id, secret, bucket, public base URL) | ⬜ **empty** |
 
 `apps/admin/.env.local` does not exist and does not need to — the dashboard
 defaults to `http://localhost:4000`. Copy `.env.example` only if the API moves.
@@ -95,9 +106,10 @@ defaults to `http://localhost:4000`. Copy `.env.example` only if the API moves.
   refused* with `email_not_configured`. The seeded account signs in normally,
   and outside production any link that would have been emailed is printed to the
   `[api]` log so you can click through your own flow locally.
-- **Without Cloudinary** the CMS runs, `uploadsEnabled` is `false`, and the
-  dashboard tells the client what is missing instead of showing a broken upload
-  button.
+- **Without the `R2_*` vars** the CMS runs, `uploadsEnabled` is `false`, and
+  the dashboard tells the client what is missing instead of showing a broken
+  upload button. Media uploaded under the previous Cloudinary backbone keeps
+  working — those URLs are stored as-is and the SDK still rewrites them.
 
 Sign-in credentials are `SEED_EMAIL` / `SEED_PASSWORD` in `apps/api/.env`.
 `.env` is gitignored and its values are not repeated here on purpose.
@@ -176,25 +188,29 @@ Full reasoning is in CLAUDE.md; these are the ones easiest to break by accident.
 
 ## 5. Next up — Phase 7, Launch
 
-In the order I would do them:
+Two are done. In the order I would do the rest:
 
-1. **Rate limit the public content API.** The signed-out auth routes are already
-   covered; `/api/content/*` is not, and it is the endpoint the whole internet
-   can reach with a key. `middleware/rate-limit.ts` already exists — this is
-   mostly wiring. *(It is in-memory and therefore per-instance. Right for one
-   always-on Render service; it is the only piece needing Redis if this ever
-   scales horizontally — nothing else in the API keeps state.)*
-2. **Per-account limits.** A public signup form with no cap on websites is an
+- ~~**Rate limit the public content API.**~~ ✅ **Done.** `/api/content/*` is
+  capped at 120 requests per minute per IP, mounted ahead of `requireApiKey` so
+  a flood of bogus keys is refused before it reaches Mongo. *(In-memory and
+  therefore per-instance. Right for one always-on Render service; it is the only
+  piece needing Redis if this ever scales horizontally — nothing else in the API
+  keeps state.)*
+- ~~**Move media to Cloudflare R2.**~~ ✅ **Done.** Same endpoints, presigned
+  PUTs straight from the browser; media uploaded before the migration keeps its
+  Cloudinary URL and still renders.
+
+1. **Per-account limits.** A public signup form with no cap on websites is an
    open-ended bill on the Atlas and Render free tiers. At minimum a website cap
    and a page cap per project.
-3. **Surface the SEO fields** (`metaTitle`, `metaDescription`, `ogImage`) in the
+2. **Surface the SEO fields** (`metaTitle`, `metaDescription`, `ogImage`) in the
    dashboard — they exist on the page model and nothing edits them.
-4. **Deployment run-through:** API → Render (~$7/mo Starter once real clients are
+3. **Deployment run-through:** API → Render (~$7/mo Starter once real clients are
    live, so publish webhooks do not hit cold starts); dashboard + landing →
    Cloudflare Pages via `@opennextjs/cloudflare`, root dir `apps/admin`, at the
    apex domain. `APP_URL` must be the dashboard's public address — every emailed
    link is built from it, and getting it wrong sends new users to localhost.
-5. **SMTP on a real domain**, with SPF and DKIM published. Without them
+4. **SMTP on a real domain**, with SPF and DKIM published. Without them
    confirmation links go to spam and nobody can finish signing up. The entire
    product now depends on delivering that one email — treat it as
    infrastructure, not a nicety.

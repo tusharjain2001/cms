@@ -25,16 +25,20 @@ function NavLink({
   children,
   active,
   onNavigate,
+  tour,
 }: {
   href: string;
   icon: string;
   children: React.ReactNode;
   active: boolean;
   onNavigate?: () => void;
+  /** Anchor name for the getting-started tour, when it points at this link. */
+  tour?: string;
 }) {
   return (
     <Link
       href={href}
+      data-tour={tour}
       onClick={onNavigate}
       className={cx(
         navBase,
@@ -49,11 +53,17 @@ function NavLink({
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const s = useStore();
-  const { user, signOut } = useAuth();
+  const { user, signOut, setOnboardingComplete } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const base = `/projects/${s.projectId}`;
+  /**
+   * Until a website is chosen there is no per-website screen to point at, and
+   * `/projects//pages` is a real 404 (Next redirects the double slash away and
+   * then cannot match it). Hide those links rather than render dead ones.
+   */
+  const hasProject = Boolean(s.projectId);
 
   /**
    * Owning a website is per website, not per person: the same account can own
@@ -137,23 +147,29 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         >
           Your websites
         </NavLink>
-        <NavLink
-          href={`${base}/pages`}
-          icon="▤"
-          active={pathname.startsWith(`${base}/pages`)}
-          onNavigate={onNavigate}
-        >
-          Pages
-        </NavLink>
-        <NavLink
-          href={`${base}/media`}
-          icon="▣"
-          active={pathname === `${base}/media`}
-          onNavigate={onNavigate}
-        >
-          Photos &amp; files
-        </NavLink>
-        {isOwner && (
+        {hasProject && (
+          <NavLink
+            href={`${base}/pages`}
+            icon="▤"
+            active={pathname.startsWith(`${base}/pages`)}
+            onNavigate={onNavigate}
+            tour="nav-pages"
+          >
+            Pages
+          </NavLink>
+        )}
+        {hasProject && (
+          <NavLink
+            href={`${base}/media`}
+            icon="▣"
+            active={pathname === `${base}/media`}
+            onNavigate={onNavigate}
+            tour="nav-media"
+          >
+            Photos &amp; files
+          </NavLink>
+        )}
+        {hasProject && isOwner && (
           <NavLink
             href={`${base}/settings`}
             icon="⚙"
@@ -166,6 +182,20 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       </nav>
 
       <div className="mt-auto flex flex-col gap-2.5">
+        {/* Skipping the tour must not be a one-way door. */}
+        {user?.onboardingComplete && (
+          <button
+            type="button"
+            onClick={() => {
+              void setOnboardingComplete(false);
+              onNavigate?.();
+            }}
+            className={cx(navBase, "text-slate hover:bg-chip-hover")}
+          >
+            <span className="w-4 text-center">◎</span>
+            Getting started
+          </button>
+        )}
         <NavLink
           href="/foundation"
           icon="◐"

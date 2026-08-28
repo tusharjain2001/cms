@@ -260,6 +260,44 @@ router.post("/logout", (_req, res) => {
 
 router.get("/me", requireAuth, (req, res) => ok(res, { user: toUserDTO(req.user!) }));
 
+/**
+ * The only thing an account may change about itself here is whether it has
+ * finished the first-sign-in tour. Deliberately narrow: nothing that decides
+ * access — `isPlatformAdmin`, `projectIds`, `emailVerifiedAt` — is settable by
+ * the account it belongs to.
+ *
+ * Answers with the same `{ user }` envelope as GET /me so the dashboard can
+ * adopt the response either way.
+ */
+router.patch(
+  "/me",
+  requireAuth,
+  validateBody(z.object({ onboardingComplete: z.boolean() })),
+  async (req, res, next) => {
+    try {
+      const { onboardingComplete } = req.body as { onboardingComplete: boolean };
+      const user = req.user!;
+
+      // Re-finishing an already-finished tour must not move the timestamp:
+      // when it was first done is the interesting fact.
+      if (onboardingComplete) {
+        if (!user.onboardingCompletedAt) {
+          user.onboardingCompletedAt = new Date();
+          await user.save();
+        }
+      } else if (user.onboardingCompletedAt) {
+        // Lets someone ask for the tour again from the dashboard.
+        user.onboardingCompletedAt = null;
+        await user.save();
+      }
+
+      return ok(res, { user: toUserDTO(user) });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 /* ---------------------------------------------------------- password rescue */
 
 router.post(

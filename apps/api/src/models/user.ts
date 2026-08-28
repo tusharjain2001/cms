@@ -28,6 +28,12 @@ const userSchema = new Schema(
      * device — which is the entire point of resetting it after a break-in.
      */
     sessionVersion: { type: Number, default: 0 },
+    /**
+     * When the first-sign-in tour was finished or skipped. Null means it has
+     * not been. It lives here rather than in the browser so signing in on a
+     * second device does not replay a tour the person has already done.
+     */
+    onboardingCompletedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );
@@ -50,5 +56,8 @@ export function toUserDTO(user: UserDoc): UserDTO {
     emailVerified: isVerified(user),
     isPlatformAdmin: user.isPlatformAdmin,
     projectIds: (user.projectIds as Types.ObjectId[]).map((id) => id.toString()),
+    // Boolean(), not `!== null`: accounts created before this field existed
+    // read back `undefined`, and they have not done the tour either.
+    onboardingComplete: Boolean(user.onboardingCompletedAt),
   };
 }

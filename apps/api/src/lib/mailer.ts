@@ -6,7 +6,7 @@ import { emailEnabled, env, isProd } from "../config/env.js";
  * developer already has — Zoho, Fastmail, their registrar's mail, or Gmail with
  * an app password. No provider SDK and no vendor lock-in.
  *
- * Email is OPTIONAL, exactly like Cloudinary. Without SMTP settings the CMS
+ * Email is OPTIONAL, exactly like the R2 media backbone. Without SMTP the CMS
  * still boots and every other feature works; what breaks is signing up, so the
  * signup endpoint refuses honestly instead of silently swallowing the address.
  * Outside production the link is printed to the server log, which is all a

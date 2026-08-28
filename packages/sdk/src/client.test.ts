@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { createServer, type Server } from "node:http";
 import { after, before, describe, it } from "node:test";
 import { createCmsClient, CmsError } from "./client.js";
-import { cmsImageUrl, cmsSrcSet, imageProps } from "./image.js";
 import { checkRevalidateRequest } from "./revalidate.js";
 
 /**
@@ -114,44 +113,7 @@ describe("cms client", () => {
   });
 });
 
-describe("image helpers", () => {
-  const url = "https://res.cloudinary.com/demo/image/upload/v1/pagecraft/p1/photo.jpg";
-
-  it("asks Cloudinary for a modern, resized copy", () => {
-    const out = cmsImageUrl(url, { width: 800 });
-    assert.match(out, /\/upload\/f_auto,q_auto,w_800,c_limit\//);
-  });
-
-  it("leaves a non-Cloudinary url alone", () => {
-    const other = "https://example.com/photo.jpg";
-    assert.equal(cmsImageUrl(other, { width: 800 }), other);
-  });
-
-  it("builds a srcset so browsers pick the right size", () => {
-    const set = cmsSrcSet(url, [400, 800]);
-    assert.match(set, /w_400.* 400w/);
-    assert.match(set, /w_800.* 800w/);
-  });
-
-  it("hands an <img> everything it needs, alt included", () => {
-    const props = imageProps(
-      { publicId: "p", url, width: 2400, height: 1350, alt: "Sourdough" },
-      { width: 1200 }
-    );
-    assert.equal(props!.alt, "Sourdough");
-    assert.equal(props!.width, 2400);
-  });
-
-  it("returns null when no photo has been chosen", () => {
-    assert.equal(imageProps(null), null);
-    assert.equal(imageProps(undefined), null);
-  });
-
-  it("uses an empty alt for a decorative image rather than inventing one", () => {
-    const props = imageProps({ publicId: "p", url, width: 10, height: 10 });
-    assert.equal(props!.alt, "");
-  });
-});
+// The image helpers have their own file — see image.test.ts.
 
 describe("revalidate webhook", () => {
   it("accepts a correctly signed publish", () => {

@@ -1,0 +1,13 @@
+{
+  // The tests and their API stub, type-checked but never emitted — the shipped
+  // build (tsconfig.json) leaves both out of dist.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": []
+}

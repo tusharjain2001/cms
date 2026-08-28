@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { Sidebar } from "@/components/sidebar";
+import { Tour } from "@/components/tour";
 
 /**
  * The signed-in shell: a fixed sidebar on desktop, a slide-over drawer on
@@ -64,6 +65,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         <main className="min-w-0 flex-1">{children}</main>
       </div>
+
+      {/*
+        Mounted here rather than in `(dash)/layout.tsx` so it can never appear
+        on the landing page or any of the signed-out screens — this shell only
+        renders once there is a session.
+      */}
+      <Tour />
     </div>
   );
 }

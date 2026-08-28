@@ -27,7 +27,7 @@ One instance serves many websites: each site is a **project** with its own API k
 - **TypeScript everywhere**, strict mode
 - **Express + Mongoose + MongoDB Atlas** for the API
 - **Next.js (App Router) + Tailwind CSS v4** for the admin dashboard
-- **Cloudinary** for media (signed uploads; CDN delivery + URL-based optimization)
+- **Cloudflare R2** for media (S3-compatible presigned uploads; CDN delivery via an R2 custom domain + URL-based Image Transformations). Replaced Cloudinary in Phase 7; media stored under the old backbone keeps its Cloudinary URL and still renders.
 - **Zod** validation at every boundary; the section registry is the source of truth
 - Content delivery: public REST API consumed at runtime; **Next.js sites use ISR + on-demand revalidation** via webhook on publish
 - API response shape: `{ success: true, data }` / `{ success: false, error }`
@@ -44,7 +44,8 @@ cms/
 │   └── admin/              # Next.js: landing page + admin dashboard    (BUILT, live API)
 └── packages/
     ├── shared/             # section registry, Zod schemas, wire types (BUILT)
-    └── sdk/                # tiny package client websites install      (BUILT)
+    ├── sdk/                # tiny package client websites install      (BUILT)
+    └── mcp/                # MCP server: the API as AI-assistant tools (BUILT)
 ```
 
 `packages/shared` is a **build-first** package: it compiles to `dist/` and both other packages consume its types through a TypeScript project reference. Any script that touches it runs `npm run shared` first — that is why the root scripts are chained rather than using `--workspaces` alone.
@@ -59,8 +60,8 @@ cms/
 | **`npm run dev`** | **The usual one.** Rebuilds shared, then runs the API (:4000) and the dashboard (:3000) together, output prefixed `[api]` / `[admin]` |
 | `npm run dev:api` | Just the API on :4000, with watch |
 | `npm run dev:admin` | Just the dashboard on :3000 |
-| `npm test` | 141 tests: registry/validation (15), API integration against a real in-memory MongoDB (105 — including self-service accounts and a contract test that walks the dashboard's exact request sequence), and SDK (21) |
-| `npm run build` | Builds shared → sdk → api → admin |
+| `npm test` | 248 tests: registry/validation (15), API integration against a real in-memory MongoDB (113 — including self-service accounts and a contract test that walks the dashboard's exact request sequence), SDK (43) and MCP server (77, against a stub API — no live keys) |
+| `npm run build` | Builds shared → sdk → mcp → api → admin |
 | `npm run typecheck` | Type-checks every workspace |
 | `npm run seed` | Creates the first developer account and a demo website |
 
@@ -132,7 +133,7 @@ Before running it: copy `apps/api/.env.example` to `apps/api/.env` and fill in `
 - Deleting your account is refused while you still own a website — a live site is reading from it.
 - `passwordHash` and `revalidateSecret` never appear in any response; two accounts cannot see each other's websites, media or pages; `allowedSectionTypes` is rejected unless every entry is a registered type.
 
-**Email** is plain SMTP via nodemailer (`lib/mailer.ts`), so any ordinary mailbox works — no provider SDK, no lock-in. It is **optional the way Cloudinary is**: without it the CMS boots and everything else works, signup refuses honestly with `email_not_configured`, and outside production the link is printed to the server log so you can click through your own flow locally. `captureMail()` is the test seam. Templates are inline-styled plain HTML on purpose — email clients strip stylesheets.
+**Email** is plain SMTP via nodemailer (`lib/mailer.ts`), so any ordinary mailbox works — no provider SDK, no lock-in. It is **optional the way R2 is**: without it the CMS boots and everything else works, signup refuses honestly with `email_not_configured`, and outside production the link is printed to the server log so you can click through your own flow locally. `captureMail()` is the test seam. Templates are inline-styled plain HTML on purpose — email clients strip stylesheets.
 
 **Pages** (Phase 2, built): `GET/POST /api/projects/:projectId/pages`, `PATCH /api/projects/:projectId/pages/reorder`, `GET/PATCH/DELETE /api/pages/:pageId`. A page titled "Home" automatically gets the empty slug, so it serves at `/`.
 
@@ -147,16 +148,20 @@ Before running it: copy `apps/api/.env.example` to `apps/api/.env` and fill in `
 - `GET /api/content/home` → convenience for the root page
 - `?preview=<token>` swaps in the draft, and is served `no-store`; everything else is `s-maxage=60, stale-while-revalidate=600`
 
+The whole router is **rate limited at 120 requests per minute per IP**, and that limiter is mounted *before* `requireApiKey` on purpose — this is the one surface the entire internet can reach, so a flood of made-up keys must be turned away before it costs a database lookup. Real sites sit behind a CDN and hit the origin rarely; raise `max` in `routes/content.ts` if a large static-site build legitimately bursts past it.
+
 Two mounting details worth remembering: the page router takes the broad `/api` prefix (its routes span both `/api/projects/:id/pages` and `/api/pages/:pageId`), so it attaches `requireAuth` **per route** rather than with `router.use` — a blanket guard there would have locked out the public content API. And `/api/content` is mounted before it for the same reason.
 
-**Media** (Phase 4, built) — uploads go **browser → Cloudinary directly**, so a client's 8MB phone photo never passes through the API:
+**Media** (Phase 4, built; moved to Cloudflare R2 in Phase 7) — uploads go **browser → R2 directly** via a presigned PUT, so a client's 8MB phone photo never passes through the API:
 
-- `POST /api/projects/:projectId/media/sign` → a one-shot upload ticket (`timestamp`, `folder`, `signature`, `uploadUrl`). The folder is scoped to the project, so one client's upload cannot land in another's library. The API secret never leaves the server.
-- `POST /api/projects/:projectId/media` → register what Cloudinary accepted. Rejects a `publicId` outside this project's folder, and is idempotent so a retried registration does not duplicate.
+- `POST /api/projects/:projectId/media/sign` → a one-shot upload ticket (`uploadUrl`, `key`, `publicUrl`, `headers`), the presigned PUT valid for 10 minutes. The browser sends a SHA-256 of the file and the key comes back as `<projectId>/<hash>[.ext]` — content-addressed, so it is cache-immutable, re-uploading the same bytes dedupes for free, and one client's upload can never land in another's prefix. The R2 secret never leaves the server.
+- `POST /api/projects/:projectId/media` → register what R2 accepted. Rejects a `publicId` outside this project's prefix, and is idempotent so a retried registration does not duplicate. `width`/`height` default to `0` — the library genuinely does not know the size of an SVG or a raw file, which is why `imageProps` omits those attributes rather than emitting `width="0"`.
 - `GET /api/projects/:projectId/media` → `{ items, uploadsEnabled }`
-- `PATCH /api/media/:mediaId` (alt text) · `DELETE /api/media/:mediaId` (also destroys the Cloudinary asset; reports `removedFromStorage` honestly if storage did not confirm)
+- `PATCH /api/media/:mediaId` (alt text) · `DELETE /api/media/:mediaId` (also deletes the R2 object; reports `removedFromStorage` honestly if storage did not confirm)
 
-**Cloudinary is optional.** Without the three env vars the CMS runs normally, `uploadsEnabled` is `false`, the sign endpoint returns a plain-English explanation, and the dashboard shows the client what is missing instead of a broken upload button. Signing is implemented directly with `node:crypto` in `lib/cloudinary.ts` (sorted `k=v&k=v` + secret, SHA-1) — no SDK dependency.
+**R2 is optional.** Without the five `R2_*` env vars the CMS runs normally, `uploadsEnabled` is `false`, the sign endpoint returns a plain-English explanation, and the dashboard shows the client what is missing instead of a broken upload button. `lib/r2.ts` holds the whole integration — presigning via `@aws-sdk/client-s3` + `s3-request-presigner`, and `publicUrl`/`transformUrl` for delivery. **Deliver from the R2 custom domain, never the un-cached `r2.dev` host.**
+
+**Orphan cleanup is not built.** Content-hashed keys mean replacing a file leaves the old object behind; an R2 lifecycle rule or a GC job is the fix, and it is deliberately deferred (see the note in `lib/r2.ts`).
 
 ## Admin dashboard (`apps/admin`)
 
@@ -178,7 +183,7 @@ Where things live:
 | `lib/auth.tsx` | Session: sign up, confirm, sign in/out, forgotten passwords, and restoring a session from the refresh cookie on reload. |
 | `lib/store.tsx` | All dashboard state, backed by real API calls. |
 | `lib/dto.ts` | Type-only re-exports from `@pagecraft/shared`, plus small display helpers. |
-| `lib/media.tsx` | Library state, direct-to-Cloudinary uploads with progress, and the promise-based `pick()` that image/file fields await. |
+| `lib/media.tsx` | Library state, direct-to-R2 presigned uploads with progress, and the promise-based `pick()` that image/file fields await. |
 | `components/media-picker.tsx` | The modal `pick()` opens. |
 | `app/(app)/foundation` | Live style guide — palette, type, parts, skeletons, phone layouts. Keep it current. |
 
@@ -205,7 +210,7 @@ Two terminals, from the repo root:
 
 CORS and the refresh cookie are already configured for this pair; `ADMIN_ORIGIN` in the API's `.env` must match the dashboard's origin. Without SMTP set, signing up is refused — but the seeded account signs in normally, and any verification link the CMS would have emailed is printed to the API's log.
 
-Screens: Sign up → confirm email → Sign in → Projects (someone invited to exactly one website lands straight in it; owners stay on the list) → **Pages** (drag-reorder, add with auto-slug, delete w/ confirm, draft/published chips) → **Page editor** (left: section cards titled by the client-entered section `name` — falling back to the type label — drag-reorder, show/hide, delete, "+ Add section" limited to `allowedSectionTypes`; right: form auto-generated from the registry, with a "Section name (for your reference)" field at the top of every section form — repeatable rows for list fields, image picker backed by media library + Cloudinary upload; top: Preview / **Publish** / Discard draft) → **Media library** → **Settings** (owner-only: API key, revalidate URL/secret, enabled section types, who else has access).
+Screens: Sign up → confirm email → Sign in → Projects (someone invited to exactly one website lands straight in it; owners stay on the list) → **Pages** (drag-reorder, add with auto-slug, delete w/ confirm, draft/published chips) → **Page editor** (left: section cards titled by the client-entered section `name` — falling back to the type label — drag-reorder, show/hide, delete, "+ Add section" limited to `allowedSectionTypes`; right: form auto-generated from the registry, with a "Section name (for your reference)" field at the top of every section form — repeatable rows for list fields, image picker backed by media library + R2 upload; top: Preview / **Publish** / Discard draft) → **Media library** → **Settings** (owner-only: API key, revalidate URL/secret, enabled section types, who else has access).
 
 Drafts autosave (debounced). Publish is the single action that pushes content live.
 
@@ -274,7 +279,10 @@ Three claims elsewhere were corrected to match this model — the landing page's
 What a client website installs. Two entry points so a non-React site never pulls in React:
 
 - **`@pagecraft/sdk`** — `createCmsClient({ apiKey, baseUrl, fetchOptions })` → `getPages()`, `getPage(slug)`, `getHome()`, `getPreview(slug, token)`. Framework-agnostic: `fetchOptions` passes straight through to `fetch`, so Next hands it `{ cache: "force-cache" }` and a Vite site hands it nothing. Errors surface as `CmsError` with a status (`0` = unreachable, `404` = no such page) so a site can decide what to do.
-- **`@pagecraft/sdk`** also exports the image helpers — `cmsImageUrl`, `cmsSrcSet`, `imageProps` — which rewrite a Cloudinary URL to ask for a resized, modern-format copy. And `checkRevalidateRequest(body, secret)`, which validates the publish webhook with a constant-time secret comparison and strips path traversal.
+- **`@pagecraft/sdk`** also exports the image helpers — `cmsImageUrl`, `cmsSrcSet`, `imageProps` — which rewrite a media URL to ask for a resized, modern-format copy. They speak **Cloudflare Image Transformations** (`/cdn-cgi/image/…`, what R2 serves through) and **Cloudinary** (`/upload/…`, kept because media uploaded before the migration keeps its old URL forever). Anything else is left untouched: rewriting a URL on a host with no transform service would 404 a working image.
+  - **A plain R2 URL carries no clue that its host can resize**, so a site must say so once: `configureCmsImages({ provider: "cloudflare" })`. Until it does, `cmsImageUrl` is a no-op and `cmsSrcSet` returns `""` — slower, never broken. That is the right default, because a wrong guess turns every photo on a live site into a 404. A srcset is omitted rather than faked for the same reason: four identical URLs with different width descriptors make a phone download the full original believing it chose the small one.
+  - `imageProps` **omits `width`/`height` when the library never measured the file** (registration defaults both to `0`). `width={0}` is not "unknown" to a browser — it is an instruction to render nothing.
+- **`@pagecraft/sdk`** also exports `checkRevalidateRequest(body, secret)`, which validates the publish webhook with a constant-time secret comparison and strips path traversal.
 - **`@pagecraft/sdk/react`** — `<SectionRenderer sections components fallback />`. You map section types to your own components; a type with no component renders nothing rather than crashing a live page.
 
 ### The website recipe
@@ -290,18 +298,38 @@ A CMS outage must not fail a deploy: catch `CmsError` with status `0` in the cat
 
 **Plain React (Vite) recipe**: same client, no `fetchOptions`; fetch at runtime and let the CDN cache headers do the work. Edits appear on the next page load instead of instantly.
 
+## MCP server (`packages/mcp`) — BUILT
+
+`pagecraft-mcp`, a Model Context Protocol server so a customer can point an AI assistant at their own website: read the live content, build pages, fill sections from the registry, manage media, publish. 26 tools over stdio, using the official `@modelcontextprotocol/sdk`. **Full setup, the tool list and the known gaps live in [`packages/mcp/README.md`](packages/mcp/README.md)** — this section is only the decisions that constrain the rest of the repo.
+
+**It is a client of the REST API and nothing more.** No Mongo connection, no shared code with `apps/api` beyond wire types from `@pagecraft/shared`. Every rule — registry validation, draft-versus-publish, who may touch which website — is enforced where it already was. This is why it can be a package a customer runs on their own machine rather than something we host.
+
+**Two credentials, not one, and this is the load-bearing bit.** The task was framed as "API-key auth for read/write", and half of that is not possible today: a website's API key is **read-only by design** (`middleware/api-key.ts` resolves it to one project and serves published content; no write route accepts it). So the server takes both:
+
+- `PAGECRAFT_API_KEY` → the four published-content tools.
+- `PAGECRAFT_EMAIL` + `PAGECRAFT_PASSWORD` → the other 22, authenticating as an ordinary account exactly like the dashboard, including the 15-minute access token and the `/api/auth/refresh` rotation that renews it. Refresh is preferred over signing in again because login is rate limited to 10 per 15 minutes per email+IP.
+
+Do not "fix" this by teaching the API key to write. The right fix — if this matters enough — is a **scoped, revocable machine token** per project, which is an API change and does not exist. Until then, writing means a password in a config file, and the README says so plainly rather than hiding it.
+
+**Tools that cannot be performed are never advertised.** A key-only config is offered four tools, not 26 that fail; `PAGECRAFT_READ_ONLY=1` removes all 16 writes from `tools/list` entirely. A model cannot reach for a tool it cannot see, which is a stronger guarantee than a refusal.
+
+**stdout belongs to the protocol.** `src/bin.ts` writes every human message to stderr. One stray `console.log` anywhere in this package corrupts the stream and the connection simply fails.
+
+Tests run every handler against `src/stub-api.ts` — a stand-in that enforces the parts that matter (the read-only key reaching only `/api/content/*`, bearer tokens expiring so renewal is exercised for real) — plus two that drive a real MCP client over an in-memory transport. No live key, password or database is needed to run them.
+
 ## Build roadmap
 
 1. **Foundation** — ✅ **DONE.** Monorepo scaffolding, `packages/shared` (registry + Zod validation), API skeleton, Mongo connection, JWT auth, project CRUD, section-types endpoint, 33 passing tests. *Milestone met: login + create project via REST.*
 2. **Content engine** — ✅ **DONE.** Page and section CRUD with registry validation, draft/publish separation, revalidate webhook, preview tokens, public content API. *Milestone met: full content lifecycle via REST.*
 3. **Admin dashboard** — ✅ **DONE.** Every screen wired to the live API: real login and session, registry-driven forms, autosave, publish with per-field errors, preview tokens. *Milestone met: a non-technical user can build and publish a page.*
-4. **Media** — ✅ **DONE.** Cloudinary signed uploads (direct from the browser), per-project library with alt text and delete, a picker modal wired into the `image` and `file` fields, and URL-based thumbnails.
-5. **SDK** — ✅ **DONE.** SDK with client, image helpers, webhook validator and `SectionRenderer`. *Milestone met and verified at the time with a full demo Next.js site: edit in CMS → live page updates automatically.* That demo site has since been **deleted** — this repo holds the CMS only, and client websites live in their own repos. The recipe it demonstrated is written out under "The website recipe" above; the SDK's own 21 tests still cover the client, image helpers and webhook validator against a stub API.
+4. **Media** — ✅ **DONE.** Signed uploads direct from the browser, per-project library with alt text and delete, a picker modal wired into the `image` and `file` fields, and URL-based thumbnails. Originally Cloudinary; re-based on Cloudflare R2 in Phase 7 behind the same endpoints.
+5. **SDK** — ✅ **DONE.** SDK with client, image helpers, webhook validator and `SectionRenderer`. *Milestone met and verified at the time with a full demo Next.js site: edit in CMS → live page updates automatically.* That demo site has since been **deleted** — this repo holds the CMS only, and client websites live in their own repos. The recipe it demonstrated is written out under "The website recipe" above; the SDK's own 43 tests still cover the client, image helpers and webhook validator against a stub API.
 6. **Open signup** — ✅ **DONE.** The pivot from "one developer's private tool" to a product anyone can use: per-website ownership replacing global roles, self-service signup with emailed confirmation, forgotten-password rescue, session invalidation on password change, SMTP mail, and rate limiting on every signed-out endpoint. *Milestone met: a stranger creates an account, confirms it, builds a website, and sees nobody else's.*
-7. **Launch** — ⬅ **NEXT.**
-   - Rate limiting on the **public content API** (the signed-out auth routes are already covered).
-   - Per-account limits — a public signup form with no cap on websites is an open-ended bill on the Atlas and Render tiers below.
-   - SEO fields surfaced in the dashboard, and the deployment run-through.
+7. **Launch** — ⬅ **IN PROGRESS.**
+   - ✅ Rate limiting on the **public content API** — 120 requests per minute per IP, applied before the key lookup so a flood of bogus keys never reaches Mongo. The signed-out auth routes were already covered.
+   - ✅ Media re-based on **Cloudflare R2** (replacing Cloudinary) behind the same endpoints.
+   - ⬜ Per-account limits — a public signup form with no cap on websites is an open-ended bill on the Atlas and Render tiers below.
+   - ⬜ SEO fields surfaced in the dashboard, and the deployment run-through.
 
 **One account per website, shared by hand — decided, do not rebuild.** There is deliberately no invite flow. Whoever owns a website shares those sign-in details with the other party directly. `ProjectRole` and `user.projectIds` still model an `editor` who was added to someone else's website, and `requireProjectAccess` honours it, so the model does not need changing if invites are ever wanted — but nothing currently creates that relationship, and `AuthToken.kind: "invite"` plus `sendProjectInviteEmail` are unused scaffolding.
 
@@ -315,7 +343,7 @@ Two consequences of sharing one account that follow from the auth design above, 
 - **CMS backend (Express)**: **Render** (decided) always-on Node service at `api.<domain>` (free instance sleeps after idle — fine for dev; use the ~$7/mo Starter once real clients are live so dashboards/publish webhooks don't hit cold starts). Railway is the equivalent alternative. Not Vercel serverless — a CMS API wants a persistent server + pooled Mongo connection.
 - **CMS dashboard + landing page (Next.js, one app)**: **Cloudflare Pages** (decided). One deploy serves the public landing page at `/` and the dashboard behind it, so it can sit at the apex `<domain>` rather than `admin.<domain>` — free, commercial use allowed, unlimited bandwidth. Root directory `apps/admin`. Because this is Next.js rather than a plain static bundle, deploy it through `@opennextjs/cloudflare` (Cloudflare's Next.js adapter) — the ISR caveats that rule Cloudflare out for *client sites* don't apply here: the landing page is prerendered static, and everything behind the login is client-rendered and fetches from the API at runtime.
 - **Client websites (Next.js, need ISR + on-demand revalidation)**: Netlify free tier to start; move to a single Vercel Pro account ($20/mo flat, unlimited projects) as client count grows. Avoid Vercel Hobby (non-commercial only) and Cloudflare Pages (ISR caveats). Self-hosted `next start` on Render/VPS also fully supports ISR.
-- **Data**: MongoDB Atlas M0 (free, 512 MB — content JSON is tiny; no media in Mongo) + Cloudinary free tier (media originals + CDN + URL transforms).
+- **Data**: MongoDB Atlas M0 (free, 512 MB — content JSON is tiny; no media in Mongo) + Cloudflare R2 (media originals, no egress fee) delivered through an R2 custom domain with Image Transformations.
 - **Email**: any SMTP mailbox on the CMS's own domain. Zoho Mail's free plan is the tidiest fit; Gmail needs an App Password and has low daily limits. Set `MAIL_FROM` to an address at a domain you control and publish SPF and DKIM records for it — without them, confirmation links go straight to spam and nobody can finish signing up. Since the whole product now depends on delivering that one email, treat it as infrastructure, not a nicety.
 - **`APP_URL`** must be the dashboard's public address (`https://<domain>`), because every emailed link is built from it. Getting this wrong sends new users to localhost.
 - Same monorepo deploys everywhere: each platform points at its app's root directory (`apps/api`, `apps/admin`).
@@ -327,6 +355,6 @@ Two consequences of sharing one account that follow from the auth design above, 
 - Zod validates every request body and all section content against the registry
 - Responses: `{ success: true, data }` / `{ success: false, error }`
 - Secrets via `.env` (never committed); keep `.env.example` current
-- Public API must never leak drafts, other projects' data, or Cloudinary secrets
+- Public API must never leak drafts, other projects' data, or storage secrets
 - **Authorization is always a lookup, never a property of the user.** Ask "what is this account's relationship to this website?" — never "is this user an admin?" The one exception is `isPlatformAdmin`, granted by seeding alone.
 - **Signed-out endpoints must not reveal which email addresses have accounts.** Identical answers for known and unknown addresses, every time.
