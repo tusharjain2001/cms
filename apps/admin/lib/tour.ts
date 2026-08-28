@@ -29,6 +29,13 @@ export interface TourState {
   mediaCount: number;
   uploadsEnabled: boolean;
   anyPagePublished: boolean;
+  /**
+   * True once the publish webhook is pointed at a real website, which is the
+   * only bit of state that proves somebody actually connected the two.
+   */
+  hasRevalidateUrl: boolean;
+  /** Only an owner has the Integration screen, so only they get that step. */
+  isOwner: boolean;
 }
 
 export interface TourStep {
@@ -154,6 +161,23 @@ export const TOUR_STEPS: TourStep[] = [
     done: (s) => s.anyPagePublished,
     href: editor,
     hereLabel: "Open the page editor",
+  },
+  {
+    id: "integration",
+    label: "Connect the website",
+    title: "Hand this to your developer",
+    body: "Your words are ready — the last piece is the website itself reading them. Integration has the keys and the code, already filled in for this website. It is the only screen here meant for whoever builds the site rather than whoever writes it.",
+    anchors: ['[data-tour="integration-keys"]', '[data-tour="nav-integration"]'],
+    // Pointing the publish webhook at a real address is the only state that
+    // proves the two ends were actually joined up.
+    done: (s) => s.hasRevalidateUrl,
+    href: (s) => (s.projectId ? `/projects/${s.projectId}/integration` : "/projects"),
+    hereLabel: "Open Integration",
+    // An editor never sees that screen, so it must not be a wall for them.
+    unavailable: (s) =>
+      s.isOwner
+        ? null
+        : "This step is for whoever owns this website — the Integration screen is theirs, not yours. Nothing else here depends on it.",
   },
 ];
 

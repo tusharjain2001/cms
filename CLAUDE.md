@@ -187,7 +187,16 @@ Where things live:
 | `components/media-picker.tsx` | The modal `pick()` opens. |
 | `app/(app)/foundation` | Live style guide — palette, type, parts, skeletons, phone layouts. Keep it current. |
 
-Routes — public: `/` (the landing page) · `/pricing` · `/login` · `/signup` · `/verify-email?token=` · `/forgot-password` · `/reset-password?token=`. Signed in: `/projects` → `/projects/[projectId]/pages` → `/projects/[projectId]/pages/[pageId]` (editor) → `/projects/[projectId]/media` → `/projects/[projectId]/settings` → `/foundation`.
+Routes — public: `/` (the landing page) · `/pricing` · **`/docs`** · `/login` · `/signup` · `/verify-email?token=` · `/forgot-password` · `/reset-password?token=`. Signed in: `/projects` → `/projects/[projectId]/pages` → `/projects/[projectId]/pages/[pageId]` (editor) → `/projects/[projectId]/media` → **`/projects/[projectId]/integration`** → `/projects/[projectId]/settings` → `/foundation`.
+
+**The two integration surfaces, and why there are two.** A developer reads docs *before* signing up and needs their own key *after*, so the same material exists at two altitudes and neither replaces the other:
+
+- **`/docs`** (public, no account) — the generic guide: quick start, the four endpoints, the response shape, and a reference for every registered section type. It is a **server component that imports `SECTION_REGISTRY` directly**, so the field reference cannot drift from what the API validates. That import is server-only — the page prerenders to static HTML and ships 160 B of its own JS, so Zod never reaches the browser. Do not add `"use client"` to it.
+- **`/projects/[projectId]/integration`** (owner-only) — the same five steps with *that website's* real API URL, key, enabled section types and published page slugs already filled in, plus a **live "Fetch it live" button** that makes the real content request from the browser and shows the actual JSON. It warns in red when `API_URL` is a localhost address, because copy-pasting that into a deployed site is an hour lost.
+
+Both generate their section-field reference from the registry rather than hard-coding it, so a new section type documents itself in both places. `links.docs` is now a real path; the remaining `TODO` sentinels (SDK reference, self-hosting, GitHub, status, privacy) still render as muted text.
+
+An eighth tour step, **"Connect the website"**, points at the Integration screen and is judged done when `revalidateUrl` is set — real state, like every other step. It carries an `unavailable` note for editors, who cannot reach that screen.
 
 **Owner-only UI is gated on `project.role`, never on the user.** Website settings appear when `s.project?.role === "owner"`. There is no such thing as a globally privileged user in the dashboard.
 
@@ -288,6 +297,8 @@ What a client website installs. Two entry points so a non-React site never pulls
 ### The website recipe
 
 This is the pattern for each client website, which lives in **its own repo** — this one holds only the CMS. A worked example previously sat in `examples/demo-site`; it was removed on purpose, so these four steps are now the reference.
+
+**A working implementation of this recipe lives at `../pagecraft-starter`** (outside this repo, deliberately — see the rule above). It is a Next.js project with all four files plus one plain-CSS component per registered section type, `lib/types.ts` carrying the `content` shape of every type, and a README. Verified end to end: pointed at a real website's key it prerendered that site's four published pages from `api.mypagecraft.com`. It is meant to become a public GitHub template repo so a developer clicks "Use this template" instead of assembling five files by hand. Keep its `components/sections/index.tsx` in step with `SECTION_REGISTRY`.
 
 1. `lib/cms.ts` — one client, `fetchOptions: { cache: "force-cache" }`.
 2. `app/[[...slug]]/page.tsx` — a catch-all with `dynamic = "force-static"` and `generateStaticParams()` from `getPages()`, rendering `<SectionRenderer>`. **Pages the client adds after the build still work**: Next generates them on first request, so a new page needs no deploy.

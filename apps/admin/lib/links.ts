@@ -31,8 +31,9 @@ export const links = {
 
   contact: "mailto:hello@pagecraft.dev",
 
+  docs: "/docs",
+
   // Not written yet.
-  docs: TODO,
   sdkReference: TODO,
   selfHosting: TODO,
   github: TODO,

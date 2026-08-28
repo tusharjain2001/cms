@@ -120,7 +120,10 @@ export const SECTION_REGISTRY: SectionTypeDef[] = [
         link("detailsUrl", "“View details” link"),
         file("specSheet", "Spec sheet", { accept: [".pdf"] }),
       ], { itemNoun: "product", max: 24, labelKey: "name" }),
-      toggle("showPrices", "Show prices next to each product", { default: false }),
+      // There was a "Show prices" toggle here. It was dropped: products carry
+      // no price field, so it switched on something that did not exist. If
+      // prices are ever wanted, add the field to the product first — a toggle
+      // for absent data is a promise the section cannot keep.
     ],
   },
   {

@@ -79,6 +79,8 @@ export function Tour() {
       mediaCount: m.items.length,
       uploadsEnabled: m.uploadsEnabled,
       anyPagePublished: s.pages.some((p) => p.status === "published"),
+      hasRevalidateUrl: Boolean(s.project?.revalidateUrl),
+      isOwner: s.project?.role === "owner",
     };
   }, [
     pathname,
@@ -90,6 +92,8 @@ export function Tour() {
     s.draftContent,
     m.items.length,
     m.uploadsEnabled,
+    s.project?.revalidateUrl,
+    s.project?.role,
   ]);
 
   /**

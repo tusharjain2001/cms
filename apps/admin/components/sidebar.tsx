@@ -171,6 +171,17 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         )}
         {hasProject && isOwner && (
           <NavLink
+            href={`${base}/integration`}
+            icon="◇"
+            active={pathname === `${base}/integration`}
+            onNavigate={onNavigate}
+            tour="nav-integration"
+          >
+            Integration
+          </NavLink>
+        )}
+        {hasProject && isOwner && (
+          <NavLink
             href={`${base}/settings`}
             icon="⚙"
             active={pathname === `${base}/settings`}

@@ -6,6 +6,7 @@ This is the "where things stand right now" note. [CLAUDE.md](CLAUDE.md) is the
 blueprint — what the product is, why every decision was made, and the rules that
 must not be re-litigated. **Read CLAUDE.md first; this file only covers state,
 setup and what to do next.** Where the two disagree, CLAUDE.md wins.
+[CHANGELOG.md](CHANGELOG.md) is the third: what changed on which day, and why.
 
 ---
 
@@ -260,17 +261,32 @@ Two are done. In the order I would do the rest:
   PUTs straight from the browser; media uploaded before the migration keeps its
   Cloudinary URL and still renders.
 
-1. **Per-account limits.** A public signup form with no cap on websites is an
+- ~~**Nowhere to learn the integration.**~~ ✅ **Done.** Three things landed
+  together: a public **`/docs`** page (readable without an account, which is the
+  order developers actually work in), a per-website **Integration** screen in the
+  dashboard with that website's own key and a live response fetch, and a
+  **starter template** at `../pagecraft-starter` — a working Next.js site,
+  verified by prerendering a real website's four published pages from
+  `api.mypagecraft.com`. Both doc surfaces build their section-field reference
+  from `SECTION_REGISTRY`, so a new section type documents itself.
+
+1. **Publish `@pagecraft/sdk` to npm.** Still `"private": true`, so a client
+   website cannot install it and everything is documented as plain `fetch`.
+   Until it ships, `content` is untyped for every customer and the image helpers
+   (`cmsSrcSet`, `imageProps`) are unreachable, so nobody gets responsive images.
+   The starter works around it by hand-writing the types in `lib/types.ts` —
+   which now has to be kept in step with the registry by hand.
+2. **Per-account limits.** A public signup form with no cap on websites is an
    open-ended bill on the Atlas and Render free tiers. At minimum a website cap
    and a page cap per project.
-2. **Surface the SEO fields** (`metaTitle`, `metaDescription`, `ogImage`) in the
+3. **Surface the SEO fields** (`metaTitle`, `metaDescription`, `ogImage`) in the
    dashboard — they exist on the page model and nothing edits them.
-3. **Deployment run-through:** API → Render (~$7/mo Starter once real clients are
+4. **Deployment run-through:** API → Render (~$7/mo Starter once real clients are
    live, so publish webhooks do not hit cold starts); dashboard + landing →
    Cloudflare Pages via `@opennextjs/cloudflare`, root dir `apps/admin`, at the
    apex domain. `APP_URL` must be the dashboard's public address — every emailed
    link is built from it, and getting it wrong sends new users to localhost.
-4. **SMTP on a real domain**, with SPF and DKIM published. Without them
+5. **SMTP on a real domain**, with SPF and DKIM published. Without them
    confirmation links go to spam and nobody can finish signing up. The entire
    product now depends on delivering that one email — treat it as
    infrastructure, not a nicety.

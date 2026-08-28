@@ -6,6 +6,7 @@ const NAV = [
   { label: "How it works", href: links.how, key: "how" },
   { label: "Section types", href: links.sections, key: "sections" },
   { label: "For developers", href: links.developers, key: "developers" },
+  { label: "Docs", href: links.docs, key: "docs" },
   { label: "Pricing", href: links.pricing, key: "pricing" },
 ] as const;
 
