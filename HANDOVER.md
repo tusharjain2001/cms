@@ -264,11 +264,11 @@ Two are done. In the order I would do the rest:
 - ~~**Nowhere to learn the integration.**~~ ✅ **Done.** Three things landed
   together: a public **`/docs`** page (readable without an account, which is the
   order developers actually work in), a per-website **Integration** screen in the
-  dashboard with that website's own key and a live response fetch, and a
-  **starter template** at `../pagecraft-starter` — a working Next.js site,
-  verified by prerendering a real website's four published pages from
-  `api.mypagecraft.com`. Both doc surfaces build their section-field reference
-  from `SECTION_REGISTRY`, so a new section type documents itself.
+  dashboard with that website's own key, a live response fetch, and a field
+  reference for every section type. Both surfaces build that reference from
+  `SECTION_REGISTRY`, so a new section type documents itself in both places.
+  (A starter template was built alongside these and then deleted by decision —
+  see CHANGELOG. Do not re-add one without asking.)
 
 1. **Publish `@pagecraft/sdk` to npm.** Still `"private": true`, so a client
    website cannot install it and everything is documented as plain `fetch`.

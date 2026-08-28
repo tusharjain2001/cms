@@ -134,7 +134,14 @@ turned the grey placeholder into a live link everywhere it appears.
 **Changed** [`apps/admin/components/landing/site-nav.tsx`](apps/admin/components/landing/site-nav.tsx)
 — **Docs** added to the top navigation, between "For developers" and "Pricing".
 
-### 6 · Starter template — `../pagecraft-starter`
+### 6 · Starter template — built, then **reverted the same day**
+
+> **⚠ Deleted by decision on 28 Aug 2026, hours after being built.** It worked,
+> but it was a third place to keep in step with `SECTION_REGISTRY` on top of
+> `/docs` and the Integration screen, and that maintenance cost was judged not
+> worth it. **Do not re-add one without asking.** The record below stays because
+> the work produced §7 — the `showPrices` bug was found while writing the
+> template's `product-grid.tsx` against the registry, and that fix is kept.
 
 **Added** a Next.js project at `C:\Users\Intel\Desktop\pagecraft-starter`,
 **outside this repo on purpose** (CLAUDE.md: client websites never live here).

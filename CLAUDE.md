@@ -298,7 +298,7 @@ What a client website installs. Two entry points so a non-React site never pulls
 
 This is the pattern for each client website, which lives in **its own repo** — this one holds only the CMS. A worked example previously sat in `examples/demo-site`; it was removed on purpose, so these four steps are now the reference.
 
-**A working implementation of this recipe lives at `../pagecraft-starter`** (outside this repo, deliberately — see the rule above). It is a Next.js project with all four files plus one plain-CSS component per registered section type, `lib/types.ts` carrying the `content` shape of every type, and a README. Verified end to end: pointed at a real website's key it prerendered that site's four published pages from `api.mypagecraft.com`. It is meant to become a public GitHub template repo so a developer clicks "Use this template" instead of assembling five files by hand. Keep its `components/sections/index.tsx` in step with `SECTION_REGISTRY`.
+**A starter template was built and then deliberately deleted** (28 Aug 2026). It worked — pointed at a real key it prerendered four published pages — but it was a third place to keep in step with the registry, on top of the two documentation surfaces. Decided against; do not re-add one without asking. The four steps below plus `/docs` and the Integration screen are the reference.
 
 1. `lib/cms.ts` — one client, `fetchOptions: { cache: "force-cache" }`.
 2. `app/[[...slug]]/page.tsx` — a catch-all with `dynamic = "force-static"` and `generateStaticParams()` from `getPages()`, rendering `<SectionRenderer>`. **Pages the client adds after the build still work**: Next generates them on first request, so a new page needs no deploy.
