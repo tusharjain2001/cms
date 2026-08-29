@@ -1,5 +1,6 @@
 import { links } from "@/lib/links";
-import { Logo, MaybeLink } from "./bits";
+import { MaybeLink } from "./bits";
+import { LiveDot } from "./motion";
 
 const COLUMNS = [
   {
@@ -30,37 +31,49 @@ const COLUMNS = [
   },
 ];
 
+/**
+ * The marketing footer (direction.md §5.13): rail background, a large Bricolage
+ * wordmark as the closing statement, Karla link columns, and a mono meta line
+ * whose Live-green heartbeat (`<LiveDot>`, the site's one footer idle motion)
+ * echoes the "goes live in ~3 seconds" promise.
+ */
 export function SiteFooter() {
   return (
     <footer className="border-t border-line bg-rail">
-      <div className="mx-auto flex max-w-[1160px] flex-wrap items-start gap-10 px-5 py-9 sm:px-8">
-        <div className="min-w-[220px] flex-1">
-          <div className="flex items-center gap-2.5">
-            <Logo size={24} />
-            <span className="text-[15px] font-bold tracking-[-.2px]">Pagecraft</span>
+      <div className="mx-auto max-w-[1160px] px-5 sm:px-8">
+        <div className="flex flex-col gap-12 py-12 lg:flex-row lg:items-start lg:justify-between lg:py-14">
+          <div className="max-w-[380px]">
+            <div className="font-display text-[clamp(2.75rem,9vw,4.5rem)] font-bold leading-[0.9] tracking-[-0.03em] text-ink">
+              Pagecraft
+            </div>
+            <p className="mt-4 text-mid leading-[1.6] text-muted">
+              A content-only CMS for developers who would rather not build another admin panel.
+            </p>
           </div>
-          <p className="mt-2.5 max-w-[280px] text-mid leading-[1.6] text-muted">
-            A content-only CMS for developers who would rather not build another admin panel.
-          </p>
-        </div>
 
-        {COLUMNS.map((col) => (
-          <div key={col.heading} className="flex flex-col gap-2">
-            <h2 className="text-helper font-semibold tracking-[0.08em] uppercase text-muted">
-              {col.heading}
-            </h2>
-            {col.items.map((item) => (
-              <MaybeLink key={item.label} href={item.href} className="text-label font-medium">
-                {item.label}
-              </MaybeLink>
+          <div className="grid grid-cols-2 gap-x-12 gap-y-9 sm:grid-cols-3">
+            {COLUMNS.map((col) => (
+              <div key={col.heading} className="flex flex-col gap-2.5">
+                <h2 className="text-helper font-semibold tracking-[0.08em] uppercase text-muted">
+                  {col.heading}
+                </h2>
+                {col.items.map((item) => (
+                  <MaybeLink key={item.label} href={item.href} className="text-label font-medium">
+                    {item.label}
+                  </MaybeLink>
+                ))}
+              </div>
             ))}
           </div>
-        ))}
-      </div>
+        </div>
 
-      <div className="mx-auto max-w-[1160px] px-5 pb-8 text-helper text-faint sm:px-8">
-        © {new Date().getFullYear()} Pagecraft. Rosewater Bakehouse is a demo website, not a real
-        customer.
+        <div className="flex flex-col gap-3 border-t border-line-soft py-6 sm:flex-row sm:items-center sm:justify-between">
+          <LiveDot label="ALL SYSTEMS PUBLISHING" />
+          <p className="text-helper text-faint">
+            © {new Date().getFullYear()} Pagecraft. Rosewater Bakehouse is a demo website, not a
+            real customer.
+          </p>
+        </div>
       </div>
     </footer>
   );

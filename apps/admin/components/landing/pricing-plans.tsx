@@ -9,8 +9,8 @@ import { links } from "@/lib/links";
  *
  * This is the ONLY interactive element on any public page, which is why it is
  * the only "use client" component in `components/landing`. Keeping the toggle
- * here means the rest of the pricing page — table, add-ons, FAQ — stays
- * server-rendered.
+ * here means the rest of the pricing page — stages, table, FAQ — stays
+ * server-rendered (direction.md §5.11).
  *
  * THE MODEL: one account is one website, and the website's owner pays for it.
  * The developer who built the site does not hold the account; the owner shares
@@ -79,36 +79,67 @@ const PLANS: Plan[] = [
 /** $7.50 should read as "7.50", $19 as "19" — never "19.00" or "7.5". */
 const money = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
 
-function Pill({
-  on,
-  onClick,
-  children,
+/**
+ * A two-option segmented control. The active pill is a Press-Blue thumb that
+ * springs between the two positions (`--ease-spring`). Both buttons are real
+ * <button>s with `aria-pressed`, so the whole thing is keyboard-operable by
+ * Tab + Enter/Space; the spring is pure decoration layered on top.
+ */
+function BillingToggle({
+  billing,
+  onChange,
 }: {
-  on: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
+  billing: Billing;
+  onChange: (b: Billing) => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={on}
-      className={`cursor-pointer rounded-full px-4 py-2 text-label font-semibold transition-colors ${
-        on ? "bg-accent text-white" : "bg-transparent text-quiet hover:text-ink"
-      }`}
+    <div
+      role="group"
+      aria-label="Billing period"
+      className="relative flex w-[300px] max-w-full items-stretch rounded-full border border-line bg-surface p-1"
     >
-      {children}
-    </button>
+      <span
+        aria-hidden
+        className="absolute inset-y-1 left-1 w-[calc(50%-4px)] rounded-full bg-accent"
+        style={{
+          transform: billing === "yearly" ? "translateX(100%)" : "translateX(0)",
+          transition: "transform 320ms var(--ease-spring)",
+        }}
+      />
+      {(
+        [
+          { key: "monthly", label: "Monthly" },
+          { key: "yearly", label: "Yearly · 2 mo free" },
+        ] as const
+      ).map((opt) => {
+        const on = billing === opt.key;
+        return (
+          <button
+            key={opt.key}
+            type="button"
+            onClick={() => onChange(opt.key)}
+            aria-pressed={on}
+            className={`relative z-10 flex-1 cursor-pointer rounded-full px-4 py-2 text-label font-semibold transition-colors ${
+              on ? "text-white" : "text-quiet hover:text-ink"
+            }`}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
 function PlanCard({ plan, billing }: { plan: Plan; billing: Billing }) {
   return (
     <div
-      className={`relative flex flex-col gap-4.5 rounded-2xl border bg-surface p-6 ${
+      className={`relative flex flex-col gap-4.5 rounded-2xl bg-surface p-6 transition-[transform,border-color,box-shadow] duration-150 hover:translate-y-px hover:shadow-[inset_0_1px_0_rgba(34,37,43,0.05)] ${
+        // Recommended plan: a static 2px Press-Blue border — a drawn look, not
+        // an animated one (direction.md §5.11; the hero demo owns FrameDraw).
         plan.featured
-          ? "border-accent shadow-[0_0_0_4px_#eaeff9,0_20px_40px_-30px_rgba(30,35,45,.4)]"
-          : "border-line"
+          ? "border-2 border-accent"
+          : "border border-line hover:border-btn-hover"
       }`}
     >
       {plan.badge && (
@@ -124,14 +155,14 @@ function PlanCard({ plan, billing }: { plan: Plan; billing: Billing }) {
 
       <div>
         <p className="flex items-baseline gap-1.5">
-          <span className="text-[34px] font-bold tracking-[-1px] tabular-nums">
+          <span className="font-display text-[38px] font-bold leading-none tracking-[-0.02em] tabular-nums">
             ${money(plan.price[billing])}
           </span>
           <span className="text-label text-muted">
             {billing === "yearly" ? "/ month, billed yearly" : "/ month"}
           </span>
         </p>
-        <p className="mt-1 text-helper text-muted">{plan.note[billing]}</p>
+        <p className="mt-1.5 text-helper text-muted">{plan.note[billing]}</p>
       </div>
 
       <Link
@@ -174,14 +205,7 @@ export function PricingPlans() {
   return (
     <>
       <div className="flex justify-center">
-        <div className="inline-flex items-center gap-1 rounded-full border border-line bg-surface p-1.25">
-          <Pill on={billing === "monthly"} onClick={() => setBilling("monthly")}>
-            Monthly
-          </Pill>
-          <Pill on={billing === "yearly"} onClick={() => setBilling("yearly")}>
-            Yearly · 2 months free
-          </Pill>
-        </div>
+        <BillingToggle billing={billing} onChange={setBilling} />
       </div>
 
       <div className="mx-auto mt-8 grid max-w-[760px] items-start gap-3.5 sm:grid-cols-2">
