@@ -100,7 +100,17 @@ export function StageController({ children }: { children: ReactNode }) {
 
 /* ------------------------------------------------------------------ M2/M7 */
 
-/** Hide-then-print-wipe on first reveal; optional rotation settle (sticker). */
+/**
+ * Print-wipe on first reveal; optional rotation settle (sticker).
+ *
+ * Visibility is NEVER gated on JS. The print-wipe is an entrance for content
+ * that scrolls IN from below, so content already on screen at mount is left
+ * exactly as the server rendered it — visible. Hiding what's already visible is
+ * what flashed/kept the whole page blank after hydration. Below-fold content is
+ * hidden and revealed when it scrolls in (a plain intersection, so it works for
+ * bands taller than the viewport), and a fail-open timer guarantees nothing can
+ * stay hidden even if the observer never fires.
+ */
 function useReveal(
   ref: RefObject<HTMLElement | null>,
   opts: { delay?: number; rotate?: number } = {},
@@ -109,6 +119,28 @@ function useReveal(
   useEffect(() => {
     const el = ref.current;
     if (!el || prefersReducedMotion()) return;
+
+    // Already in (or above) the viewport at mount? Leave it visible — no hide,
+    // no animation. This is the whole fix for the hero/first-band blank.
+    const vh = window.innerHeight || 0;
+    const rect = el.getBoundingClientRect();
+    if (rect.bottom > 0 && rect.top < vh) return;
+
+    let revealed = false;
+    const reveal = () => {
+      if (revealed) return;
+      revealed = true;
+      el.style.transition =
+        "clip-path 550ms var(--ease-press), opacity 150ms linear, transform 550ms var(--ease-press)";
+      el.style.clipPath = "inset(0 0 0 0)";
+      el.style.opacity = "1";
+      el.style.transform = "translateY(0) rotate(0deg)";
+      const done = () => {
+        el.style.willChange = "";
+        el.removeEventListener("transitionend", done);
+      };
+      el.addEventListener("transitionend", done);
+    };
 
     el.style.clipPath = "inset(0 100% 0 0)";
     el.style.opacity = "0";
@@ -119,23 +151,22 @@ function useReveal(
       (entries, obs) => {
         if (!entries[0].isIntersecting) return;
         obs.disconnect();
-        window.setTimeout(() => {
-          el.style.transition =
-            "clip-path 550ms var(--ease-press), opacity 150ms linear, transform 550ms var(--ease-press)";
-          el.style.clipPath = "inset(0 0 0 0)";
-          el.style.opacity = "1";
-          el.style.transform = "translateY(0) rotate(0deg)";
-          const done = () => {
-            el.style.willChange = "";
-            el.removeEventListener("transitionend", done);
-          };
-          el.addEventListener("transitionend", done);
-        }, delay);
+        window.setTimeout(reveal, delay);
       },
-      { threshold: 0.2 },
+      // Any intersection triggers it (a % threshold can never be met by a band
+      // taller than the viewport); the small bottom margin gives a lead-in.
+      { rootMargin: "0px 0px -12% 0px", threshold: 0 },
     );
     io.observe(el);
-    return () => io.disconnect();
+
+    // Fail open: content is never left hidden. If the observer somehow never
+    // fires, reveal anyway shortly after it would have scrolled into play.
+    const failsafe = window.setTimeout(reveal, 2500 + delay);
+
+    return () => {
+      io.disconnect();
+      window.clearTimeout(failsafe);
+    };
   }, [ref, delay, rotate]);
 }
 
