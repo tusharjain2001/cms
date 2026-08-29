@@ -52,7 +52,7 @@ export default function PagesScreen() {
         <EmptyState
           icon="▤"
           title="Your website has no pages yet"
-          body="Most websites start with a Home page. You can add more later and drag them into the order you want."
+          body="Start from a template so the first page isn't empty, or build one from scratch. You can add more later and drag them into the order you want."
           action={
             <Button variant="primary" onClick={() => s.openModal("addpage")}>
               + Add your first page

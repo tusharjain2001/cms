@@ -21,6 +21,7 @@ import type {
   SectionDTO,
   SectionTypeDef,
 } from "./dto";
+import type { PageTemplate } from "./templates";
 
 /**
  * All dashboard state, backed by the CMS API.
@@ -69,6 +70,7 @@ interface Store {
   pages: PageSummaryDTO[];
   loadingPages: boolean;
   addPage: (title: string) => Promise<void>;
+  addPageFromTemplate: (title: string, template: PageTemplate) => Promise<PageDTO | null>;
   duplicatePage: (id: string) => Promise<void>;
   deletePage: (id: string) => Promise<void>;
   movePage: (from: number, to: number) => Promise<void>;
@@ -435,6 +437,40 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [projectId, refreshPages, pushToast, reportError]
   );
 
+  const addPageFromTemplate = useCallback(
+    async (title: string, template: PageTemplate) => {
+      if (!projectId) return null;
+      // Only seed section types this website actually has enabled — never let
+      // a template send a type the project doesn't allow.
+      const allowed = new Set(project?.allowedSectionTypes ?? []);
+      const applicable = template.sections.filter((sec) => allowed.has(sec.type) && typeFor(sec.type));
+      try {
+        const created = await api<PageDTO>(`/api/projects/${projectId}/pages`, {
+          method: "POST",
+          body: { title },
+        });
+        for (const sec of applicable) {
+          const added = await api<{ section: SectionDTO }>(`/api/pages/${created.id}/sections`, {
+            method: "POST",
+            body: { type: sec.type },
+          });
+          await api(`/api/pages/${created.id}/sections/${added.section.id}`, {
+            method: "PATCH",
+            body: sec.name ? { content: sec.content, name: sec.name } : { content: sec.content },
+          });
+        }
+        await refreshPages(projectId);
+        setModal(null);
+        pushToast(`“${created.title}” added from the ${template.name} template. Edit it, then Publish when ready.`);
+        return created;
+      } catch (err) {
+        reportError(err);
+        return null;
+      }
+    },
+    [projectId, project, typeFor, refreshPages, pushToast, reportError]
+  );
+
   const duplicatePage = useCallback(
     async (id: string) => {
       const source = pages.find((p) => p.id === id);
@@ -772,6 +808,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     pages,
     loadingPages,
     addPage,
+    addPageFromTemplate,
     duplicatePage,
     deletePage,
     movePage,
