@@ -56,8 +56,9 @@ function Lines({ n, tint }: { n: number; tint: string }) {
   );
 }
 
-/** The card itself — a mini published page. Shared by both layers. */
-function SheetFace({ kind, tone }: { kind: Kind; tone: Tone }) {
+/** The card itself — a mini published page. Shared by both layers (and the
+ *  publish pipeline's stage-3 "live page" — press-run.tsx). */
+export function SheetFace({ kind, tone }: { kind: Kind; tone: Tone }) {
   return (
     <div className="flex h-full w-full flex-col overflow-hidden rounded-[7px] border border-ink/12 bg-white p-[10%] shadow-[0_10px_30px_-14px_rgba(27,30,36,0.45)]">
       {kind === "swatch" ? (
@@ -118,18 +119,14 @@ const PAPERS: Paper[] = [
 
 function Sheet({ p, i }: { p: Paper; i: number }) {
   const ratio = p.kind === "swatch" ? 0.74 : 1.26;
-  // Fly-in: from off the sheet's own side (right sheets sweep in from the
-  // right, left from the left), rising, over-rotated then unwinding, staggered.
-  const ix = p.pos.right !== undefined ? 74 : p.pos.left !== undefined ? -60 : 20;
-  const irot = p.rot >= 0 ? 14 : -14;
-  const inDelay = Math.min(720, 110 + i * 55);
+  // Drop-in stagger: the sheets fall from the top a beat apart, so the entrance
+  // reads as a playful cascade rather than everything landing at once.
+  const inDelay = Math.min(780, 60 + i * 75);
   return (
     <div
       className={`pc-paper-in absolute ${p.show}`}
       style={{
         ...p.pos,
-        ["--ix" as string]: `${ix}px`,
-        ["--irot" as string]: `${irot}deg`,
         ["--in-delay" as string]: `${inDelay}ms`,
       }}
     >

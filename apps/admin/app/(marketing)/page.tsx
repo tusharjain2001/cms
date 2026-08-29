@@ -180,25 +180,9 @@ export default function LandingPage() {
             </Marquee>
           </section>
 
-          {/* ------------------------------------------- press run · sky */}
+          {/* --------------------------- press run · sky (publish pipeline) */}
           <Band stage="sky" id="how" className="py-20 sm:py-24">
-            <PressRun
-              intro={
-                <div className="max-w-[440px]">
-                  <Print>
-                    <Eyebrow>How it works</Eyebrow>
-                  </Print>
-                  <Print delay={70}>
-                    <H2 className="mt-3">You build it. They fill it in.</H2>
-                  </Print>
-                  <Print delay={140}>
-                    <Lede className="mt-4">
-                      Three moving parts, and only one of them belongs to your client.
-                    </Lede>
-                  </Print>
-                </div>
-              }
-            />
+            <PressRun />
           </Band>
 
           {/* ------------------------------------- stats + can / cannot · paper */}

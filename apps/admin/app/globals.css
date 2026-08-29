@@ -447,19 +447,39 @@
    `transform`. Decorative (aria-hidden), so the opacity:0 start never touches
    content. Switched off under reduced motion -> the sheet is simply at rest. */
 .pc-paper-in {
-  animation: pcPaperFlyIn 0.8s var(--ease-press) both;
+  /* Drop in from above (watchable, near-constant fall) then a damped-spring
+     settle — 3 diminishing bounces, like a ball on a rope. */
+  animation: pcPaperDrop 1.15s linear both;
   animation-delay: var(--in-delay, 0s);
   will-change: transform, opacity;
 }
-@keyframes pcPaperFlyIn {
-  from {
+@keyframes pcPaperDrop {
+  0% {
     opacity: 0;
-    transform: translate3d(var(--ix, 0px), var(--iy, 42px), 0)
-      rotate(var(--irot, 6deg)) scale(0.78);
+    transform: translate3d(0, -44vh, 0) rotate(-5deg);
   }
-  to {
+  8% {
     opacity: 1;
-    transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
+  }
+  /* lands at rest ~45%, then 3 diminishing bounces settle it */
+  45% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+    animation-timing-function: cubic-bezier(0.34, 1.25, 0.6, 1);
+  }
+  59% {
+    transform: translate3d(0, 18px, 0) rotate(1.8deg);
+  }
+  72% {
+    transform: translate3d(0, -9px, 0) rotate(-0.9deg);
+  }
+  84% {
+    transform: translate3d(0, 4px, 0) rotate(0.4deg);
+  }
+  93% {
+    transform: translate3d(0, -1.5px, 0) rotate(-0.15deg);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
   }
 }
 
@@ -510,6 +530,91 @@
   }
 }
 
+/* ---- How-it-works publish pipeline (press-run.tsx) ----------------------
+   A left-to-right pipeline: connectors draw in when the section scrolls in, a
+   paper token loops stage 1 -> 2 -> 3, an editor caret blinks, and the live
+   page pops. All transform/opacity, all decorative — the cards themselves are
+   plain markup revealed by <Print>, so with no JS or reduced motion the pipe
+   reads as a finished, connected diagram (the base connector line is always
+   painted; only the brighter accent overlay draws). ------------------------- */
+
+/* Connector: the accent overlay is drawn (scaleX) on scroll-in; the base line
+   under it is always visible, so a connected pipeline holds without motion. */
+.pc-pipe .pc-conn-draw {
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+.pc-pipe.is-live .pc-conn-draw {
+  animation: pcConnDraw 0.55s var(--ease-press) forwards;
+}
+.pc-pipe.is-live .pc-conn-2 .pc-conn-draw {
+  animation-delay: 0.35s;
+}
+@keyframes pcConnDraw {
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* The paper token gliding across a connector, on a loop so motion is always on
+   screen when the reader arrives. The second connector is phase-offset half a
+   cycle, so the two hops read as one packet flowing 1 -> 2 -> 3. */
+.pc-flow {
+  transform: translateY(-50%);
+  animation: pcFlow 2.6s var(--ease-press) infinite;
+  will-change: transform, opacity;
+}
+.pc-conn-2 .pc-flow {
+  animation-delay: 1.3s;
+}
+@keyframes pcFlow {
+  0% {
+    transform: translate(0, -50%) rotate(-6deg);
+    opacity: 0;
+  }
+  14% {
+    opacity: 1;
+  }
+  68% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(60px, -50%) rotate(-6deg);
+    opacity: 0;
+  }
+}
+
+/* Blinking caret in the stage-2 editor field. */
+.pc-caret {
+  animation: pcCaret 1.05s steps(1) infinite;
+}
+@keyframes pcCaret {
+  0%,
+  55% {
+    opacity: 1;
+  }
+  56%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* The live page pops the moment the pipeline goes live. */
+.pc-pipe.is-live .pc-pop {
+  animation: pcPublishPop 0.7s var(--ease-spring) 0.55s both;
+}
+@keyframes pcPublishPop {
+  0% {
+    transform: scale(0.94);
+  }
+  55% {
+    transform: scale(1.03);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .pc-paper,
   .pc-paper-in,
@@ -522,7 +627,11 @@
   .animate-accordion-up,
   .animate-print,
   .animate-marquee,
-  .animate-heartbeat {
+  .animate-heartbeat,
+  .pc-conn-draw,
+  .pc-flow,
+  .pc-caret,
+  .pc-pop {
     animation: none;
   }
 }
