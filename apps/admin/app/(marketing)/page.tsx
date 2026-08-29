@@ -402,7 +402,7 @@ export default function LandingPage() {
           </Band>
 
           {/* ------------------------------- comparison + testimonials · lilac */}
-          <Band stage="lilac" className="py-20 sm:py-24">
+          <Band stage="lilac" className="py-20 sm:py-24" bg={<SectionPapers preset="lilac" />}>
             <Print>
               <div className="overflow-x-auto rounded-2xl border border-line bg-surface">
                 <table className="w-full min-w-[640px] border-collapse text-left">
@@ -429,7 +429,10 @@ export default function LandingPage() {
                   </thead>
                   <tbody>
                     {COMPARISON.rows.map(([label, ours, ...theirs]) => (
-                      <tr key={label} className="border-b border-line-soft last:border-b-0">
+                      <tr
+                        key={label}
+                        className="border-b border-line-soft transition-colors duration-150 last:border-b-0 hover:bg-sunken"
+                      >
                         <th
                           scope="row"
                           className="px-6 py-4 text-left text-[13.5px] font-medium text-ink"
@@ -459,7 +462,7 @@ export default function LandingPage() {
                 {TESTIMONIALS.map((t) => (
                   <figure
                     key={t.name}
-                    className="h-full rounded-2xl border border-line bg-surface p-7 sm:p-8"
+                    className="pc-lift h-full rounded-2xl border border-line bg-surface p-7 hover:border-accent-line sm:p-8"
                   >
                     <blockquote className="font-display text-[26px] leading-[1.2] font-semibold tracking-[-0.01em] sm:text-[32px]">
                       &ldquo;{t.quote}&rdquo;
@@ -494,7 +497,7 @@ export default function LandingPage() {
                     key={f.q}
                     className="group border-b border-line-soft last:border-b-0 [&_summary::-webkit-details-marker]:hidden"
                   >
-                    <summary className="flex cursor-pointer items-center justify-between gap-4 px-6 py-4.5 text-[14.5px] font-semibold select-none">
+                    <summary className="flex cursor-pointer items-center justify-between gap-4 px-6 py-4.5 text-[14.5px] font-semibold transition-colors duration-150 select-none hover:bg-sunken">
                       {f.q}
                       <span
                         aria-hidden

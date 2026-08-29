@@ -198,6 +198,10 @@ const SECTION_PRESETS: Record<string, SectionPaper[]> = {
     { w: 116, kind: "photo", tone: "mint",  pos: { bottom: "-8%", left: "15%" }, rot: 6, par: 70, show: "hidden lg:block" },
     { w: 76,  kind: "page",  tone: "lilac", pos: { bottom: "4%", right: "17%" }, rot: -6, par: 32, show: "hidden lg:block" },
   ],
+  lilac: [
+    { w: 96,  kind: "page",  tone: "sky",   pos: { top: "-5%", right: "2%"  }, rot: 8,  par: 44, show: "hidden lg:block" },
+    { w: 80,  kind: "page",  tone: "sun",   pos: { bottom: "1%", left: "-2%" }, rot: -7, par: 58, show: "hidden lg:block" },
+  ],
 };
 
 function SectionSheet({ p }: { p: SectionPaper }) {
