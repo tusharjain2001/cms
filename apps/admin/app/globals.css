@@ -23,7 +23,7 @@
 
   /* Text */
   --color-ink: #22252b;
-  --color-quiet: #6f737d;
+  --color-quiet: #63676f; /* AA fix: 5.21:1 on paper (was #6f737d, 4.35:1) */
   --color-muted: #63666e;
   --color-faint: #6c6f77;
   --color-slate: #4c5058;
@@ -31,14 +31,25 @@
      though --color-faint was darkened for AA (see ::placeholder below). */
   --color-placeholder: #a9aab0;
 
-  /* Accent */
-  --color-accent: #2b4f9e;
-  --color-accent-dark: #24427f;
-  --color-accent-soft: #eef1f9;
-  --color-accent-tint: #e4e9f4;
-  --color-accent-line: #c9d5ec;
-  --color-accent-line-soft: #b9c6e2;
-  --color-accent-wash: #f5f8fd;
+  /* Accent — Press Blue (the interactive voice; retunes indigo everywhere) */
+  --color-accent: #0d63c0;
+  --color-accent-dark: #0a4f9b;
+  --color-accent-soft: #e7f0fb;
+  --color-accent-tint: #dbe8f8;
+  --color-accent-line: #bcd4ef;
+  --color-accent-line-soft: #a8c7ea;
+  --color-accent-wash: #f2f7fd;
+
+  /* Marketing spot inks + stage washes (light only — marketing never renders
+     dark). Flat ink, no gradients. See cms-redesign/direction.md §3. */
+  --color-sun: #ffd731;      /* the highlighter — never a text colour */
+  --color-sun-ink: #5f4a06;  /* sun-family chips only (6.08:1 on sun) */
+  --color-mint-pop: #55db9c; /* decorative in light; text-safe only on plate */
+  --color-wash-sky: #dcecfd;
+  --color-wash-butter: #fdeebc;
+  --color-wash-lilac: #e9e3f6;
+  --color-wash-mint: #e3f2db;
+  --color-plate: #1b1e24;    /* the ink band (tonal reset) */
 
   /* Published (green) */
   --color-published: #2f7d5b;
@@ -65,6 +76,9 @@
   /* Type scale — Karla for words, IBM Plex Mono for paths and keys */
   --font-sans: Karla, Helvetica, Arial, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  /* Marketing display face — Bricolage Grotesque, loaded via next/font in
+     app/layout.tsx as --font-bricolage. Marketing headlines >=32px only. */
+  --font-display: var(--font-bricolage, "Bricolage Grotesque"), Karla, Helvetica, Arial, sans-serif;
 
   --text-screen: 26px;
   --text-screen--line-height: 32px;
@@ -112,8 +126,15 @@
   --animate-accordion-down: pcAccordionDown 0.25s var(--ease-spring) both;
   --animate-accordion-up: pcAccordionUp 0.2s ease both;
 
+  /* Marketing motion — the print-press grammar (direction.md §2). */
+  --animate-print: pcPrint 0.55s var(--ease-press) both;
+  --animate-marquee: pcMarquee 38s linear infinite;
+  --animate-heartbeat: pcHeartbeat 2.4s ease-in-out infinite;
+
   /* A spring-like ease for drag-drop settle and accordion expand/collapse. */
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* The print-press entrance ease — every marketing reveal (direction.md §2). */
+  --ease-press: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* ------------------------------------------------------------------
@@ -154,14 +175,14 @@
     --color-slate: #cfc3aa;
     --color-placeholder: #6e6353;
 
-    /* Accent */
-    --color-accent: #7b9ce8;
-    --color-accent-dark: #5c7dd6;
-    --color-accent-soft: #262c40;
-    --color-accent-tint: #2c3348;
-    --color-accent-line: #3d4a6e;
-    --color-accent-line-soft: #333e5c;
-    --color-accent-wash: #201f2c;
+    /* Accent — Press Blue, dark sibling (keeps one brand voice in the dash) */
+    --color-accent: #6fb1ec;
+    --color-accent-dark: #5fa8e8;
+    --color-accent-soft: #1e2a38;
+    --color-accent-tint: #24344a;
+    --color-accent-line: #31537a;
+    --color-accent-line-soft: #2b4668;
+    --color-accent-wash: #181f28;
 
     /* Published (green) */
     --color-published: #4fae82;
@@ -207,13 +228,13 @@
   --color-slate: #cfc3aa;
   --color-placeholder: #6e6353;
 
-  --color-accent: #7b9ce8;
-  --color-accent-dark: #5c7dd6;
-  --color-accent-soft: #262c40;
-  --color-accent-tint: #2c3348;
-  --color-accent-line: #3d4a6e;
-  --color-accent-line-soft: #333e5c;
-  --color-accent-wash: #201f2c;
+  --color-accent: #6fb1ec;
+  --color-accent-dark: #5fa8e8;
+  --color-accent-soft: #1e2a38;
+  --color-accent-tint: #24344a;
+  --color-accent-line: #31537a;
+  --color-accent-line-soft: #2b4668;
+  --color-accent-wash: #181f28;
 
   --color-published: #4fae82;
   --color-published-bg: #1b2e24;
@@ -361,6 +382,45 @@
     box-shadow: 0 0 0 4px var(--color-accent), 0 0 0 15px rgba(43, 79, 158, 0.08);
   }
 }
+
+/* ---- Marketing motion keyframes (direction.md §2) — flat ink, transform/
+   opacity/clip-path only. Neutralized in the reduced-motion block below. ---- */
+@keyframes pcPrint {
+  from {
+    clip-path: inset(0 100% 0 0);
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  28% {
+    opacity: 1;
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes pcMarquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+@keyframes pcHeartbeat {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-published) 45%, transparent);
+  }
+  50% {
+    transform: scale(1.25);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 7px transparent;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .pc-spotlight,
   .animate-bob-up,
@@ -368,7 +428,10 @@
   .animate-settle,
   .animate-celebrate,
   .animate-accordion-down,
-  .animate-accordion-up {
+  .animate-accordion-up,
+  .animate-print,
+  .animate-marquee,
+  .animate-heartbeat {
     animation: none;
   }
 }

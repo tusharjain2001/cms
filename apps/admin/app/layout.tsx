@@ -1,5 +1,21 @@
 import type { Metadata } from "next";
+import { Bricolage_Grotesque } from "next/font/google";
 import "./globals.css";
+
+/**
+ * Bricolage Grotesque — the marketing display face (headlines >=32px only;
+ * never dashboard, never body). Self-hosted by next/font (no layout shift, no
+ * render-blocking Google request) and exposed as the `--font-bricolage` CSS
+ * variable, which globals.css `--font-display` consumes. Karla + IBM Plex Mono
+ * stay on the Google stylesheet <link> below, unchanged.
+ */
+const bricolage = Bricolage_Grotesque({
+  subsets: ["latin"],
+  weight: ["600", "700", "800"],
+  display: "swap",
+  variable: "--font-bricolage",
+  fallback: ["Karla", "Helvetica", "Arial", "sans-serif"],
+});
 
 /**
  * The root layout is deliberately bare.
@@ -18,7 +34,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={bricolage.variable}>
       <head>
         {/* Applies a saved explicit theme choice before first paint, so
             there is no flash of the wrong theme while React hydrates.
