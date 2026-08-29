@@ -1,4 +1,5 @@
 import type { SectionContent } from "./fields.js";
+import type { PlanId } from "./plans.js";
 
 /**
  * Wire shapes shared by the API, the dashboard and the site SDK.
@@ -76,6 +77,34 @@ export interface ProjectDTO {
   ownerName: string;
 }
 
+/**
+ * A write-scoped API token for ONE website, handed to that site's developer so
+ * their tools (or the Pagecraft MCP) can author content on exactly that site —
+ * without ever having the owner's account login, and without touching any other
+ * website. The full secret is shown once at creation; only this summary travels
+ * afterwards.
+ */
+export interface ProjectTokenDTO {
+  id: string;
+  label: string;
+  /** A short, non-secret prefix so a token is recognisable in a list. */
+  prefix: string;
+  createdAt: string;
+  /** Null until the token is first used to make a request. */
+  lastUsedAt?: string;
+}
+
+/** Everything the dashboard needs to draw a website's usage against its plan. */
+export interface QuotaUsageDTO {
+  plan: PlanId;
+  planName: string;
+  /** Account-level: websites this owner has, against the plan's ceiling. */
+  projects: { used: number; limit: number };
+  pages: { used: number; limit: number };
+  storageBytes: { used: number; limit: number };
+  apiCallsThisMonth: { used: number; limit: number };
+}
+
 /** One file in a project's media library. */
 export interface MediaDTO {
   id: string;
@@ -103,6 +132,8 @@ export interface UserDTO {
   /** Reserved for whoever runs this CMS instance. Never granted by signing up. */
   isPlatformAdmin: boolean;
   projectIds: string[];
+  /** The account's subscription plan, which sets its quotas. */
+  plan: PlanId;
   /**
    * Whether this account has finished (or skipped) the first-sign-in tour.
    * Kept on the account rather than in the browser so the tour does not replay
@@ -116,7 +147,7 @@ export interface UserDTO {
  * merely display. Matching on the English message would break the first time
  * anyone rewords it.
  */
-export type ApiErrorCode = "email_not_verified" | "email_not_configured";
+export type ApiErrorCode = "email_not_verified" | "email_not_configured" | "quota_exceeded";
 
 /** Every API response uses this envelope. */
 export type ApiResponse<T> =

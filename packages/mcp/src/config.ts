@@ -15,9 +15,13 @@
  * - `PAGECRAFT_EMAIL` / `PAGECRAFT_PASSWORD` are an ordinary account sign-in.
  *   Everything that edits pages, sections or media authenticates as an account,
  *   exactly like the dashboard does.
+ * - `PAGECRAFT_PROJECT_TOKEN` is a write-scoped token for ONE website (minted
+ *   on that website's Integration screen). It authors pages, sections and media
+ *   on that one site with no account login and no access to anything else —
+ *   which is exactly what you hand a client's developer.
  *
- * Supplying one, the other, or both is valid; the server only offers the tools
- * the credentials it has can actually perform.
+ * Supplying one, some, or all is valid; the server only offers the tools the
+ * credentials it has can actually perform.
  */
 
 export interface McpConfig {
@@ -35,6 +39,12 @@ export interface McpConfig {
    * refresh itself.
    */
   accessToken?: string;
+  /**
+   * A write-scoped token for one website. Unlocks the authoring tools for that
+   * site alone; never expires and needs no refresh, so it suits both a
+   * short-lived call and a long-running server.
+   */
+  projectToken?: string;
   /** Used whenever a tool's `projectId` argument is omitted. */
   defaultProjectId?: string;
   /** Hides every tool that changes anything. Reads still work. */
@@ -74,11 +84,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): McpConfig {
 
   const apiKey = clean(env.PAGECRAFT_API_KEY);
   const accessToken = clean(env.PAGECRAFT_ACCESS_TOKEN);
+  const projectToken = clean(env.PAGECRAFT_PROJECT_TOKEN);
 
-  if (!apiKey && !email && !accessToken) {
+  if (!apiKey && !email && !accessToken && !projectToken) {
     throw new ConfigError(
       "No credentials. Set PAGECRAFT_API_KEY to read published content, and/or " +
-        "PAGECRAFT_EMAIL + PAGECRAFT_PASSWORD to edit pages, sections and media."
+        "PAGECRAFT_PROJECT_TOKEN (a website's write token) or PAGECRAFT_EMAIL + " +
+        "PAGECRAFT_PASSWORD to edit pages, sections and media."
     );
   }
 
@@ -88,14 +100,15 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): McpConfig {
     email,
     password,
     accessToken,
+    projectToken,
     defaultProjectId: clean(env.PAGECRAFT_PROJECT_ID),
     readOnly: truthy(env.PAGECRAFT_READ_ONLY),
   };
 }
 
-/** True when the config can authenticate as an account, and so may write. */
+/** True when the config can author content — via a write token or an account. */
 export const hasSessionCredentials = (config: McpConfig) =>
-  Boolean(config.accessToken || (config.email && config.password));
+  Boolean(config.projectToken || config.accessToken || (config.email && config.password));
 
 const maskEmail = (email: string) => {
   const [name, domain] = email.split("@");
@@ -111,7 +124,8 @@ const maskEmail = (email: string) => {
 export function describeConfig(config: McpConfig): string {
   const parts = [config.apiUrl];
   parts.push(config.apiKey ? "content key: set" : "content key: none");
-  if (config.accessToken) parts.push("account: access token");
+  if (config.projectToken) parts.push("authoring: project token");
+  else if (config.accessToken) parts.push("account: access token");
   else if (config.email) parts.push(`account: ${maskEmail(config.email)}`);
   else parts.push("account: none");
   if (config.defaultProjectId) parts.push(`default project: ${config.defaultProjectId}`);

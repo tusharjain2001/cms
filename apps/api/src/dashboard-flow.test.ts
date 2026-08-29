@@ -43,6 +43,7 @@ before(async () => {
   disconnect = disconnectDb;
   await User.create({
     email: "maya@studio.test",
+    plan: "business", // this fixture owns several sites; quotas are tested elsewhere
     name: "Maya Kessler",
     emailVerifiedAt: new Date(),
     passwordHash: await hashPassword("open-sesame"),

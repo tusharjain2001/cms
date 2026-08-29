@@ -2,6 +2,7 @@ import { Router } from "express";
 import { Page, toPublicPageDTO } from "../models/page.js";
 import { requireApiKey } from "../middleware/api-key.js";
 import { rateLimit } from "../middleware/rate-limit.js";
+import { enforceApiCallQuota } from "../lib/plan.js";
 import { notFound, ok } from "../lib/respond.js";
 import { verifyPreviewToken } from "../lib/tokens.js";
 
@@ -28,6 +29,13 @@ router.use(
 );
 
 router.use(requireApiKey);
+
+// Meter this website's content-API usage against its plan's monthly quota, and
+// refuse with a friendly 402 once it is spent. Runs after the key lookup so the
+// count is attributed to the right website; the meter is atomic (see usage.ts).
+router.use((req, res, next) => {
+  enforceApiCallQuota(req.project!).then(() => next(), next);
+});
 
 /** Cached at the CDN, which is what keeps a plain React site fast. */
 function cacheable(res: import("express").Response) {

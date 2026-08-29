@@ -150,9 +150,13 @@ npm run build --workspace @pagecraft/mcp
           <p className="mt-2 text-helper leading-[1.55] text-muted">
             The key here is <strong>read-only</strong> and scoped to this website alone, so it is
             safe to keep in your config. To let the agent <em>author</em> content (create pages, add
-            sections, publish) swap it for <span className="font-mono text-micro">PAGECRAFT_EMAIL</span>{" "}
-            + <span className="font-mono text-micro">PAGECRAFT_PASSWORD</span> and drop{" "}
-            <span className="font-mono text-micro">PAGECRAFT_READ_ONLY</span>.
+            sections, publish), don&apos;t hand it your account login — mint a{" "}
+            <strong>write-scoped project token</strong> instead under{" "}
+            <span className="font-mono text-micro">Developer access tokens</span> on this page, then
+            swap <span className="font-mono text-micro">PAGECRAFT_API_KEY</span> +{" "}
+            <span className="font-mono text-micro">PAGECRAFT_READ_ONLY</span> for{" "}
+            <span className="font-mono text-micro">PAGECRAFT_PROJECT_TOKEN</span> +{" "}
+            <span className="font-mono text-micro">PAGECRAFT_PROJECT_ID</span>.
           </p>
 
           <details className="group mt-4 rounded-lg border border-line-mid bg-rail">

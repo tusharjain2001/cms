@@ -126,11 +126,22 @@ export class PagecraftClient {
   /* --------------------------------------------------- the authoring API */
 
   async authed<T>(method: HttpMethod, path: string, body?: unknown): Promise<T> {
+    // A write-scoped project token is the simplest authoring credential: it
+    // never expires, so there is no sign-in, no refresh and no retry dance —
+    // just send it. The API accepts it as a Bearer token (it recognises the
+    // `pwt_` prefix) and confines it to its own website.
+    if (this.config.projectToken) {
+      const res = await this.send(method, path, body, {
+        authorization: `Bearer ${this.config.projectToken}`,
+      });
+      return this.unwrap<T>(res);
+    }
+
     if (!this.hasSession) {
       throw new PagecraftError(
         401,
-        "This tool edits your website, which needs an account sign-in: set PAGECRAFT_EMAIL and PAGECRAFT_PASSWORD. " +
-          "A website's API key is read-only and cannot be used here."
+        "This tool edits your website, which needs either PAGECRAFT_PROJECT_TOKEN (a website's write token) " +
+          "or an account sign-in (PAGECRAFT_EMAIL + PAGECRAFT_PASSWORD). A website's API key is read-only."
       );
     }
 

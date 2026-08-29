@@ -43,7 +43,8 @@ config block gives a server.
 |---|---|
 | `PAGECRAFT_API_URL` | **Required.** e.g. `https://api.yourdomain.com` |
 | `PAGECRAFT_API_KEY` | A website's read-only key, from its Settings screen. Unlocks the published-content tools. |
-| `PAGECRAFT_EMAIL` | Account email. Unlocks everything that edits. |
+| `PAGECRAFT_PROJECT_TOKEN` | A **write-scoped token for one website**, minted on that website's Integration screen. Unlocks the authoring tools for that site alone, with no account login and no access to anything else — this is what a site owner hands their developer. Never expires; pair it with `PAGECRAFT_PROJECT_ID`. |
+| `PAGECRAFT_EMAIL` | Account email. Unlocks editing across every website the account can reach. |
 | `PAGECRAFT_PASSWORD` | Account password. |
 | `PAGECRAFT_ACCESS_TOKEN` | An already-minted access token instead of email/password. These expire after 15 minutes and cannot be renewed, so this suits a one-off run, not a server left open. |
 | `PAGECRAFT_PROJECT_ID` | Default website, so tools need not repeat it. |

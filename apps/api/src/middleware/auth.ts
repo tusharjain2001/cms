@@ -3,6 +3,12 @@ import { Types } from "mongoose";
 import { User, type UserDoc } from "../models/user.js";
 import { Project, type ProjectDoc } from "../models/project.js";
 import { Page, type PageDoc } from "../models/page.js";
+import {
+  ProjectToken,
+  type ProjectTokenDoc,
+  hashToken,
+  looksLikeProjectToken,
+} from "../models/project-token.js";
 import { forbidden, notFound, unauthorized } from "../lib/respond.js";
 import { verifyAccessToken } from "../lib/tokens.js";
 
@@ -13,9 +19,20 @@ declare global {
       user?: UserDoc;
       project?: ProjectDoc;
       page?: PageDoc;
+      /**
+       * Set instead of `user` when the caller authenticated with a write-scoped
+       * project token rather than a signed-in account. It grants content
+       * authoring on exactly `projectToken.projectId` and nothing else — never
+       * a website's settings, and never any other website.
+       */
+      projectToken?: ProjectTokenDoc;
     }
   }
 }
+
+/** The project a token-authenticated request is confined to, or null. */
+const tokenProjectId = (req: Request): string | null =>
+  req.projectToken ? req.projectToken.projectId.toString() : null;
 
 /**
  * True when this user may open this website at all.
@@ -64,6 +81,46 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
 }
 
 /**
+ * Authenticates a *content-authoring* request as EITHER a signed-in account
+ * (Bearer access token, sets `req.user`) OR a write-scoped project token
+ * (`pwt_…`, sets `req.projectToken`). Use this in place of `requireAuth` on the
+ * routes a client's developer must be able to reach — pages, sections, publish,
+ * media — so they can be handed one website without an account.
+ *
+ * The token is accepted either as `Authorization: Bearer pwt_…` (what the MCP
+ * sends) or an `x-project-token` header. Owner-only routes deliberately keep
+ * plain `requireAuth`, so a token can never reach a website's settings.
+ */
+export async function requireActor(req: Request, _res: Response, next: NextFunction) {
+  try {
+    const header = req.headers.authorization ?? "";
+    const bearer = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
+    const xToken = (req.header("x-project-token") ?? "").trim();
+    const rawToken = looksLikeProjectToken(bearer) ? bearer : xToken || "";
+
+    if (rawToken) {
+      const token = await ProjectToken.findOne({ tokenHash: hashToken(rawToken) });
+      if (!token) throw unauthorized("That project token is not valid.");
+      req.projectToken = token;
+      // Record use, but not on every request — a coarse timestamp is plenty and
+      // saves a write per call. Fire-and-forget; never blocks the request.
+      const last = token.lastUsedAt?.getTime() ?? 0;
+      if (Date.now() - last > 60_000) {
+        void ProjectToken.updateOne({ _id: token._id }, { $set: { lastUsedAt: new Date() } }).catch(
+          () => {}
+        );
+      }
+      return next();
+    }
+
+    // No project token — fall back to account auth.
+    return requireAuth(req, _res, next);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
  * Guards the settings a website's owner alone controls: its API key, revalidate
  * webhook, enabled section types, who else has access, and deleting it.
  *
@@ -90,17 +147,25 @@ export function requireVerified(req: Request, _res: Response, next: NextFunction
   next();
 }
 
-/** Loads `:projectId` and checks the signed-in user may touch it. */
+/** Loads `:projectId` and checks the caller (account OR project token) may touch it. */
 export async function requireProjectAccess(req: Request, _res: Response, next: NextFunction) {
   try {
-    if (!req.user) throw unauthorized();
-
     const id = req.params.projectId ?? req.params.id;
     if (!id || !Types.ObjectId.isValid(id)) throw notFound("That website does not exist.");
 
+    // A project token is confined to its own website, full stop.
+    const scoped = tokenProjectId(req);
+    if (scoped) {
+      if (scoped !== id) throw forbidden("This token is for a different website.");
+      const project = await Project.findById(id);
+      if (!project) throw notFound("That website does not exist.");
+      req.project = project;
+      return next();
+    }
+
+    if (!req.user) throw unauthorized();
     const project = await Project.findById(id);
     if (!project) throw notFound("That website does not exist.");
-
     if (!userCanAccessProject(req.user, project)) {
       throw forbidden("You do not have access to that website.");
     }
@@ -118,8 +183,6 @@ export async function requireProjectAccess(req: Request, _res: Response, next: N
  */
 export async function requirePageAccess(req: Request, _res: Response, next: NextFunction) {
   try {
-    if (!req.user) throw unauthorized();
-
     const pageId = req.params.pageId;
     if (!pageId || !Types.ObjectId.isValid(pageId)) throw notFound("That page does not exist.");
 
@@ -129,6 +192,15 @@ export async function requirePageAccess(req: Request, _res: Response, next: Next
     const project = await Project.findById(page.projectId);
     if (!project) throw notFound("That page does not exist.");
 
+    const scoped = tokenProjectId(req);
+    if (scoped) {
+      if (scoped !== project._id.toString()) throw forbidden("This token is for a different website.");
+      req.page = page;
+      req.project = project;
+      return next();
+    }
+
+    if (!req.user) throw unauthorized();
     if (!userCanAccessProject(req.user, project)) {
       throw forbidden("You do not have access to that page.");
     }

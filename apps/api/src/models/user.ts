@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { Schema, model, type HydratedDocument, type InferSchemaType, type Types } from "mongoose";
-import type { UserDTO } from "@pagecraft/shared";
+import { type PlanId, type UserDTO, isPlanId } from "@pagecraft/shared";
 
 /**
  * Anyone can create one of these by signing up, so nothing on this record
@@ -22,6 +22,12 @@ const userSchema = new Schema(
     isPlatformAdmin: { type: Boolean, default: false },
     /** Websites this user was invited to. Websites they OWN are not listed here. */
     projectIds: [{ type: Schema.Types.ObjectId, ref: "Project" }],
+    /**
+     * Subscription plan, which sets this account's quotas (see @pagecraft/shared
+     * `PLANS`). Everyone starts on Free; a real payment provider changes this by
+     * calling `setPlan` from its webhook — nothing else here changes.
+     */
+    plan: { type: String, default: "free" },
     /**
      * Bumped whenever the password changes. Refresh tokens carry the value they
      * were signed with, so resetting a password instantly logs out every other
@@ -56,8 +62,12 @@ export function toUserDTO(user: UserDoc): UserDTO {
     emailVerified: isVerified(user),
     isPlatformAdmin: user.isPlatformAdmin,
     projectIds: (user.projectIds as Types.ObjectId[]).map((id) => id.toString()),
+    plan: planIdOf(user),
     // Boolean(), not `!== null`: accounts created before this field existed
     // read back `undefined`, and they have not done the tour either.
     onboardingComplete: Boolean(user.onboardingCompletedAt),
   };
 }
+
+/** The account's plan, defaulting anything unknown/legacy to Free. */
+export const planIdOf = (user: UserDoc): PlanId => (isPlanId(user.plan) ? user.plan : "free");

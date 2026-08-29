@@ -54,6 +54,7 @@ before(async () => {
 
   await User.create({
     email: "dev@example.com",
+    plan: "business", // this fixture owns several sites; quotas are tested elsewhere
     name: "Dev",
     emailVerifiedAt: new Date(),
     passwordHash: await hashPassword("correct-horse"),

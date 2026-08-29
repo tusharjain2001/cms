@@ -89,7 +89,7 @@ describe("authoring API (account session)", () => {
   it("refuses without account credentials, and says the API key will not do", async () => {
     await assert.rejects(
       client({ email: undefined, password: undefined }).authed("GET", "/api/projects"),
-      /read-only and cannot be used here/
+      /PAGECRAFT_PROJECT_TOKEN.*account sign-in|API key is read-only/
     );
   });
 
@@ -262,6 +262,35 @@ describe("authoring API (account session)", () => {
       assert.equal(err.status, 401);
       return true;
     });
+  });
+});
+
+describe("authoring API (project write token)", () => {
+  it("sends the token as a bearer and never signs in or refreshes", async () => {
+    const calls: { url: string; auth?: string }[] = [];
+    const fakeFetch = (async (url: string | URL, init?: RequestInit) => {
+      const headers = (init?.headers ?? {}) as Record<string, string>;
+      calls.push({ url: String(url), auth: headers.authorization });
+      return new Response(JSON.stringify({ success: true, data: [] }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }) as unknown as typeof fetch;
+
+    const c = new PagecraftClient({
+      config: {
+        apiUrl: "https://api.example.test",
+        projectToken: "pwt_live_deadbeef",
+        readOnly: false,
+      },
+      fetchImpl: fakeFetch,
+    });
+
+    await c.authed("GET", "/api/projects/abc/pages");
+
+    assert.equal(calls.length, 1, "no extra login/refresh round-trips");
+    assert.equal(calls[0]!.auth, "Bearer pwt_live_deadbeef");
+    assert.ok(!calls.some((k) => k.url.includes("/api/auth/")), "never hits the auth endpoints");
   });
 });
 

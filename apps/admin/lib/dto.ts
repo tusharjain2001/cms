@@ -17,6 +17,8 @@ export type {
   PageStatus,
   PageSummaryDTO,
   ProjectDTO,
+  ProjectTokenDTO,
+  QuotaUsageDTO,
   SectionContent,
   SectionDTO,
   SectionTypeDef,

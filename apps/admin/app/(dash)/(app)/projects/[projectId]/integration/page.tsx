@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { API_URL } from "@/lib/api";
-import type { FieldDef, SectionTypeDef } from "@/lib/dto";
+import { ApiError, API_URL, api } from "@/lib/api";
+import type { FieldDef, ProjectTokenDTO, QuotaUsageDTO, SectionTypeDef } from "@/lib/dto";
 import { useStore } from "@/lib/store";
-import { Button, Card, CardTitle, cx } from "@/components/ui";
+import { Button, Card, CardTitle, Input, Modal, ModalActions, cx } from "@/components/ui";
 
 /**
  * How a developer connects a real website to this one CMS website.
@@ -224,6 +224,275 @@ function Step({
   );
 }
 
+/**
+ * Write-scoped tokens: how an owner hands a developer authoring access to
+ * exactly ONE website — no account password, revocable, nothing else exposed.
+ * Owner-only; a 403 (not the owner) just hides the card rather than erroring.
+ */
+function DeveloperTokensCard({ projectId }: { projectId: string }) {
+  const s = useStore();
+  const [tokens, setTokens] = useState<ProjectTokenDTO[] | null>(null);
+  const [forbidden, setForbidden] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [label, setLabel] = useState("");
+  const [creating, setCreating] = useState(false);
+  /** The one moment the raw secret exists in this browser — never fetched again. */
+  const [newToken, setNewToken] = useState<(ProjectTokenDTO & { token: string }) | null>(null);
+
+  async function load() {
+    try {
+      setTokens(await api<ProjectTokenDTO[]>(`/api/projects/${projectId}/tokens`));
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 403) {
+        setForbidden(true);
+        return;
+      }
+      s.pushToast(err instanceof ApiError ? err.message : "Could not load tokens.", "error");
+    }
+  }
+
+  useEffect(() => {
+    void load();
+  }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (forbidden) return null;
+
+  async function create() {
+    if (!label.trim()) return;
+    setCreating(true);
+    try {
+      const created = await api<ProjectTokenDTO & { token: string }>(
+        `/api/projects/${projectId}/tokens`,
+        { method: "POST", body: { label: label.trim() } }
+      );
+      setNewToken(created);
+      setLabel("");
+      await load();
+    } catch (err) {
+      s.pushToast(err instanceof ApiError ? err.message : "Could not create that token.", "error");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function revoke(t: ProjectTokenDTO) {
+    if (!window.confirm(`Revoke “${t.label}”? Anything using it stops working immediately.`)) return;
+    try {
+      await api(`/api/projects/${projectId}/tokens/${t.id}`, { method: "DELETE" });
+      s.pushToast("Token revoked");
+      await load();
+    } catch (err) {
+      s.pushToast(err instanceof ApiError ? err.message : "Could not revoke that token.", "error");
+    }
+  }
+
+  return (
+    <Card>
+      <CardTitle sub="Safe to hand out — it never exposes your account, only this website, and you can revoke it any time.">
+        Developer access tokens
+      </CardTitle>
+      <p className="mb-4 text-label leading-[1.6] text-quiet">
+        Mint a token and give it to your (or your client&apos;s) developer, or drop it into their
+        coding agent&apos;s config. It can create pages, add sections and publish — on{" "}
+        <strong>this website only</strong>. It cannot see or touch anything else in your account.
+      </p>
+
+      {tokens === null ? (
+        <p className="text-label text-muted">Loading…</p>
+      ) : tokens.length === 0 ? (
+        <p className="mb-4 text-label text-muted">No tokens yet.</p>
+      ) : (
+        <div className="mb-4 overflow-hidden rounded-lg border border-line-mid">
+          <table className="w-full border-collapse text-left">
+            <tbody>
+              {tokens.map((t) => (
+                <tr key={t.id} className="border-b border-line-soft last:border-b-0">
+                  <td className="px-4 py-3">
+                    <div className="text-label font-semibold">{t.label}</div>
+                    <div className="mt-0.5 font-mono text-micro text-muted">{t.prefix}</div>
+                  </td>
+                  <td className="px-4 py-3 text-mid whitespace-nowrap text-quiet">
+                    Created{" "}
+                    {new Date(t.createdAt).toLocaleDateString(undefined, {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </td>
+                  <td className="px-4 py-3 text-mid whitespace-nowrap text-quiet">
+                    {t.lastUsedAt
+                      ? `Used ${new Date(t.lastUsedAt).toLocaleDateString(undefined, {
+                          day: "numeric",
+                          month: "short",
+                        })}`
+                      : "Never used"}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <Button variant="quiet" onClick={() => void revoke(t)}>
+                      Revoke
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <Button variant="secondary" onClick={() => setModalOpen(true)}>
+        Create token
+      </Button>
+
+      <Modal
+        open={modalOpen}
+        onClose={() => {
+          // The raw secret only ever lived in this state — once shown, closing
+          // the modal any other way must not silently drop it unseen.
+          if (!newToken) setModalOpen(false);
+        }}
+      >
+        <div className="p-6">
+          {newToken ? (
+            <>
+              <h2 className="text-modal font-bold">Copy this now</h2>
+              <p className="mt-1 mb-4 rounded-lg border border-destructive-line bg-destructive-bg px-4 py-3 text-label leading-[1.55] text-slate">
+                <strong>Copy this now — you won&apos;t be able to see it again.</strong> Paste it
+                wherever your developer needs it (their MCP config, or an{" "}
+                <span className="font-mono text-micro">Authorization: Bearer</span> header).
+              </p>
+              <CodeBlock code={newToken.token} file={newToken.label} />
+              <ModalActions>
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    setNewToken(null);
+                    setModalOpen(false);
+                  }}
+                >
+                  Done
+                </Button>
+              </ModalActions>
+            </>
+          ) : (
+            <>
+              <h2 className="text-modal font-bold">Create a token</h2>
+              <p className="mt-1 mb-4 text-label text-quiet">
+                Give it a name so you recognise it later — e.g. “Acme Co. developer”.
+              </p>
+              <Input
+                autoFocus
+                placeholder="Label"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void create();
+                }}
+              />
+              <ModalActions>
+                <Button variant="quiet" onClick={() => setModalOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  disabled={!label.trim() || creating}
+                  onClick={() => void create()}
+                >
+                  {creating ? "Creating…" : "Create"}
+                </Button>
+              </ModalActions>
+            </>
+          )}
+        </div>
+      </Modal>
+    </Card>
+  );
+}
+
+/** bytes → the largest unit that keeps the number readable. */
+function formatBytes(bytes: number): string {
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
+  if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${bytes} B`;
+}
+
+/** One labelled meter bar — amber past 80%, red at or over the limit. */
+function Meter({
+  label,
+  used,
+  limit,
+  format = (n: number) => n.toLocaleString(),
+}: {
+  label: string;
+  used: number;
+  limit: number;
+  format?: (n: number) => string;
+}) {
+  const pct = limit > 0 ? Math.min(100, (used / limit) * 100) : 0;
+  const over = limit > 0 && used >= limit;
+  const near = limit > 0 && !over && used / limit >= 0.8;
+  return (
+    <div>
+      <div className="mb-1.5 flex items-baseline justify-between text-label">
+        <span className="font-semibold">{label}</span>
+        <span className="text-mid text-quiet">
+          {format(used)} / {limit > 0 ? format(limit) : "∞"}
+        </span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-chip">
+        <div
+          className={cx(
+            "h-full rounded-full transition-[width]",
+            over ? "bg-destructive" : near ? "bg-draft" : "bg-accent"
+          )}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/** Plan + quota snapshot — read-only, fetched once on mount. */
+function UsageCard({ projectId }: { projectId: string }) {
+  const s = useStore();
+  const [usage, setUsage] = useState<QuotaUsageDTO | null>(null);
+
+  useEffect(() => {
+    api<QuotaUsageDTO>(`/api/projects/${projectId}/usage`)
+      .then(setUsage)
+      .catch((err) =>
+        s.pushToast(err instanceof ApiError ? err.message : "Could not load usage.", "error")
+      );
+  }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <Card>
+      <CardTitle sub={usage ? `You're on the ${usage.planName} plan.` : undefined}>
+        Usage & plan
+      </CardTitle>
+      {!usage ? (
+        <p className="text-label text-muted">Loading…</p>
+      ) : (
+        <div className="flex flex-col gap-4">
+          <Meter label="Websites" used={usage.projects.used} limit={usage.projects.limit} />
+          <Meter label="Pages" used={usage.pages.used} limit={usage.pages.limit} />
+          <Meter
+            label="Storage"
+            used={usage.storageBytes.used}
+            limit={usage.storageBytes.limit}
+            format={formatBytes}
+          />
+          <Meter
+            label="API calls this month"
+            used={usage.apiCallsThisMonth.used}
+            limit={usage.apiCallsThisMonth.limit}
+          />
+        </div>
+      )}
+    </Card>
+  );
+}
+
 export default function IntegrationScreen() {
   const s = useStore();
   const params = useParams<{ projectId: string }>();
@@ -387,6 +656,9 @@ export async function POST(req) {
             sections and content and writes the same code for you.
           </p>
         </div>
+
+        {/* --------------------------------------------- developer tokens */}
+        <DeveloperTokensCard projectId={project.id} />
 
         {/* ------------------------------------------------------ the idea */}
         <Card>
@@ -647,6 +919,9 @@ export async function POST(req) {
             </p>
           )}
         </Card>
+
+        {/* ----------------------------------------------------- usage & plan */}
+        <UsageCard projectId={project.id} />
       </div>
     </div>
   );

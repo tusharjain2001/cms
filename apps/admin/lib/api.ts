@@ -27,7 +27,7 @@ export interface ApiIssue {
 }
 
 /** Matches `ApiErrorCode` in @pagecraft/shared. */
-export type ApiCode = "email_not_verified" | "email_not_configured";
+export type ApiCode = "email_not_verified" | "email_not_configured" | "quota_exceeded";
 
 export class ApiError extends Error {
   constructor(

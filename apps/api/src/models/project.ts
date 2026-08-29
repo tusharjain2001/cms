@@ -81,11 +81,18 @@ export async function describeProjects(
   );
 }
 
-/** Single-website version of the above. */
-export async function describeProject(project: ProjectDoc, viewer: UserDoc): Promise<ProjectDTO> {
+/**
+ * Single-website version of the above. `viewer` is null when the caller
+ * authenticated with a write-scoped project token rather than an account — such
+ * a caller is an editor of this one website, never its owner.
+ */
+export async function describeProject(
+  project: ProjectDoc,
+  viewer: UserDoc | null
+): Promise<ProjectDTO> {
   const owner = await User.findById(project.ownerId as Types.ObjectId).select("name");
   return toProjectDTO(project, {
-    role: roleFor(project, viewer),
+    role: viewer ? roleFor(project, viewer) : "editor",
     ownerName: owner?.name ?? "Unknown",
   });
 }

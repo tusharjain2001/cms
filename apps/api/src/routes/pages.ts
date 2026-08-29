@@ -15,8 +15,9 @@ import {
   toPageSummaryDTO,
   toSectionDTOs,
 } from "../models/page.js";
-import { requireAuth, requirePageAccess, requireProjectAccess } from "../middleware/auth.js";
+import { requireActor, requirePageAccess, requireProjectAccess } from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
+import { assertCanAddPage } from "../lib/plan.js";
 import { badRequest, conflict, notFound, ok } from "../lib/respond.js";
 import { fireRevalidate } from "../lib/revalidate.js";
 import { signPreviewToken } from "../lib/tokens.js";
@@ -41,7 +42,7 @@ const seoSchema = z.object({
 
 /* ------------------------------------------------------- pages in a website */
 
-router.get("/projects/:projectId/pages", requireAuth, requireProjectAccess, async (req, res, next) => {
+router.get("/projects/:projectId/pages", requireActor, requireProjectAccess, async (req, res, next) => {
   try {
     const pages = await Page.find({ projectId: req.project!._id }).sort({ order: 1, createdAt: 1 });
     return ok(res, pages.map(toPageSummaryDTO));
@@ -57,7 +58,7 @@ const createPageSchema = z.object({
 
 router.post(
   "/projects/:projectId/pages",
-  requireAuth,
+  requireActor,
   requireProjectAccess,
   validateBody(createPageSchema),
   async (req, res, next) => {
@@ -69,6 +70,8 @@ router.post(
 
       const clash = await Page.findOne({ projectId: req.project!._id, slug });
       if (clash) throw conflict("A page already uses that web address.");
+
+      await assertCanAddPage(req.project!);
 
       const count = await Page.countDocuments({ projectId: req.project!._id });
       const page = await Page.create({
@@ -91,7 +94,7 @@ const reorderSchema = z.object({ ids: z.array(z.string()).min(1) });
 
 router.patch(
   "/projects/:projectId/pages/reorder",
-  requireAuth,
+  requireActor,
   requireProjectAccess,
   validateBody(reorderSchema),
   async (req, res, next) => {
@@ -118,7 +121,7 @@ router.patch(
 
 /* ----------------------------------------------------------------- one page */
 
-router.get("/pages/:pageId", requireAuth, requirePageAccess, (req, res) => ok(res, toPageDTO(req.page!)));
+router.get("/pages/:pageId", requireActor, requirePageAccess, (req, res) => ok(res, toPageDTO(req.page!)));
 
 const updatePageSchema = z.object({
   title: z.string().min(1).max(120).optional(),
@@ -128,7 +131,7 @@ const updatePageSchema = z.object({
 
 router.patch(
   "/pages/:pageId",
-  requireAuth,
+  requireActor,
   requirePageAccess,
   validateBody(updatePageSchema),
   async (req, res, next) => {
@@ -158,7 +161,7 @@ router.patch(
   }
 );
 
-router.delete("/pages/:pageId", requireAuth, requirePageAccess, async (req, res, next) => {
+router.delete("/pages/:pageId", requireActor, requirePageAccess, async (req, res, next) => {
   try {
     await req.page!.deleteOne();
     return ok(res, { deleted: true });
@@ -173,7 +176,7 @@ const addSectionSchema = z.object({ type: z.string().min(1) });
 
 router.post(
   "/pages/:pageId/sections",
-  requireAuth,
+  requireActor,
   requirePageAccess,
   validateBody(addSectionSchema),
   async (req, res, next) => {
@@ -217,7 +220,7 @@ const patchSectionSchema = z.object({
 
 router.patch(
   "/pages/:pageId/sections/:sectionId",
-  requireAuth,
+  requireActor,
   requirePageAccess,
   validateBody(patchSectionSchema),
   async (req, res, next) => {
@@ -247,7 +250,7 @@ router.patch(
   }
 );
 
-router.delete("/pages/:pageId/sections/:sectionId", requireAuth, requirePageAccess, async (req, res, next) => {
+router.delete("/pages/:pageId/sections/:sectionId", requireActor, requirePageAccess, async (req, res, next) => {
   try {
     const page = req.page!;
     const current = toSectionDTOs(page.draftSections);
@@ -264,7 +267,7 @@ router.delete("/pages/:pageId/sections/:sectionId", requireAuth, requirePageAcce
 
 router.patch(
   "/pages/:pageId/sections-reorder",
-  requireAuth,
+  requireActor,
   requirePageAccess,
   validateBody(reorderSchema),
   async (req, res, next) => {
@@ -289,7 +292,7 @@ router.patch(
 
 /* -------------------------------------------------------- publish / discard */
 
-router.post("/pages/:pageId/publish", requireAuth, requirePageAccess, async (req, res, next) => {
+router.post("/pages/:pageId/publish", requireActor, requirePageAccess, async (req, res, next) => {
   try {
     const page = req.page!;
     const draft = toSectionDTOs(page.draftSections);
@@ -337,7 +340,7 @@ router.post("/pages/:pageId/publish", requireAuth, requirePageAccess, async (req
   }
 });
 
-router.post("/pages/:pageId/discard-draft", requireAuth, requirePageAccess, async (req, res, next) => {
+router.post("/pages/:pageId/discard-draft", requireActor, requirePageAccess, async (req, res, next) => {
   try {
     const page = req.page!;
     setDraftSections(page, toSectionDTOs(page.sections));
@@ -350,7 +353,7 @@ router.post("/pages/:pageId/discard-draft", requireAuth, requirePageAccess, asyn
 });
 
 /** Short-lived link so the client can see their draft on their real website. */
-router.post("/pages/:pageId/preview-token", requireAuth, requirePageAccess, (req, res) => {
+router.post("/pages/:pageId/preview-token", requireActor, requirePageAccess, (req, res) => {
   const page = req.page!;
   return ok(res, {
     token: signPreviewToken(page._id.toString()),

@@ -43,5 +43,8 @@ export const forbidden = (msg = "You do not have access to that.", code?: ApiErr
   new HttpError(403, msg, undefined, code);
 export const notFound = (msg = "Not found.") => new HttpError(404, msg);
 export const conflict = (msg: string) => new HttpError(409, msg);
+/** A plan limit was hit — 402 tells the dashboard to offer an upgrade. */
+export const paymentRequired = (msg: string) =>
+  new HttpError(402, msg, undefined, "quota_exceeded");
 export const serviceUnavailable = (msg: string, code?: ApiErrorCode) =>
   new HttpError(503, msg, undefined, code);

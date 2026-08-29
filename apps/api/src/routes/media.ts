@@ -3,8 +3,9 @@ import { Types } from "mongoose";
 import { z } from "zod";
 import { Media, toMediaDTO } from "../models/media.js";
 import { Project } from "../models/project.js";
-import { requireAuth, requireProjectAccess } from "../middleware/auth.js";
+import { requireActor, requireProjectAccess } from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
+import { assertStorageAllows } from "../lib/plan.js";
 import { badRequest, forbidden, notFound, ok } from "../lib/respond.js";
 import {
   createUploadTicket,
@@ -39,12 +40,16 @@ const signSchema = z.object({
  */
 router.post(
   "/projects/:projectId/media/sign",
-  requireAuth,
+  requireActor,
   requireProjectAccess,
   validateBody(signSchema),
   async (req, res, next) => {
     try {
       if (!r2Configured()) throw badRequest(NOT_SET_UP);
+      // Size is unknown before a presigned PUT, so this only refuses once the
+      // website is already at its storage ceiling — register (below) does the
+      // exact check with the real byte count.
+      await assertStorageAllows(req.project!, 0);
       const { contentHash, contentType, ext } = req.body as z.infer<typeof signSchema>;
       const ticket = await createUploadTicket({
         projectId: req.project!._id.toString(),
@@ -119,7 +124,7 @@ const uploadQuerySchema = z.object({
  */
 router.post(
   "/projects/:projectId/media/upload",
-  requireAuth,
+  requireActor,
   requireProjectAccess,
   raw({ type: "*/*", limit: MAX_PROXY_UPLOAD_BYTES }),
   async (req, res, next) => {
@@ -139,6 +144,10 @@ router.post(
       const parsed = uploadQuerySchema.safeParse(req.query);
       if (!parsed.success) throw badRequest("That upload's details were not valid.");
       const meta = parsed.data;
+
+      // We have the real bytes in hand and have not written anything yet, so
+      // this is the clean place to enforce the storage quota with no orphan.
+      await assertStorageAllows(req.project!, body.length);
 
       const projectId = req.project!._id.toString();
       // Hashed here, from the bytes actually received — the client's claim about
@@ -189,7 +198,7 @@ const registerSchema = z.object({
  */
 router.post(
   "/projects/:projectId/media",
-  requireAuth,
+  requireActor,
   requireProjectAccess,
   validateBody(registerSchema),
   async (req, res, next) => {
@@ -204,6 +213,16 @@ router.post(
       const existing = await Media.findOne({ projectId: req.project!._id, publicId: body.publicId });
       if (existing) return ok(res, toMediaDTO(existing));
 
+      // The object is already in R2 (the browser PUT it via the presigned
+      // ticket). If registering it would exceed the storage quota, remove the
+      // object so a rejected upload leaves nothing behind, then refuse.
+      try {
+        await assertStorageAllows(req.project!, body.bytes);
+      } catch (quotaErr) {
+        await destroyObject(body.publicId).catch(() => {});
+        throw quotaErr;
+      }
+
       const created = await Media.create({ ...body, projectId: req.project!._id });
       return ok(res, toMediaDTO(created), 201);
     } catch (err) {
@@ -216,7 +235,7 @@ router.post(
 
 router.get(
   "/projects/:projectId/media",
-  requireAuth,
+  requireActor,
   requireProjectAccess,
   async (req, res, next) => {
     try {
@@ -231,20 +250,28 @@ router.get(
   }
 );
 
-/** Loads `:mediaId` and checks the caller may touch the project that owns it. */
-async function loadMedia(req: Parameters<typeof requireAuth>[0]) {
+/** Loads `:mediaId` and checks the caller (account OR project token) may touch it. */
+async function loadMedia(req: Parameters<typeof requireActor>[0]) {
   const id = req.params.mediaId;
   if (!id || !Types.ObjectId.isValid(id)) throw notFound("That file is not in your library.");
 
   const item = await Media.findById(id);
   if (!item) throw notFound("That file is not in your library.");
 
-  // Access follows the website the file belongs to — owning it, or having been
-  // added to it. A media id from another account's library must not resolve.
-  const user = req.user!;
   const project = await Project.findById(item.projectId);
   if (!project) throw notFound("That file is not in your library.");
 
+  // A project token may only touch files on its own website.
+  if (req.projectToken) {
+    if (req.projectToken.projectId.toString() !== project._id.toString()) {
+      throw forbidden("This token is for a different website.");
+    }
+    return item;
+  }
+
+  // Otherwise access follows the website the file belongs to — owning it, or
+  // having been added to it. A media id from another account must not resolve.
+  const user = req.user!;
   const allowed =
     user.isPlatformAdmin ||
     project.ownerId.toString() === user._id.toString() ||
@@ -258,7 +285,7 @@ const altSchema = z.object({ alt: z.string().max(300) });
 
 router.patch(
   "/media/:mediaId",
-  requireAuth,
+  requireActor,
   validateBody(altSchema),
   async (req, res, next) => {
     try {
@@ -272,7 +299,7 @@ router.patch(
   }
 );
 
-router.delete("/media/:mediaId", requireAuth, async (req, res, next) => {
+router.delete("/media/:mediaId", requireActor, async (req, res, next) => {
   try {
     const item = await loadMedia(req);
     const removed = await destroyObject(item.publicId);
