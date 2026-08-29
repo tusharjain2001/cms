@@ -66,9 +66,12 @@ function SheetFace({ kind, tone }: { kind: Kind; tone: Tone }) {
         <>
           <span className={`block h-[10%] w-[46%] rounded-full ${BAR[tone]}`} />
           {kind === "photo" && (
-            <div className={`mt-[9%] h-[40%] w-full rounded-[3px] ${SWATCH[tone]}`} />
+            <div className={`mt-[9%] h-[38%] w-full rounded-[3px] ${SWATCH[tone]}`} />
           )}
-          <Lines n={kind === "photo" ? 2 : 3} tint="bg-ink/10" />
+          <Lines n={kind === "photo" ? 1 : 3} tint="bg-ink/10" />
+          {kind === "photo" && (
+            <span className="mt-[8%] block h-[7%] w-[38%] rounded-full bg-accent" />
+          )}
         </>
       )}
     </div>
@@ -113,25 +116,39 @@ const PAPERS: Paper[] = [
   { w: 56,  kind: "photo",  tone: "mint",   pos: { bottom: "3%", right: "-5%" }, rot: -9, dx: -5, dy: 12,  dr: -2, dur: 23, delay: -3,  show: "sm:hidden" },
 ];
 
-function Sheet({ p }: { p: Paper }) {
+function Sheet({ p, i }: { p: Paper; i: number }) {
   const ratio = p.kind === "swatch" ? 0.74 : 1.26;
+  // Fly-in: from off the sheet's own side (right sheets sweep in from the
+  // right, left from the left), rising, over-rotated then unwinding, staggered.
+  const ix = p.pos.right !== undefined ? 74 : p.pos.left !== undefined ? -60 : 20;
+  const irot = p.rot >= 0 ? 14 : -14;
+  const inDelay = Math.min(720, 110 + i * 55);
   return (
     <div
-      className={`pc-paper absolute ${p.show}`}
+      className={`pc-paper-in absolute ${p.show}`}
       style={{
         ...p.pos,
-        width: p.w,
-        height: Math.round(p.w * ratio),
-        transform: `rotate(${p.rot}deg)`,
-        ["--rot" as string]: `${p.rot}deg`,
-        ["--dx" as string]: `${p.dx}px`,
-        ["--dy" as string]: `${p.dy}px`,
-        ["--dr" as string]: `${p.dr}deg`,
-        ["--dur" as string]: `${p.dur}s`,
-        ["--delay" as string]: `${p.delay}s`,
+        ["--ix" as string]: `${ix}px`,
+        ["--irot" as string]: `${irot}deg`,
+        ["--in-delay" as string]: `${inDelay}ms`,
       }}
     >
-      <SheetFace kind={p.kind} tone={p.tone} />
+      <div
+        className="pc-paper"
+        style={{
+          width: p.w,
+          height: Math.round(p.w * ratio),
+          transform: `rotate(${p.rot}deg)`,
+          ["--rot" as string]: `${p.rot}deg`,
+          ["--dx" as string]: `${p.dx}px`,
+          ["--dy" as string]: `${p.dy}px`,
+          ["--dr" as string]: `${p.dr}deg`,
+          ["--dur" as string]: `${p.dur}s`,
+          ["--delay" as string]: `${p.delay}s`,
+        }}
+      >
+        <SheetFace kind={p.kind} tone={p.tone} />
+      </div>
     </div>
   );
 }
@@ -140,7 +157,7 @@ export function FlyingPapers() {
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
       {PAPERS.map((p, i) => (
-        <Sheet key={i} p={p} />
+        <Sheet key={i} p={p} i={i} />
       ))}
     </div>
   );

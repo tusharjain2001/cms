@@ -441,6 +441,28 @@
   }
 }
 
+/* Hero papers fly in on load, then hand off to the ambient drift. The entrance
+   lives on an outer wrapper (translate/scale/spin/opacity) and the perpetual
+   drift on the inner sheet, so the two compose instead of fighting for the one
+   `transform`. Decorative (aria-hidden), so the opacity:0 start never touches
+   content. Switched off under reduced motion -> the sheet is simply at rest. */
+.pc-paper-in {
+  animation: pcPaperFlyIn 0.8s var(--ease-press) both;
+  animation-delay: var(--in-delay, 0s);
+  will-change: transform, opacity;
+}
+@keyframes pcPaperFlyIn {
+  from {
+    opacity: 0;
+    transform: translate3d(var(--ix, 0px), var(--iy, 42px), 0)
+      rotate(var(--irot, 6deg)) scale(0.78);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
+  }
+}
+
 /* ------------------------------------------------------------------
    Scroll-driven parallax (the "alive as you scroll" layer).
 
@@ -490,6 +512,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .pc-paper,
+  .pc-paper-in,
   .pc-spotlight,
   .animate-bob-up,
   .animate-bob-down,
