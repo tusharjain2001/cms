@@ -441,6 +441,53 @@
   }
 }
 
+/* ------------------------------------------------------------------
+   Scroll-driven parallax (the "alive as you scroll" layer).
+
+   Pure CSS: the scroll timeline drives a transform as the element passes
+   through the viewport — GPU-composited, off the main thread, and with NO
+   scroll listener (jank-free at 60fps). Applied only to decorative layers
+   (drifting paper accents), never to content, so it can never shift or hide
+   copy. Gated so browsers without scroll-timeline and readers with reduced
+   motion simply get the static resting position. --pc-par sets the travel. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .pc-parallax {
+      animation: pcParallax linear both;
+      animation-timeline: view();
+      animation-range: cover;
+      will-change: transform;
+    }
+  }
+}
+@keyframes pcParallax {
+  from {
+    transform: translate3d(0, var(--pc-par, 44px), 0);
+  }
+  to {
+    transform: translate3d(0, calc(var(--pc-par, 44px) * -1), 0);
+  }
+}
+
+/* Hover lift — cards and framed blocks float up a touch and cast a softer,
+   background-tinted shadow. Motion is gated to no-preference; the shadow/
+   border shift is harmless and stays. transition lists properties explicitly
+   (never `all`). */
+.pc-lift {
+  transition:
+    transform 240ms var(--ease-press),
+    box-shadow 240ms var(--ease-press),
+    border-color 200ms ease;
+}
+.pc-lift:hover {
+  box-shadow: 0 26px 46px -26px rgba(27, 30, 36, 0.42);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .pc-lift:hover {
+    transform: translateY(-4px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .pc-paper,
   .pc-spotlight,

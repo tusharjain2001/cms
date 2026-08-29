@@ -29,7 +29,7 @@ function Box({ className = "" }: { className?: string }) {
 
 function Thumb({ children }: { children: ReactNode }) {
   return (
-    <span className="mb-4 flex h-[74px] w-full flex-col gap-[6px] rounded-[8px] border border-line-mid bg-sunken p-2.5 text-slate">
+    <span className="mb-4 flex h-[74px] w-full flex-col gap-[6px] rounded-[8px] border border-line-mid bg-sunken p-2.5 text-slate transition-colors duration-200 group-hover:border-accent-line group-hover:bg-accent-soft group-hover:text-accent">
       {children}
     </span>
   );
@@ -170,7 +170,7 @@ export function SectionTypeGrid() {
         {TYPES.map((t) => (
           <div
             key={t.name}
-            className="group relative h-full rounded-[12px] border border-line bg-surface p-4 transition-[transform,border-color,box-shadow] duration-150 ease-out hover:translate-y-px hover:border-btn-hover hover:shadow-[inset_0_2px_6px_-4px_rgba(30,35,45,.2)]"
+            className="group pc-lift relative h-full rounded-[12px] border border-line bg-surface p-4 hover:border-accent-line"
           >
             {/* voltage dot — line colour at rest, publish green when pointed at */}
             <span

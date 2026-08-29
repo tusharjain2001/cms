@@ -144,7 +144,7 @@ function useReveal(
 
     el.style.clipPath = "inset(0 100% 0 0)";
     el.style.opacity = "0";
-    el.style.transform = `translateY(4px)${rotate ? ` rotate(${rotate}deg)` : ""}`;
+    el.style.transform = `translateY(16px)${rotate ? ` rotate(${rotate}deg)` : ""}`;
     el.style.willChange = "clip-path, opacity, transform";
 
     const io = new IntersectionObserver(

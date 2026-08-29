@@ -47,11 +47,18 @@ export function Band({
   id,
   stage,
   className = "",
+  bg,
 }: {
   children: ReactNode;
   id?: string;
   stage?: Stage;
   className?: string;
+  /**
+   * A full-bleed decorative layer painted behind the column (e.g. drifting
+   * `<SectionPapers>`). Positioned against the band, clipped to it, and sitting
+   * beneath the content, which is lifted into its own stacking level.
+   */
+  bg?: ReactNode;
 }) {
   const column = `mx-auto max-w-[1160px] px-5 sm:px-8`;
 
@@ -64,8 +71,15 @@ export function Band({
   }
 
   return (
-    <section id={id} data-stage={stage} className={`stage-band ${STAGE_BG[stage]}`}>
-      <div className={`${column} ${className}`}>{children}</div>
+    <section
+      id={id}
+      data-stage={stage}
+      // Clip only when a decorative layer needs containing — an overflow-hidden
+      // ancestor would break `position: sticky` inside a band (the press run).
+      className={`stage-band relative ${bg ? "overflow-hidden" : ""} ${STAGE_BG[stage]}`}
+    >
+      {bg}
+      <div className={`relative ${column} ${className}`}>{children}</div>
     </section>
   );
 }

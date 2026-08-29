@@ -4,6 +4,7 @@ import { SectionTypeGrid } from "@/components/landing/section-types";
 import { SiteFooter } from "@/components/landing/site-footer";
 import { SiteNav } from "@/components/landing/site-nav";
 import { Band, ButtonLink, Check, Cross, Eyebrow, H2, Lede } from "@/components/landing/bits";
+import { SectionPapers } from "@/components/landing/flying-papers";
 import {
   CountUp,
   GhostDrift,
@@ -369,7 +370,12 @@ export default function LandingPage() {
           </section>
 
           {/* ------------------------------------- section types · butter */}
-          <Band stage="butter" id="sections" className="py-20 sm:py-24">
+          <Band
+            stage="butter"
+            id="sections"
+            className="py-20 sm:py-24"
+            bg={<SectionPapers preset="types" />}
+          >
             <div className="flex flex-wrap items-end justify-between gap-8">
               <div className="max-w-[600px]">
                 <Print>
@@ -505,7 +511,7 @@ export default function LandingPage() {
           </Band>
 
           {/* --------------------------------------------- final cta · mint */}
-          <Band stage="mint" className="py-20 sm:py-28">
+          <Band stage="mint" className="py-20 sm:py-28" bg={<SectionPapers preset="cta" />}>
             <div className="mx-auto max-w-[720px] text-center">
               <Print>
                 <h2 className="font-display text-[clamp(3rem,7vw,4.5rem)] leading-[0.95] font-extrabold tracking-[-0.025em] text-ink">
