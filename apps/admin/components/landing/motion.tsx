@@ -63,9 +63,13 @@ export function StageController({ children }: { children: ReactNode }) {
     wrap.style.transition = "background-color 700ms ease";
     wrap.style.backgroundColor = STAGE_VAR[firstStage] ?? STAGE_VAR.paper;
 
-    // Bands become transparent windows onto the wrapper wash.
+    // Light-wash bands become transparent windows onto the wrapper wash. The
+    // plate band stays opaque: its text is paper-coloured and would vanish on a
+    // light wrapper while scrolling in/out before the wrapper reaches plate.
     const prevBg = bands.map((b) => b.style.backgroundColor);
-    bands.forEach((b) => (b.style.backgroundColor = "transparent"));
+    bands.forEach((b) => {
+      if (b.dataset.stage !== "plate") b.style.backgroundColor = "transparent";
+    });
 
     let current = firstStage;
     const io = new IntersectionObserver(
