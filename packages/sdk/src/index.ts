@@ -9,4 +9,4 @@ export type {
   PageStatus,
   SectionContent,
   SectionDTO,
-} from "@pagecraft/shared";
+} from "./content-types.js";

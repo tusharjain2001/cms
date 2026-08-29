@@ -1,7 +1,8 @@
 {
-  "name": "@pagecraft/sdk",
+  "name": "@mypagecraft/sdk",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
+  "description": "TypeScript SDK for reading a Pagecraft CMS website's published content.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -23,9 +24,6 @@
     "prepare": "tsc -p tsconfig.json",
     "test": "tsx --test src/client.test.ts src/image.test.ts",
     "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@pagecraft/shared": "*"
   },
   "peerDependencies": {
     "react": ">=18"

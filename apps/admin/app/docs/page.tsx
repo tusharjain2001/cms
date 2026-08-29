@@ -20,9 +20,9 @@ import { links } from "@/lib/links";
  * to static HTML, so nothing from `@pagecraft/shared` (Zod included) reaches
  * the browser. Keep it that way: no "use client" in this file.
  *
- * Everything here is deliberately framework-plain `fetch`. `@pagecraft/sdk` is
- * not published to npm yet, so documenting an import nobody can install would
- * be worse than documenting none.
+ * Everything here is deliberately framework-plain `fetch` — no dependency to
+ * install, so it runs anywhere as-is. `@mypagecraft/sdk` is on npm for anyone
+ * who wants a typed client, but the docs stay copy-paste-runnable without it.
  */
 
 const API = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "https://api.mypagecraft.com";

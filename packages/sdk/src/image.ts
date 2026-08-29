@@ -1,4 +1,4 @@
-import type { ImageValue } from "@pagecraft/shared";
+import type { ImageValue } from "./content-types.js";
 
 /**
  * Image delivery helpers.

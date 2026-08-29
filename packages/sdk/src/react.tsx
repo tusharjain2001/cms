@@ -1,5 +1,5 @@
 import { Fragment, createElement, type ComponentType, type ReactNode } from "react";
-import type { SectionDTO } from "@pagecraft/shared";
+import type { SectionDTO } from "./content-types.js";
 
 /**
  * Maps section types to YOUR React components.

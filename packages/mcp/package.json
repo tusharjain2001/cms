@@ -1,7 +1,7 @@
 {
-  "name": "@pagecraft/mcp",
+  "name": "@mypagecraft/mcp",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
   "type": "module",
   "description": "Model Context Protocol server for the Pagecraft CMS API",
   "main": "./dist/index.js",
@@ -29,10 +29,10 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "@pagecraft/shared": "*",
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@pagecraft/shared": "*",
     "@types/node": "^22.10.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.0"

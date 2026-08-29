@@ -1,4 +1,4 @@
-# `@pagecraft/mcp` — Pagecraft as an MCP server
+# `@mypagecraft/mcp` — Pagecraft as an MCP server
 
 An [MCP](https://modelcontextprotocol.io) server that puts a Pagecraft website
 inside an AI assistant. Point it at a Pagecraft API and it offers tools for
@@ -50,16 +50,15 @@ config block gives a server.
 | `PAGECRAFT_PROJECT_ID` | Default website, so tools need not repeat it. |
 | `PAGECRAFT_READ_ONLY` | `1` to offer no tool that changes anything. |
 
-In Claude Desktop / Claude Code, that is — note the path, because this package
-is not published to npm yet, so `npx pagecraft-mcp` will not find it; build the
-repo once (`npm run build --workspace @pagecraft/mcp`) and point at `dist`:
+In Claude Desktop / Claude Code, that is — `npx` fetches and runs it, so there
+is nothing to install:
 
 ```json
 {
   "mcpServers": {
     "pagecraft": {
-      "command": "node",
-      "args": ["/path/to/pagecraft/packages/mcp/dist/bin.js"],
+      "command": "npx",
+      "args": ["-y", "@mypagecraft/mcp"],
       "env": {
         "PAGECRAFT_API_URL": "https://api.yourdomain.com",
         "PAGECRAFT_API_KEY": "pk_...",
@@ -77,10 +76,13 @@ Two things worth deciding on purpose:
 - **`PAGECRAFT_READ_ONLY=1` is the right default for exploring.** Write tools
   are not merely refused, they are never advertised, so an assistant cannot
   reach for one.
-- **A password in a config file is a password in a config file.** Pagecraft has
-  no scoped machine token yet (see *Gaps* below), so this is the only way to
-  authorise writes. Use an account that owns only the websites you are happy for
-  an assistant to edit, and remember a password reset signs every session out.
+- **Prefer a write-scoped project token over an account password.** Mint a
+  `PAGECRAFT_PROJECT_TOKEN` on a website's Integration screen and pair it with
+  `PAGECRAFT_PROJECT_ID`: it authorises writes to that one website, with no
+  account login and no reach into any other site, and is revocable without a
+  password reset. Use the email/password pair only when you genuinely need to
+  work across every website an account can reach — and then an account that owns
+  only what you are happy for an assistant to edit.
 
 ## The tools
 
@@ -165,11 +167,11 @@ editing never goes live, read the registry before writing content, and
 Written down rather than worked around. None of these are invented behaviour;
 each is a real limit of the current API.
 
-1. **No write surface for a website's API key.** The key is read-only by
-   design. Writes need an account password in the config, which is a genuine
-   security cost. The fix is a scoped, revocable machine token — a per-project
-   token with its own permissions, revocable without a password reset. That
-   does not exist yet and would be an API change, not an MCP-server change.
+1. **A website's API key stays read-only by design.** It cannot write, and
+   there is no version of it that can. For writes without an account password,
+   use a `PAGECRAFT_PROJECT_TOKEN` — a scoped, revocable, per-website token
+   minted on the Integration screen (documented above). The API key itself is
+   deliberately never a write credential.
 2. **No token with a useful lifetime.** Access tokens last 15 minutes. This
    server renews itself through `POST /api/auth/refresh` with the rotating
    refresh cookie, falling back to a fresh sign-in — the same mechanism the
@@ -199,9 +201,9 @@ each is a real limit of the current API.
 From the repo root, never from inside this folder:
 
 ```bash
-npm run build --workspace @pagecraft/mcp     # tsc → dist/
-npm test --workspace @pagecraft/mcp          # 74 tests, no live API needed
-npm run typecheck --workspace @pagecraft/mcp
+npm run build --workspace @mypagecraft/mcp     # tsc → dist/
+npm test --workspace @mypagecraft/mcp          # 74 tests, no live API needed
+npm run typecheck --workspace @mypagecraft/mcp
 ```
 
 The tests run every tool handler against `src/stub-api.ts`, a stand-in for the

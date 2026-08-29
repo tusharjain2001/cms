@@ -17,10 +17,9 @@ import { Button, Card, CardTitle, Input, Modal, ModalActions, cx } from "@/compo
  * than reading a generic tutorial and substituting their own details, which is
  * the step people get wrong.
  *
- * It deliberately teaches plain `fetch` rather than `@pagecraft/sdk`. The SDK
- * is unpublished (`"private": true`), so a separate repo cannot install it
- * yet — documenting an import nobody can resolve would be worse than useless.
- * Swap this for the SDK the day it ships to npm.
+ * It deliberately teaches plain `fetch` rather than `@mypagecraft/sdk`: the
+ * copy stays dependency-free and runs anywhere as-is. The SDK is on npm for a
+ * typed client, but plain fetch is the surer thing to hand someone starting out.
  *
  * Nothing here is hard-coded about any section type: the component map and the
  * type list are both generated from `allowedSectionTypes`, so a new entry in

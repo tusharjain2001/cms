@@ -1,4 +1,4 @@
-import type { SectionContent, SectionDTO } from "@pagecraft/shared";
+import type { SectionContent, SectionDTO } from "./content-types.js";
 
 /**
  * The tiny client a website installs to read its own published content.

@@ -73,7 +73,7 @@ export function McpWidget() {
   "mcpServers": {
     "pagecraft": {
       "command": "npx",
-      "args": ["-y", "@pagecraft/mcp"],
+      "args": ["-y", "@mypagecraft/mcp"],
       "env": {
         "PAGECRAFT_API_URL": "${API_URL}",
         "PAGECRAFT_API_KEY": "${project.apiKey}",
@@ -83,13 +83,6 @@ export function McpWidget() {
     }
   }
 }`;
-
-  const fromSource = `# Until @pagecraft/mcp is on npm, build it from the CMS repo,
-# then point your MCP client's "command" at node + this path:
-npm install
-npm run build --workspace @pagecraft/mcp
-#   "command": "node",
-#   "args": ["<path-to-repo>/packages/mcp/dist/bin.js"]`;
 
   return (
     <>
@@ -158,24 +151,6 @@ npm run build --workspace @pagecraft/mcp
             <span className="font-mono text-micro">PAGECRAFT_PROJECT_TOKEN</span> +{" "}
             <span className="font-mono text-micro">PAGECRAFT_PROJECT_ID</span>.
           </p>
-
-          <details className="group mt-4 rounded-lg border border-line-mid bg-rail">
-            <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-2.5 text-label font-semibold text-slate">
-              <span aria-hidden className="text-tiny text-faint transition-transform group-open:rotate-90">
-                ▶
-              </span>
-              The MCP isn&apos;t on npm yet — how to run it today
-            </summary>
-            <div className="border-t border-line-mid px-4 py-3">
-              <p className="mb-2.5 text-mid leading-[1.55] text-quiet">
-                The <span className="font-mono text-micro">npx</span> line above works the moment{" "}
-                <span className="font-mono text-micro">@pagecraft/mcp</span> is published. Until
-                then, build it from the CMS repo and point <span className="font-mono text-micro">command</span>{" "}
-                at the built file:
-              </p>
-              <CodeBox code={fromSource} label="terminal" />
-            </div>
-          </details>
 
           <div className="mt-5 flex items-center justify-between gap-3">
             <button
