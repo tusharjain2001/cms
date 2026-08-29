@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import type {
   ButtonHTMLAttributes,
   InputHTMLAttributes,
@@ -266,7 +267,10 @@ export function EmptyState({
 }) {
   return (
     <div className="rounded-xl border border-dashed border-field bg-surface px-8 py-16 text-center">
-      <div className="mx-auto mb-4 grid h-[46px] w-[46px] place-items-center rounded-xl bg-chip-hover text-xl text-faint">
+      <div
+        aria-hidden="true"
+        className="mx-auto mb-4 grid h-[46px] w-[46px] place-items-center rounded-xl bg-chip-hover text-xl text-faint"
+      >
         {icon}
       </div>
       <h3 className="mb-1.5 text-[17px] font-semibold">{title}</h3>
@@ -328,6 +332,10 @@ export function PhotoTile({
 
 /* ----------------------------------------------------------------- modals */
 
+/** Elements a Tab/Shift+Tab focus trap should cycle through. */
+const FOCUSABLE =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 export function Modal({
   open,
   onClose,
@@ -341,6 +349,57 @@ export function Modal({
   width?: string;
   scroll?: boolean;
 }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // Kept fresh every render but not a dep of the effect below, so the trap
+  // isn't torn down and rebuilt (stealing focus back) whenever a parent
+  // re-render hands Modal a new `onClose` closure (e.g. typing in a field).
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    if (!open) return;
+    const dialog = dialogRef.current;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+
+    const focusable = () =>
+      dialog
+        ? Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+            (el) => el.offsetParent !== null
+          )
+        : [];
+
+    (focusable()[0] ?? dialog)?.focus();
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        onCloseRef.current();
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const nodes = focusable();
+      if (nodes.length === 0) {
+        e.preventDefault();
+        dialog?.focus();
+        return;
+      }
+      const first = nodes[0];
+      const last = nodes[nodes.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      previouslyFocused?.focus?.();
+    };
+  }, [open]);
+
   if (!open) return null;
   return (
     <div
@@ -349,8 +408,11 @@ export function Modal({
       role="presentation"
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
+        aria-label="Dialog"
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         style={{ maxWidth: width }}
         className={cx(

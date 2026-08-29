@@ -27,13 +27,25 @@ export function AppChrome() {
               s.toast.kind === "error" ? "bg-destructive" : "bg-ink"
             )}
           >
-            <span className={s.toast.kind === "error" ? "text-white" : "text-[#7fc0a1]"}>
+            <span aria-hidden="true" className={s.toast.kind === "error" ? "text-white" : "text-[#7fc0a1]"}>
               {s.toast.kind === "error" ? "!" : s.toast.kind === "publish" ? "◉" : "✓"}
             </span>
             <span className="text-sub font-medium">{s.toast.msg}</span>
           </div>
         </div>
       )}
+      {/*
+       * Persistent (always-mounted) live regions so screen readers announce
+       * toast text. Two separate regions — rather than one whose role/aria-live
+       * is toggled at runtime — because most SRs only pick up politeness that
+       * was already in place before the content changed.
+       */}
+      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+        {s.toast && s.toast.kind !== "error" ? s.toast.msg : ""}
+      </div>
+      <div role="alert" aria-live="assertive" aria-atomic="true" className="sr-only">
+        {s.toast && s.toast.kind === "error" ? s.toast.msg : ""}
+      </div>
     </>
   );
 }

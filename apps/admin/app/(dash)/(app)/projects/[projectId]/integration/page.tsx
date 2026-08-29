@@ -428,9 +428,13 @@ function Meter({
   limit: number;
   format?: (n: number) => string;
 }) {
-  const pct = limit > 0 ? Math.min(100, (used / limit) * 100) : 0;
-  const over = limit > 0 && used >= limit;
-  const near = limit > 0 && !over && used / limit >= 0.8;
+  const unlimited = limit <= 0;
+  const pct = unlimited ? 0 : Math.min(100, (used / limit) * 100);
+  const over = !unlimited && used >= limit;
+  const near = !unlimited && !over && used / limit >= 0.8;
+  const ariaLabel = unlimited
+    ? `${label}: ${format(used)} used, unlimited`
+    : `${label}: ${format(used)} of ${format(limit)} used`;
   return (
     <div>
       <div className="mb-1.5 flex items-baseline justify-between text-label">
@@ -439,7 +443,14 @@ function Meter({
           {format(used)} / {limit > 0 ? format(limit) : "∞"}
         </span>
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-chip">
+      <div
+        role="progressbar"
+        aria-label={ariaLabel}
+        aria-valuemin={0}
+        aria-valuemax={unlimited ? undefined : limit}
+        aria-valuenow={unlimited ? undefined : used}
+        className="h-2 overflow-hidden rounded-full bg-chip"
+      >
         <div
           className={cx(
             "h-full rounded-full transition-[width]",

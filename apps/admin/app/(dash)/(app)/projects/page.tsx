@@ -75,7 +75,10 @@ export default function ProjectsPage() {
               className="cursor-pointer rounded-xl border border-line bg-surface p-[18px] text-left transition-[border-color,box-shadow] hover:border-accent-line hover:shadow-[0_8px_24px_-16px_rgba(30,35,45,.25)]"
             >
               <div className="flex items-start gap-3">
-                <span className="grid h-[38px] w-[38px] shrink-0 place-items-center rounded-lg bg-accent-tint text-label font-bold text-accent">
+                <span
+                  aria-hidden="true"
+                  className="grid h-[38px] w-[38px] shrink-0 place-items-center rounded-lg bg-accent-tint text-label font-bold text-accent"
+                >
                   {initials(p.name)}
                 </span>
                 <span className="min-w-0 flex-1">

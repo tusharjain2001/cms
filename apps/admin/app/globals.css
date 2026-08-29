@@ -24,9 +24,12 @@
   /* Text */
   --color-ink: #22252b;
   --color-quiet: #6f737d;
-  --color-muted: #8b8e96;
-  --color-faint: #a9aab0;
+  --color-muted: #63666e;
+  --color-faint: #6c6f77;
   --color-slate: #4c5058;
+  /* Lighter than --color-faint on purpose — placeholders stay quiet even
+     though --color-faint was darkened for AA (see ::placeholder below). */
+  --color-placeholder: #a9aab0;
 
   /* Accent */
   --color-accent: #2b4f9e;
@@ -100,6 +103,135 @@
      button, so a first-time user's eye is pulled to the one thing to press. */
   --animate-bob-up: pcBobUp 1s ease-in-out infinite;
   --animate-bob-down: pcBobDown 1s ease-in-out infinite;
+  /* A quiet "saved" settle — a control easing back into place once a change
+     has landed. */
+  --animate-settle: pcSettle 0.3s ease both;
+  /* The publish moment. This is the app's one emotional peak, so it gets a
+     confident pulse instead of the restraint everything else uses. */
+  --animate-celebrate: pcCelebrate 0.6s ease both;
+  --animate-accordion-down: pcAccordionDown 0.25s var(--ease-spring) both;
+  --animate-accordion-up: pcAccordionUp 0.2s ease both;
+
+  /* A spring-like ease for drag-drop settle and accordion expand/collapse. */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ------------------------------------------------------------------
+   Dark palette — same roles, warm near-black instead of warm paper.
+   Every --color-* above gets redefined here under two selectors so both
+   paths work:
+     - OS dark, unmoored by an explicit choice: the media query, guarded by
+       :not([data-theme="light"]) so an explicit light pick always wins.
+     - An explicit choice via the theme toggle (lib/theme.ts sets
+       data-theme="dark"|"light" on <html>; "system" removes the attribute
+       and leaves this to the media query above).
+   Stays warm on purpose — browns and ambers, not blue-grays — to match the
+   paper-and-ink character of the light palette. Keep both blocks in sync;
+   there is no third place these values live.
+   ------------------------------------------------------------------ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    /* Surfaces */
+    --color-canvas: #17140f;
+    --color-surface: #221d15;
+    --color-rail: #1c1812;
+    --color-sunken: #110e0a;
+
+    /* Lines, from strongest to faintest */
+    --color-line: #3d362a;
+    --color-line-mid: #332c22;
+    --color-line-soft: #2a251c;
+    --color-field: #453e30;
+    --color-btn: #443c2f;
+    --color-btn-hover: #6b5f49;
+    --color-grip: #554c3c;
+
+    /* Text */
+    --color-ink: #f2ece0;
+    --color-quiet: #b8ae9c;
+    --color-muted: #998e79;
+    --color-faint: #938872;
+    --color-slate: #cfc3aa;
+    --color-placeholder: #6e6353;
+
+    /* Accent */
+    --color-accent: #7b9ce8;
+    --color-accent-dark: #5c7dd6;
+    --color-accent-soft: #262c40;
+    --color-accent-tint: #2c3348;
+    --color-accent-line: #3d4a6e;
+    --color-accent-line-soft: #333e5c;
+    --color-accent-wash: #201f2c;
+
+    /* Published (green) */
+    --color-published: #4fae82;
+    --color-published-bg: #1b2e24;
+    --color-published-line: #2f4d3c;
+    --color-published-ink: #8fd4ae;
+
+    /* Draft (amber) */
+    --color-draft: #e0a94f;
+    --color-draft-bg: #2e2412;
+    --color-draft-ink: #f0c98a;
+
+    /* Destructive (rust) */
+    --color-destructive: #e2624c;
+    --color-destructive-dark: #c94a34;
+    --color-destructive-bg: #2e1a15;
+    --color-destructive-line: #5a3228;
+    --color-destructive-soft: #24140f;
+
+    /* Neutral chips */
+    --color-chip: #2a251c;
+    --color-chip-hover: #332c22;
+  }
+}
+:root[data-theme="dark"] {
+  --color-canvas: #17140f;
+  --color-surface: #221d15;
+  --color-rail: #1c1812;
+  --color-sunken: #110e0a;
+
+  --color-line: #3d362a;
+  --color-line-mid: #332c22;
+  --color-line-soft: #2a251c;
+  --color-field: #453e30;
+  --color-btn: #443c2f;
+  --color-btn-hover: #6b5f49;
+  --color-grip: #554c3c;
+
+  --color-ink: #f2ece0;
+  --color-quiet: #b8ae9c;
+  --color-muted: #998e79;
+  --color-faint: #938872;
+  --color-slate: #cfc3aa;
+  --color-placeholder: #6e6353;
+
+  --color-accent: #7b9ce8;
+  --color-accent-dark: #5c7dd6;
+  --color-accent-soft: #262c40;
+  --color-accent-tint: #2c3348;
+  --color-accent-line: #3d4a6e;
+  --color-accent-line-soft: #333e5c;
+  --color-accent-wash: #201f2c;
+
+  --color-published: #4fae82;
+  --color-published-bg: #1b2e24;
+  --color-published-line: #2f4d3c;
+  --color-published-ink: #8fd4ae;
+
+  --color-draft: #e0a94f;
+  --color-draft-bg: #2e2412;
+  --color-draft-ink: #f0c98a;
+
+  --color-destructive: #e2624c;
+  --color-destructive-dark: #c94a34;
+  --color-destructive-bg: #2e1a15;
+  --color-destructive-line: #5a3228;
+  --color-destructive-soft: #24140f;
+
+  --color-chip: #2a251c;
+  --color-chip-hover: #332c22;
 }
 
 @keyframes pcSpin {
@@ -163,6 +295,56 @@
     transform: translateY(-8px);
   }
 }
+/* "Saved" — a tiny scale/opacity ease back into place. */
+@keyframes pcSettle {
+  from {
+    opacity: 0.6;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+/* Publish — a confident scale+glow pulse, the app's one moment to feel
+   rewarding rather than merely quiet. No confetti; the glow does the work. */
+@keyframes pcCelebrate {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 var(--color-accent-soft);
+  }
+  35% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 9px var(--color-accent-soft);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(43, 79, 158, 0);
+  }
+}
+/* Accordion expand/collapse — pair with `grid-template-rows` on a
+   `display:grid` wrapper (the row's content sits in an `overflow-hidden`
+   child so `0fr` truly collapses it). */
+@keyframes pcAccordionDown {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+  to {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+}
+@keyframes pcAccordionUp {
+  from {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+  to {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+}
 /* The getting-started spotlight, breathing so the eye is drawn to the exact
    control rather than a flat ring that fades into the page. Respects a user's
    reduced-motion setting. */
@@ -182,7 +364,11 @@
 @media (prefers-reduced-motion: reduce) {
   .pc-spotlight,
   .animate-bob-up,
-  .animate-bob-down {
+  .animate-bob-down,
+  .animate-settle,
+  .animate-celebrate,
+  .animate-accordion-down,
+  .animate-accordion-up {
     animation: none;
   }
 }
@@ -199,15 +385,28 @@
     -webkit-font-smoothing: antialiased;
   }
   ::placeholder {
-    color: var(--color-faint);
+    color: var(--color-placeholder);
   }
   textarea {
     resize: vertical;
   }
-  /* The design never shows a browser focus ring; every control carries its
-     own accent ring instead (see .pc-focus below). */
-  :focus-visible {
-    outline: none;
+  /* Every keyboard-focused interactive element gets a clear accent ring —
+     a solid outline (for reliability across browsers/themes) plus the same
+     soft halo .pc-focus uses. Controls that already carry .pc-focus (inputs,
+     selects, textareas) are excluded here so the two never stack; they keep
+     their own box-shadow-only ring exactly as before. Mouse/touch focus is
+     untouched — this is :focus-visible only. */
+  button:not(.pc-focus):focus-visible,
+  a:not(.pc-focus):focus-visible,
+  input:not(.pc-focus):focus-visible,
+  select:not(.pc-focus):focus-visible,
+  textarea:not(.pc-focus):focus-visible,
+  summary:not(.pc-focus):focus-visible,
+  [role="button"]:not(.pc-focus):focus-visible,
+  [tabindex]:not([tabindex="-1"]):not(.pc-focus):focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 3px var(--color-accent-soft);
   }
 }
 
