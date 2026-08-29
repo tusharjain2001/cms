@@ -356,19 +356,29 @@ function ListView({
                   <TrashButton onClick={() => remove(i)} />
                 </div>
 
-                {isOpen && (
-                  <div className="flex animate-fade flex-col gap-[18px] border-t border-line-mid bg-[#fdfdfc] p-4">
-                    {def.of.map((child) => (
-                      <FieldView
-                        key={child.key}
-                        def={child}
-                        value={item[child.key]}
-                        onChange={(v) => setItem(i, child.key, v)}
-                        depth={depth + 1}
-                      />
-                    ))}
+                {/* Grid 0fr/1fr accordion: the row stays mounted (so a field
+                    mid-edit never loses its place) and only its allotted
+                    track height animates, per the accordion tokens in
+                    globals.css. */}
+                <div
+                  className={cx("grid", isOpen ? "animate-accordion-down" : "animate-accordion-up")}
+                  style={{ gridTemplateRows: isOpen ? "1fr" : "0fr" }}
+                  aria-hidden={!isOpen}
+                >
+                  <div className="overflow-hidden">
+                    <div className="flex flex-col gap-[18px] border-t border-line-mid bg-[#fdfdfc] p-4">
+                      {def.of.map((child) => (
+                        <FieldView
+                          key={child.key}
+                          def={child}
+                          value={item[child.key]}
+                          onChange={(v) => setItem(i, child.key, v)}
+                          depth={depth + 1}
+                        />
+                      ))}
+                    </div>
                   </div>
-                )}
+                </div>
               </div>
             </div>
           );
@@ -404,7 +414,7 @@ function AddButton({
         "w-full rounded-lg border border-dashed p-2.5 text-label font-semibold transition-colors",
         atMax
           ? "cursor-not-allowed border-field bg-sunken text-faint"
-          : "cursor-pointer border-accent-line-soft bg-accent-wash text-accent hover:bg-[#eef3fc]"
+          : "cursor-pointer border-accent-line-soft bg-accent-wash text-accent hover:bg-[#eef3fc] active:scale-[.98]"
       )}
     >
       + Add {def.itemNoun}
@@ -418,7 +428,7 @@ function TrashButton({ onClick }: { onClick: () => void }) {
       type="button"
       title="Delete"
       onClick={onClick}
-      className="grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-[5px] text-tiny text-faint transition-colors hover:bg-destructive-bg hover:text-destructive"
+      className="grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-[5px] text-tiny text-faint transition-colors hover:bg-destructive-bg hover:text-destructive active:scale-[.9]"
     >
       🗑
     </button>

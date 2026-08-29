@@ -49,7 +49,10 @@ export default function EditorScreen() {
             <span className="h-[11px] w-[11px] animate-spin-fast rounded-full border-2 border-[#cfd4de] border-t-accent" />
           )}
           {s.publishedNow && s.saving === "saved" && <span className="text-published">◉</span>}
-          <span className="hidden sm:inline">
+          <span
+            key={s.saving}
+            className={cx("hidden sm:inline", s.saving === "saved" && "animate-settle")}
+          >
             {s.saving === "saving"
               ? "Saving…"
               : s.saving === "error"
@@ -66,15 +69,17 @@ export default function EditorScreen() {
           )}
           <Button onClick={() => void s.preview()}>Preview</Button>
           <button
+            key={s.publishedNow ? "celebrate" : "idle"}
             type="button"
             data-tour="publish"
             disabled={!s.dirty}
             onClick={() => void s.publish()}
             className={cx(
-              "rounded-[7px] px-[18px] py-[9px] text-label font-semibold transition-[filter]",
+              "rounded-[7px] px-[18px] py-[9px] text-label font-semibold transition-[filter] active:scale-[.97]",
               s.dirty
                 ? "cursor-pointer bg-accent text-white hover:brightness-[.96]"
-                : "cursor-default border border-[#cfe0d5] bg-published-bg text-published"
+                : "cursor-default border border-[#cfe0d5] bg-published-bg text-published",
+              s.publishedNow && "animate-celebrate"
             )}
           >
             {s.dirty ? "Publish" : "Published"}

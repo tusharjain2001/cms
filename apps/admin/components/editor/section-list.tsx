@@ -32,6 +32,7 @@ export function SectionList() {
             const def = s.typeFor(sec.type);
             const selected = sec.id === s.selected;
             const hidden = !sec.visible;
+            const dragging = drag.draggingIndex === i;
             return (
               <div key={sec.id} {...drag.rowProps(i)}>
                 {drag.overIndex === i && <div className="mb-1 h-0.5 rounded-full bg-accent" />}
@@ -40,8 +41,15 @@ export function SectionList() {
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => e.key === "Enter" && s.selectSection(sec.id)}
+                  style={{
+                    transition: "box-shadow 150ms ease, transform 0.35s var(--ease-spring)",
+                    ...(dragging && {
+                      transform: "scale(1.02)",
+                      boxShadow: "0 8px 18px rgba(30,35,45,.16)",
+                    }),
+                  }}
                   className={cx(
-                    "flex cursor-pointer items-start gap-2.5 rounded-[10px] border p-3 transition-shadow",
+                    "flex cursor-pointer items-start gap-2.5 rounded-[10px] border p-3",
                     selected
                       ? "border-accent bg-surface shadow-[0_0_0_3px_#eaeff9]"
                       : hidden
@@ -89,7 +97,7 @@ export function SectionList() {
                         e.stopPropagation();
                         void s.toggleHidden(sec.id);
                       }}
-                      className="grid h-6 w-[26px] cursor-pointer place-items-center rounded-[5px] text-helper text-muted transition-colors hover:bg-chip hover:text-slate"
+                      className="grid h-6 w-[26px] cursor-pointer place-items-center rounded-[5px] text-helper text-muted transition-colors hover:bg-chip hover:text-slate active:scale-[.9]"
                     >
                       {hidden ? "◌" : "◉"}
                     </button>
@@ -104,7 +112,7 @@ export function SectionList() {
                           name: sec.name || def?.name || sec.type,
                         });
                       }}
-                      className="grid h-6 w-[26px] cursor-pointer place-items-center rounded-[5px] text-helper text-faint transition-colors hover:bg-destructive-bg hover:text-destructive"
+                      className="grid h-6 w-[26px] cursor-pointer place-items-center rounded-[5px] text-helper text-faint transition-colors hover:bg-destructive-bg hover:text-destructive active:scale-[.9]"
                     >
                       🗑
                     </button>
@@ -120,7 +128,7 @@ export function SectionList() {
         type="button"
         data-tour="add-section"
         onClick={() => s.openModal("picker")}
-        className="mt-3 w-full cursor-pointer rounded-[9px] border border-dashed border-accent-line-soft bg-accent-wash p-3 text-sub font-semibold text-accent transition-colors hover:border-[#94aad9] hover:bg-[#eef3fc]"
+        className="mt-3 w-full cursor-pointer rounded-[9px] border border-dashed border-accent-line-soft bg-accent-wash p-3 text-sub font-semibold text-accent transition-colors hover:border-[#94aad9] hover:bg-[#eef3fc] active:scale-[.98]"
       >
         + Add section
       </button>
