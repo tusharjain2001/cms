@@ -374,6 +374,20 @@ export async function POST(req) {
       </p>
 
       <div className="flex flex-col gap-4">
+        {/* ------------------------------------------- the two ways to build it */}
+        <div className="flex items-start gap-3 rounded-xl border border-accent-line bg-accent-wash px-4 py-3.5">
+          <span aria-hidden className="text-[20px] leading-none">
+            🔌
+          </span>
+          <p className="text-label leading-[1.6] text-slate">
+            <strong>Two ways from here.</strong> Copy the five files below by hand — or let your AI
+            coding agent do it. Press{" "}
+            <span className="font-semibold text-accent">“🔌 Connect your coding agent”</span> at the
+            top of the screen to plug an agent into Pagecraft&apos;s MCP; it reads this website&apos;s
+            sections and content and writes the same code for you.
+          </p>
+        </div>
+
         {/* ------------------------------------------------------ the idea */}
         <Card>
           <CardTitle sub="Worth understanding once, before any code.">How this works</CardTitle>

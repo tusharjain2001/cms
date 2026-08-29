@@ -96,6 +96,10 @@
   --animate-fade: pcFade 0.14s ease both;
   --animate-pulse-soft: pcPulse 1.4s ease-in-out infinite;
   --animate-bar: pcBar 2.4s ease-out both;
+  /* A gentle up-and-down bob for the "look here" pointing hand and the MCP
+     button, so a first-time user's eye is pulled to the one thing to press. */
+  --animate-bob-up: pcBobUp 1s ease-in-out infinite;
+  --animate-bob-down: pcBobDown 1s ease-in-out infinite;
 }
 
 @keyframes pcSpin {
@@ -136,6 +140,50 @@
   }
   to {
     width: 92%;
+  }
+}
+/* A hand sitting ABOVE its target points down, and dips toward it. */
+@keyframes pcBobDown {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(8px);
+  }
+}
+/* A hand sitting BELOW its target points up, and rises toward it. Also used by
+   the MCP button, which simply floats. */
+@keyframes pcBobUp {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+/* The getting-started spotlight, breathing so the eye is drawn to the exact
+   control rather than a flat ring that fades into the page. Respects a user's
+   reduced-motion setting. */
+.pc-spotlight {
+  box-shadow: 0 0 0 3px var(--color-accent), 0 0 0 9px var(--color-accent-soft);
+  animation: pcSpotlight 1.5s ease-in-out infinite;
+}
+@keyframes pcSpotlight {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px var(--color-accent), 0 0 0 8px var(--color-accent-soft);
+  }
+  50% {
+    box-shadow: 0 0 0 4px var(--color-accent), 0 0 0 15px rgba(43, 79, 158, 0.08);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pc-spotlight,
+  .animate-bob-up,
+  .animate-bob-down {
+    animation: none;
   }
 }
 

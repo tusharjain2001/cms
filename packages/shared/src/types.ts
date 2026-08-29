@@ -111,17 +111,6 @@ export interface UserDTO {
   onboardingComplete: boolean;
 }
 
-/** One person with access to a website, listed on the Settings screen. */
-export interface ProjectMemberDTO {
-  id: string;
-  email: string;
-  name: string;
-  role: ProjectRole;
-  /** False while an invited person has not finished signing up. */
-  active: boolean;
-  addedAt: string;
-}
-
 /**
  * A machine-readable tag on the errors the dashboard must react to rather than
  * merely display. Matching on the English message would break the first time

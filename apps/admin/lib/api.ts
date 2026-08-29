@@ -8,8 +8,18 @@
  * an hour never sees a session expire.
  */
 
+/**
+ * The CMS API base for every dashboard call and every copy-paste snippet.
+ *
+ * `NEXT_PUBLIC_API_URL` is baked at build time and is what the real deploy
+ * sets. The fallback is split by build so a *production* build that forgets it
+ * still points at the live API rather than silently shipping `localhost:4000`
+ * (which would make every page fail to load with no error) — while a local dev
+ * build with no env keeps talking to the API on this machine.
+ */
 export const API_URL =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:4000";
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ??
+  (process.env.NODE_ENV === "production" ? "https://api.mypagecraft.com" : "http://localhost:4000");
 
 export interface ApiIssue {
   path: string;

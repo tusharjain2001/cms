@@ -27,9 +27,9 @@ export type {
 import type { FieldDef, SectionContent, SectionTypeDef } from "@pagecraft/shared";
 
 /**
- * A blank row for a list field. Mirrors `defaultListItem` in the shared
- * package, reimplemented here so the dashboard does not have to bundle Zod
- * just to add an empty row. The API re-validates whatever we send anyway.
+ * A blank row for a list field, built from the field definitions so the
+ * dashboard does not have to bundle Zod just to add an empty row. The API
+ * re-validates whatever we send anyway.
  */
 export function blankListItem(fields: FieldDef[]): Record<string, unknown> {
   const out: Record<string, unknown> = {};

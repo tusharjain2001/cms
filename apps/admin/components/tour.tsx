@@ -350,15 +350,42 @@ export function Tour() {
           data-tour-ui="spotlight"
           // pointer-events-none is load-bearing: the control underneath has to
           // stay clickable, because clicking it is what finishes the step.
-          className="pointer-events-none fixed z-[55] rounded-[10px] transition-[top,left,width,height] duration-150"
+          // pc-spotlight adds the breathing ring (see globals.css).
+          className="pc-spotlight pointer-events-none fixed z-[55] rounded-[10px] transition-[top,left,width,height] duration-150"
           style={{
             top: box.top - 6,
             left: box.left - 6,
             width: box.width + 12,
             height: box.height + 12,
-            boxShadow: "0 0 0 3px var(--color-accent), 0 0 0 9px var(--color-accent-soft)",
           }}
         />
+      )}
+
+      {/*
+        A big bobbing hand aimed at the exact control — the plainest possible
+        "press this". It sits on whichever side the card is NOT, so the two
+        never collide, and never eats the click (pointer-events-none).
+      */}
+      {box && (
+        <div
+          aria-hidden
+          data-tour-ui="hand"
+          className="pointer-events-none fixed z-[56] select-none"
+          style={
+            arrow === "down"
+              ? { left: box.left + box.width / 2 - 16, top: box.top + box.height + 4 }
+              : { left: box.left + box.width / 2 - 16, top: Math.max(2, box.top - 42) }
+          }
+        >
+          <span
+            className={cx(
+              "block text-[32px] leading-none drop-shadow-[0_2px_3px_rgba(20,24,32,.35)]",
+              arrow === "down" ? "animate-bob-up" : "animate-bob-down"
+            )}
+          >
+            {arrow === "down" ? "👆" : "👇"}
+          </span>
+        </div>
       )}
 
       <div

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { Sidebar } from "@/components/sidebar";
 import { Tour } from "@/components/tour";
+import { McpWidget } from "@/components/mcp-widget";
 
 /**
  * The signed-in shell: a fixed sidebar on desktop, a slide-over drawer on
@@ -72,6 +73,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         renders once there is a session.
       */}
       <Tour />
+      <McpWidget />
     </div>
   );
 }

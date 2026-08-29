@@ -7,6 +7,18 @@ import { z } from "zod";
  * Fail fast on missing configuration: a CMS that boots with a blank JWT secret
  * is worse than one that refuses to boot.
  */
+
+/**
+ * Chooses localhost defaults for local dev and the real domains in production,
+ * so a prod deploy that forgets ADMIN_ORIGIN/APP_URL boots CORS-open to the
+ * live admin and emails working links — instead of silently defaulting to
+ * localhost (blocked admin, unusable verification links). The .env on the box
+ * still overrides these; this is the safety net when it does not.
+ */
+const prodDefault = process.env.NODE_ENV === "production";
+const defaultAdminOrigin = prodDefault ? "https://mypagecraft.com" : "http://localhost:3000";
+const defaultAppUrl = prodDefault ? "https://mypagecraft.com" : "http://localhost:3000";
+
 const schema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(4000),
@@ -15,9 +27,9 @@ const schema = z.object({
   JWT_REFRESH_SECRET: z.string().min(16, "JWT_REFRESH_SECRET must be at least 16 characters"),
   ACCESS_TOKEN_TTL: z.string().default("15m"),
   REFRESH_TOKEN_TTL: z.string().default("30d"),
-  ADMIN_ORIGIN: z.string().default("http://localhost:3000"),
+  ADMIN_ORIGIN: z.string().default(defaultAdminOrigin),
   /** Where the dashboard lives, used to build links inside emails. */
-  APP_URL: z.string().default("http://localhost:3000"),
+  APP_URL: z.string().default(defaultAppUrl),
 
   // Email is optional in the same way R2 media is: without it the CMS runs,
   // but signing up cannot complete, so the API says so in plain English and
@@ -31,7 +43,10 @@ const schema = z.object({
     .enum(["true", "false"])
     .optional()
     .transform((v) => (v === undefined ? undefined : v === "true")),
-  MAIL_FROM: z.string().default("Pagecraft <no-reply@localhost>"),
+  // A "@localhost" sender is rejected by many receiving mail servers, so the
+  // default is a real deliverable address rather than one that only works
+  // nowhere; a self-hoster overrides it in .env.
+  MAIL_FROM: z.string().default("Pagecraft <no-reply@mypagecraft.com>"),
 
   // Cloudflare R2 (S3-compatible) is the media backbone, and is optional the
   // same way: without these the CMS runs fine, uploads are switched off, and

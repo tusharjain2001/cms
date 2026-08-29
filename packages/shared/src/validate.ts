@@ -179,31 +179,3 @@ export function defaultContent(def: SectionTypeDef): SectionContent {
   }
   return out;
 }
-
-/** One blank row for a list field, used when a client presses "+ Add …". */
-export function defaultListItem(fields: FieldDef[]): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const field of fields) {
-    switch (field.kind) {
-      case "text":
-      case "para":
-      case "link":
-        out[field.key] = "";
-        break;
-      case "select":
-        out[field.key] = field.options[0] ?? "";
-        break;
-      case "toggle":
-        out[field.key] = field.default ?? false;
-        break;
-      case "image":
-      case "file":
-        out[field.key] = null;
-        break;
-      case "list":
-        out[field.key] = [];
-        break;
-    }
-  }
-  return out;
-}
