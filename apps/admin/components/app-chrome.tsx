@@ -5,6 +5,7 @@ import { useStore } from "@/lib/store";
 import { Button, Input, Modal, ModalActions, cx } from "./ui";
 import { Wire } from "./wire";
 import { MediaPicker } from "./media-picker";
+import { CommandPalette } from "./command-palette";
 
 /**
  * Global overlays: every modal plus the toast. Mounted once in the root layout
@@ -15,6 +16,7 @@ export function AppChrome() {
 
   return (
     <>
+      <CommandPalette />
       <SectionPicker />
       <MediaPicker />
       <AddPageModal />
