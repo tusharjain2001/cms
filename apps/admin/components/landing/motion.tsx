@@ -492,7 +492,17 @@ export interface Step {
  * Blue. Under 768px or reduced motion it renders as stacked cards (no pinning),
  * which is also the server / no-JS output — the enhancement is added on mount.
  */
-export function StickySteps({ steps, className = "" }: { steps: Step[]; className?: string }) {
+export function StickySteps({
+  steps,
+  intro,
+  className = "",
+}: {
+  steps: Step[];
+  /** Heading block rendered above the sticky visual (left col) / cards (mobile),
+   * so the section fills from its first frame instead of a bare scroll runway. */
+  intro?: ReactNode;
+  className?: string;
+}) {
   const [enhanced, setEnhanced] = useState(false);
   const [active, setActive] = useState(0);
   const blockRefs = useRef<Array<HTMLDivElement | null>>([]);
@@ -522,9 +532,11 @@ export function StickySteps({ steps, className = "" }: { steps: Step[]; classNam
 
   if (!enhanced) {
     return (
-      <div className={`flex flex-col gap-6 ${className}`}>
-        {steps.map((s, i) => (
-          <div key={i} className="rounded-xl border border-line bg-surface p-5 sm:p-6">
+      <div className={className}>
+        {intro && <div className="mb-8">{intro}</div>}
+        <div className="flex flex-col gap-6">
+          {steps.map((s, i) => (
+            <div key={i} className="rounded-xl border border-line bg-surface p-5 sm:p-6">
             <div className="mb-3 font-mono text-[12px] font-semibold tracking-[0.08em] text-accent">
               {s.index}
             </div>
@@ -532,7 +544,8 @@ export function StickySteps({ steps, className = "" }: { steps: Step[]; classNam
             <div className="mb-4 text-quiet">{s.body}</div>
             <div>{s.visual}</div>
           </div>
-        ))}
+          ))}
+        </div>
       </div>
     );
   }
@@ -540,11 +553,12 @@ export function StickySteps({ steps, className = "" }: { steps: Step[]; classNam
   return (
     <div className={`grid grid-cols-[1fr_1.1fr] gap-10 ${className}`}>
       <div>
-        <div className="sticky top-24 h-[62vh]">
+        {intro && <div className="mb-10">{intro}</div>}
+        <div className="sticky top-24 h-[52vh]">
           {steps.map((s, i) => (
             <div
               key={i}
-              className="absolute inset-0 flex items-center transition-opacity duration-[450ms] ease-out"
+              className="absolute inset-0 flex items-start transition-opacity duration-[450ms] ease-out"
               style={{ opacity: active === i ? 1 : 0 }}
               aria-hidden={active !== i}
             >
@@ -560,7 +574,7 @@ export function StickySteps({ steps, className = "" }: { steps: Step[]; classNam
             ref={(el) => {
               blockRefs.current[i] = el;
             }}
-            className="flex min-h-[62vh] flex-col justify-center"
+            className="flex min-h-[52vh] flex-col justify-start pt-1 first:pt-0"
           >
             <div
               className={`mb-3 font-mono text-[13px] font-semibold tracking-[0.08em] transition-colors duration-300 ${

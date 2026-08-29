@@ -38,8 +38,8 @@ const STEPS = [
   },
 ];
 
-export function PressRun() {
-  return <StickySteps steps={STEPS} />;
+export function PressRun({ intro }: { intro?: ReactNode }) {
+  return <StickySteps steps={STEPS} intro={intro} />;
 }
 
 /* ---------------------------------------------------------------- visuals */

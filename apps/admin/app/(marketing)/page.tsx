@@ -182,22 +182,23 @@ export default function LandingPage() {
 
           {/* ------------------------------------------- press run · sky */}
           <Band stage="sky" id="how" className="py-20 sm:py-24">
-            <div className="max-w-[640px]">
-              <Print>
-                <Eyebrow>How it works</Eyebrow>
-              </Print>
-              <Print delay={70}>
-                <H2 className="mt-3">You build it. They fill it in.</H2>
-              </Print>
-              <Print delay={140}>
-                <Lede className="mt-4">
-                  Three moving parts, and only one of them belongs to your client.
-                </Lede>
-              </Print>
-            </div>
-            <div className="mt-12">
-              <PressRun />
-            </div>
+            <PressRun
+              intro={
+                <div className="max-w-[440px]">
+                  <Print>
+                    <Eyebrow>How it works</Eyebrow>
+                  </Print>
+                  <Print delay={70}>
+                    <H2 className="mt-3">You build it. They fill it in.</H2>
+                  </Print>
+                  <Print delay={140}>
+                    <Lede className="mt-4">
+                      Three moving parts, and only one of them belongs to your client.
+                    </Lede>
+                  </Print>
+                </div>
+              }
+            />
           </Band>
 
           {/* ------------------------------------- stats + can / cannot · paper */}
@@ -431,7 +432,7 @@ export default function LandingPage() {
                     {COMPARISON.rows.map(([label, ours, ...theirs]) => (
                       <tr
                         key={label}
-                        className="border-b border-line-soft transition-colors duration-150 last:border-b-0 hover:bg-sunken"
+                        className="border-b border-line-soft transition-colors duration-150 even:bg-sunken last:border-b-0 hover:bg-accent-wash"
                       >
                         <th
                           scope="row"
