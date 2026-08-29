@@ -147,9 +147,9 @@ function HeroBlock({ def, content }: { def: SectionTypeDef; content: SectionCont
           {textOrPlaceholder(get(content, hDef?.key), hDef?.label ?? "Headline")}
         </h2>
         {subDef && (
-          <p className={cx("max-w-[38ch] text-sub", img ? "text-white/85" : "text-quiet")}>
-            {textOrPlaceholder(get(content, subDef.key), subDef.label)}
-          </p>
+          <div className={cx("max-w-[38ch] text-sub", img ? "text-white/85" : "text-quiet")}>
+            {textOrPlaceholder(get(content, subDef.key), subDef.label, subDef.kind === "para")}
+          </div>
         )}
         {buttons.length > 0 && (
           <div className={cx("mt-1 flex flex-wrap gap-2", img ? "justify-start" : "justify-center")}>
@@ -218,9 +218,9 @@ function ColsBlock({ def, content }: { def: SectionTypeDef; content: SectionCont
                   </p>
                 )}
                 {descKey && (
-                  <p className="mt-1 text-mid text-quiet">
-                    {textOrPlaceholder(get(item, descKey), "Description")}
-                  </p>
+                  <div className="mt-1 text-mid text-quiet">
+                    {textOrPlaceholder(get(item, descKey), "Description", true)}
+                  </div>
                 )}
                 {filledBullets.length > 0 && bulletTextKey && (
                   <ul className="mt-2 flex flex-col gap-1">
@@ -289,7 +289,9 @@ function GridBlock({ def, content }: { def: SectionTypeDef; content: SectionCont
                     </p>
                   )}
                   {typeof desc === "string" && desc.trim() !== "" && (
-                    <p className="mt-0.5 line-clamp-2 text-micro text-quiet">{desc}</p>
+                    <div className="mt-0.5 line-clamp-2 text-micro text-quiet">
+                      {renderMarkdown(desc)}
+                    </div>
                   )}
                   {specs.length > 0 && specValueKey && specLabelKey && (
                     <div className="mt-1.5 flex flex-wrap gap-x-2.5 gap-y-0.5">
@@ -342,9 +344,9 @@ function QuoteBlock({ def, content }: { def: SectionTypeDef; content: SectionCon
             const role = roleKey ? get(item, roleKey) : undefined;
             return (
               <div key={i} className="rounded-[9px] border border-line bg-surface p-4">
-                <p className="text-card leading-[1.5] text-ink">
-                  “{quoteDef ? textOrPlaceholder(get(item, quoteDef.key), quoteDef.label) : ""}”
-                </p>
+                <div className="text-card leading-[1.5] text-ink">
+                  “{quoteDef ? textOrPlaceholder(get(item, quoteDef.key), quoteDef.label, true) : ""}”
+                </div>
                 <div className="mt-3 flex items-center gap-2.5">
                   {avatar ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -399,17 +401,19 @@ function RowsBlock({ def, content }: { def: SectionTypeDef; content: SectionCont
                   <p className="text-sub font-semibold text-ink">
                     {textOrPlaceholder(get(item, textDef!.key), textDef!.label)}
                   </p>
-                  <p className="mt-1.5 text-mid text-quiet">
-                    {textOrPlaceholder(get(item, paraDef!.key), paraDef!.label)}
-                  </p>
+                  <div className="mt-1.5 text-mid text-quiet">
+                    {textOrPlaceholder(get(item, paraDef!.key), paraDef!.label, true)}
+                  </div>
                 </div>
               ))
             : items.map((item, i) => {
                 const bodyDef = paraDef ?? textDef;
                 return (
-                  <p key={i} className="text-body leading-[1.6] text-ink">
-                    {bodyDef ? textOrPlaceholder(get(item, bodyDef.key), bodyDef.label) : ""}
-                  </p>
+                  <div key={i} className="text-body leading-[1.6] text-ink">
+                    {bodyDef
+                      ? textOrPlaceholder(get(item, bodyDef.key), bodyDef.label, bodyDef.kind === "para")
+                      : ""}
+                  </div>
                 );
               })}
         </div>
@@ -435,9 +439,9 @@ function BandBlock({ def, content }: { def: SectionTypeDef; content: SectionCont
         </h2>
       )}
       {subDef && (
-        <p className="mx-auto mt-1.5 max-w-[36ch] text-sub text-quiet">
-          {textOrPlaceholder(get(content, subDef.key), subDef.label)}
-        </p>
+        <div className="mx-auto mt-1.5 max-w-[36ch] text-sub text-quiet">
+          {textOrPlaceholder(get(content, subDef.key), subDef.label, subDef.kind === "para")}
+        </div>
       )}
       {buttons.length > 0 && (
         <div className="mt-4 flex flex-wrap justify-center gap-2">
@@ -479,9 +483,9 @@ function SplitBlock({ def, content }: { def: SectionTypeDef; content: SectionCon
         </h2>
       )}
       {introDef && (
-        <p className="mb-4 text-mid text-quiet">
-          {textOrPlaceholder(get(content, introDef.key), introDef.label)}
-        </p>
+        <div className="mb-4 text-mid text-quiet">
+          {textOrPlaceholder(get(content, introDef.key), introDef.label, introDef.kind === "para")}
+        </div>
       )}
       <div className="flex flex-col gap-3.5">
         <div className="flex flex-col gap-2 rounded-[9px] border border-line bg-surface p-4">
@@ -561,9 +565,9 @@ function FallbackBody({ content, def }: { content: SectionContent; def?: Section
       {stringFields
         .filter((f) => f.key !== hDef?.key)
         .map((f) => (
-          <p key={f.key} className="text-mid text-quiet">
-            {textOrPlaceholder(get(content, f.key), f.label)}
-          </p>
+          <div key={f.key} className="text-mid text-quiet">
+            {textOrPlaceholder(get(content, f.key), f.label, f.kind === "para")}
+          </div>
         ))}
     </div>
   );
@@ -605,10 +609,111 @@ function headingField(def: SectionTypeDef): FieldDef | undefined {
 
 /** A filled value renders as itself; an empty one renders as a faint, italic
  *  ghost of the field's own label, so the skeleton still reads while a
- *  client is mid-type. */
-function textOrPlaceholder(value: unknown, label?: string): ReactNode {
+ *  client is mid-type. Pass `markdown` for a `para`-kind field so its light
+ *  markdown (bold, italic, links, lists) renders instead of the raw string. */
+function textOrPlaceholder(value: unknown, label?: string, markdown?: boolean): ReactNode {
   const str = typeof value === "string" ? value.trim() : "";
-  if (str) return value as string;
+  if (str) return markdown ? renderMarkdown(value as string) : (value as string);
   if (!label) return null;
   return <span className="text-faint italic">{label}</span>;
+}
+
+/* --------------------------------------------------------------- markdown
+   A tiny, safe reader for the light markdown `para` fields store (see
+   rich-text-area.tsx for the writer side). It understands only bold, italic,
+   links and `- ` / `1. ` line lists — everything else (a stray `*`, an
+   unpaired `[bracket]`) falls through and renders as plain text. Every node
+   here is a React element or a text string — never dangerouslySetInnerHTML —
+   so raw HTML in the source (a pasted `<script>`, say) can never execute. */
+
+function renderInline(text: string, keyPrefix: string): ReactNode[] {
+  const pattern = /\*\*(.+?)\*\*|\*(.+?)\*|\[([^[\]]+)\]\(([^()\s]+)\)/g;
+  const nodes: ReactNode[] = [];
+  let last = 0;
+  let i = 0;
+  let m: RegExpExecArray | null;
+  while ((m = pattern.exec(text))) {
+    if (m.index > last) nodes.push(text.slice(last, m.index));
+    if (m[1] !== undefined) {
+      nodes.push(<strong key={`${keyPrefix}-${i++}`}>{m[1]}</strong>);
+    } else if (m[2] !== undefined) {
+      nodes.push(<em key={`${keyPrefix}-${i++}`}>{m[2]}</em>);
+    } else {
+      // A link previews as styled but inert text — this pane shows content,
+      // never a navigable site, so it never renders a real <a>.
+      nodes.push(
+        <span key={`${keyPrefix}-${i++}`} className="text-accent underline underline-offset-2">
+          {m[3]}
+        </span>
+      );
+    }
+    last = pattern.lastIndex;
+  }
+  if (last < text.length) nodes.push(text.slice(last));
+  return nodes;
+}
+
+function renderMarkdown(value: string): ReactNode {
+  const lines = value.split("\n");
+  const blocks: ReactNode[] = [];
+  const bulletRe = /^-\s+/;
+  const numberRe = /^\d+\.\s+/;
+  let i = 0;
+  let key = 0;
+  const nextKey = () => key++;
+
+  while (i < lines.length) {
+    if (bulletRe.test(lines[i])) {
+      const items: ReactNode[] = [];
+      while (i < lines.length && bulletRe.test(lines[i])) {
+        const k = nextKey();
+        items.push(<li key={k}>{renderInline(lines[i].replace(bulletRe, ""), `b${k}`)}</li>);
+        i++;
+      }
+      blocks.push(
+        <ul key={nextKey()} className="ml-5 list-disc">
+          {items}
+        </ul>
+      );
+      continue;
+    }
+    if (numberRe.test(lines[i])) {
+      const items: ReactNode[] = [];
+      while (i < lines.length && numberRe.test(lines[i])) {
+        const k = nextKey();
+        items.push(<li key={k}>{renderInline(lines[i].replace(numberRe, ""), `n${k}`)}</li>);
+        i++;
+      }
+      blocks.push(
+        <ol key={nextKey()} className="ml-5 list-decimal">
+          {items}
+        </ol>
+      );
+      continue;
+    }
+    if (lines[i].trim() === "") {
+      i++;
+      continue;
+    }
+    const paraNodes: ReactNode[] = [];
+    let first = true;
+    while (
+      i < lines.length &&
+      lines[i].trim() !== "" &&
+      !bulletRe.test(lines[i]) &&
+      !numberRe.test(lines[i])
+    ) {
+      if (!first) paraNodes.push(<br key={`br${nextKey()}`} />);
+      paraNodes.push(...renderInline(lines[i], `t${nextKey()}`));
+      first = false;
+      i++;
+    }
+    blocks.push(
+      <p key={nextKey()} className="[&:not(:first-child)]:mt-2">
+        {paraNodes}
+      </p>
+    );
+  }
+
+  return <>{blocks}</>;
 }

@@ -96,7 +96,7 @@ export function Field({
   );
 }
 
-const inputBase =
+export const inputBase =
   "w-full px-3 py-2.5 rounded-[7px] border bg-surface text-ink outline-none transition-shadow pc-focus";
 
 export function Input({

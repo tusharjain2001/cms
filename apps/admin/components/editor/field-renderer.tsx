@@ -6,6 +6,7 @@ import { thumb, toFileValue, toImageValue, useMedia } from "@/lib/media";
 import { blankListItem, listItemLabel } from "@/lib/dto";
 import type { FieldDef, FileValue, ImageValue, ListDef } from "@/lib/dto";
 import { useDragList } from "@/lib/use-drag-list";
+import { RichTextArea } from "@/components/editor/rich-text-area";
 import {
   Button,
   Field as FieldShell,
@@ -13,7 +14,6 @@ import {
   Input,
   PhotoTile,
   Select,
-  Textarea,
   Toggle,
   cx,
 } from "@/components/ui";
@@ -73,15 +73,16 @@ export function FieldView({ def, value, onChange, depth = 0, error }: Props) {
           label={def.label}
           counter={def.max ? `${text.length} / ${def.max}` : undefined}
           counterTone={over ? "warn" : "muted"}
-          help={def.help}
+          help={def.help ?? "Select text to format — bold, italic, links and lists are saved as simple markdown."}
           error={error}
         >
-          <Textarea
+          <RichTextArea
             rows={small ? 3 : 4}
             value={text}
             placeholder={def.placeholder}
+            invalid={over || !!error}
             className={compact}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={onChange}
           />
         </FieldShell>
       );
