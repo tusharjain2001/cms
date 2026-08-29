@@ -421,7 +421,28 @@
     box-shadow: 0 0 0 7px transparent;
   }
 }
+
+/* Flying papers (hero signature). Each sheet keeps its resting tilt as an inline
+   transform; the drift animates transform only (GPU-cheap) around that rest and
+   is switched off under reduced motion, leaving the scattered poster static. */
+.pc-paper {
+  animation: pcPaperDrift var(--dur, 22s) ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+  will-change: transform;
+}
+@keyframes pcPaperDrift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(var(--rot, 0deg));
+  }
+  50% {
+    transform: translate3d(var(--dx, 0px), var(--dy, -14px), 0)
+      rotate(calc(var(--rot, 0deg) + var(--dr, 2deg)));
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .pc-paper,
   .pc-spotlight,
   .animate-bob-up,
   .animate-bob-down,

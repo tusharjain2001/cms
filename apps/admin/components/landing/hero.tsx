@@ -1,85 +1,91 @@
 import { EditorMock } from "@/components/landing/editor-mock";
+import { FlyingPapers } from "@/components/landing/flying-papers";
 import { ButtonLink, Eyebrow, Lede } from "@/components/landing/bits";
 import { FrameDraw, Print } from "@/components/landing/motion";
 import { links } from "@/lib/links";
 
 /**
- * The hero — the thesis. Paper stage; a poster-scale headline in the display
- * face, a Sun swash struck behind "client's words", the CTA pair, and the real
- * editor demo (T27, frozen) handed the spotlight inside a drawn Press-Blue
- * frame.
+ * The hero — the thesis, staged as a poster.
  *
- * This is a server component. Every moving part is a primitive from
- * `motion.tsx` (the one client module on the marketing site) given a `delay`,
- * so the whole ≤1.4s press-start sequence (direction.md §5.1 / M3) is expressed
- * declaratively and the page itself ships no client JavaScript of its own.
- * Order of the load: eyebrow (0) → line 1 (150) → line 2 (330) → swash (700) →
- * lede + CTAs (600) → demo settles + frame draws (800).
+ * A left-aligned display headline holds the thesis; the open right and top of
+ * the frame fill with a drift of flying papers — miniature published pages, the
+ * sites your clients edit, caught mid-flight the instant Publish is pressed. The
+ * papers are the one loud element and are scoped to the upper block, so they
+ * never crowd the type or the live editor demo, which lands in its own clean
+ * band below.
  *
- * With JS off or under reduced motion each `Print` renders its content settled
- * and visible, the swash is already struck and the frame already drawn — the
- * hero reads as a finished poster, never a half-printed one.
+ * Server component. Every moving part is either the CSS paper drift
+ * (`flying-papers.tsx`) or a `Print` primitive from `motion.tsx` given a
+ * `delay`, so the press-start sequence is declarative and the hero ships no
+ * client JavaScript of its own. With JS off or under reduced motion the papers
+ * hold their scatter, each `Print` renders settled, the swash is struck and the
+ * frame drawn — a finished poster, never a half-printed one.
  */
 export function Hero() {
   return (
-    <section className="relative overflow-hidden px-5 pt-[76px] pb-14 sm:px-8 sm:pt-[92px] sm:pb-16">
-      <DotGrid />
+    <section className="relative overflow-hidden px-5 pt-[70px] pb-16 sm:px-8 sm:pt-[84px] sm:pb-20">
+      <DeskGrid />
 
       <div className="relative mx-auto max-w-[1160px]">
-        <div className="mx-auto max-w-[860px] text-center">
-          <Print delay={0} className="inline-block">
-            <Eyebrow live>Content-only CMS — live in ~3 seconds</Eyebrow>
-          </Print>
+        {/* Upper hero: the thesis, left-weighted, with the papers drifting
+            through the open right and top. The paper layer is scoped to this
+            block so it never reaches the demo below. */}
+        <div className="relative pb-6 sm:pb-10">
+          <HeadlineGlow />
+          <FlyingPapers />
 
-          <h1 className="mt-6 font-display text-[clamp(3.25rem,9vw,9rem)] leading-[0.92] font-extrabold tracking-[-0.025em] text-ink">
-            <Print as="span" delay={150} className="block">
-              Your React code.
+          <div className="relative z-10 max-w-[740px]">
+            <Print delay={0} className="inline-block">
+              <Eyebrow>Headless CMS for client websites</Eyebrow>
             </Print>
-            <span className="mt-[0.06em] block">
-              <Print as="span" delay={330} className="inline">
-                Your{" "}
+
+            <h1 className="mt-6 font-display text-[clamp(3rem,8.2vw,6.5rem)] leading-[0.86] font-extrabold tracking-[-0.035em] text-ink">
+              <Print as="span" delay={150} className="block">
+                Your code.
               </Print>
-              <span className="relative inline-block align-baseline">
-                <Print
-                  as="span"
-                  delay={700}
-                  className="absolute inset-x-[-0.08em] top-[0.16em] bottom-[0.14em] z-0 block -rotate-1 bg-sun"
-                >
-                  {null}
+              <span className="mt-[0.02em] block">
+                <Print as="span" delay={330} className="inline">
+                  Their{" "}
                 </Print>
-                <Print as="span" delay={330} className="relative z-10 inline">
-                  client&rsquo;s words.
-                </Print>
+                <span className="relative inline-block align-baseline">
+                  <Print
+                    as="span"
+                    delay={700}
+                    className="absolute inset-x-[-0.09em] top-[0.44em] bottom-[0.16em] z-0 block -rotate-[1.4deg] rounded-[2px] bg-sun"
+                  >
+                    {null}
+                  </Print>
+                  <Print as="span" delay={330} className="relative z-10 inline">
+                    words.
+                  </Print>
+                </span>
               </span>
-            </span>
-          </h1>
+            </h1>
 
-          <Print delay={600} className="block">
-            <Lede className="mx-auto mt-6 max-w-[600px]">
-              Pagecraft is a headless CMS for the websites you build by hand. Clients edit
-              text and photos in a dashboard a bakery owner can use — they never touch a
-              colour, a font or a layout.
-            </Lede>
+            <Print delay={600} className="block">
+              <Lede className="mt-7 max-w-[480px]">
+                You build the site in React. Your client edits the words and photos, and never
+                touches a colour, a font or a layout.
+              </Lede>
 
-            <div className="mt-8 flex flex-wrap justify-center gap-3">
-              <ButtonLink href={links.signUp}>Create a free account</ButtonLink>
-              <ButtonLink href="#demo" tone="outline">
-                See it in action
-              </ButtonLink>
-            </div>
-
-            <p className="mt-5 font-mono text-[12px] tracking-[0.08em] text-quiet uppercase">
-              Fourteen days free · No card to start · Bring your own Next.js sites
-            </p>
-          </Print>
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                <ButtonLink href={links.signUp} className="w-full text-center sm:w-auto">
+                  Create a free account
+                </ButtonLink>
+                <ButtonLink href="#demo" tone="outline" className="w-full text-center sm:w-auto">
+                  See it in action
+                </ButtonLink>
+              </div>
+            </Print>
+          </div>
         </div>
 
-        {/* The product, shown. The frame is the site's one drawn-border moment;
-            everything else in the hero holds still once it lands so the demo,
-            which animates inside, has the stage to itself. */}
-        <Print delay={800} className="block">
+        {/* The product, shown — its own clean band. The frame is the site's one
+            drawn-border moment; everything above has landed and holds still, so
+            the demo, which animates inside, has the stage to itself. */}
+        <Print delay={820} className="block">
           <div id="demo" className="mt-14 scroll-mt-24 sm:mt-16">
-            <FrameDraw className="rounded-2xl border border-line bg-surface p-2.5 sm:p-3.5">
+            <FrameDraw className="rounded-2xl border border-line bg-surface p-2.5 shadow-[0_44px_90px_-52px_rgba(27,30,36,0.5)] sm:p-3.5">
               <EditorMock />
             </FrameDraw>
           </div>
@@ -90,19 +96,37 @@ export function Hero() {
 }
 
 /**
- * The hero's only texture: a faint 24px dot grid at 4% ink, drawn as a static
- * SVG tile (not a CSS gradient — the site is flat ink, no gradients anywhere).
- * Decorative, so it is hidden from assistive tech and the reader.
+ * A soft warm bloom behind the left-aligned headline. It lifts the type off the
+ * drifting papers so the thesis always reads first, without a hard box. Purely
+ * atmospheric, so it is hidden from assistive tech.
  */
-function DotGrid() {
+function HeadlineGlow() {
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-0"
+      style={{
+        background:
+          "radial-gradient(44% 46% at 26% 40%, rgba(255,255,255,0.92) 0%, rgba(246,245,242,0.3) 46%, rgba(246,245,242,0) 72%)",
+      }}
+    />
+  );
+}
+
+/**
+ * The desk under the papers: a faint 26px dot grid at 3.5% ink, a static SVG
+ * tile that reads as a cutting mat the sheets are scattered on. Decorative, so
+ * it is hidden from assistive tech and sits beneath everything.
+ */
+function DeskGrid() {
   return (
     <svg
       aria-hidden
       className="pointer-events-none absolute inset-0 h-full w-full text-ink"
-      style={{ opacity: 0.04 }}
+      style={{ opacity: 0.035 }}
     >
       <defs>
-        <pattern id="pc-hero-dots" width="24" height="24" patternUnits="userSpaceOnUse">
+        <pattern id="pc-hero-dots" width="26" height="26" patternUnits="userSpaceOnUse">
           <circle cx="1" cy="1" r="1" fill="currentColor" />
         </pattern>
       </defs>
