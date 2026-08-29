@@ -4,15 +4,42 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useStore } from "@/lib/store";
+import { ContentPreview } from "@/components/editor/content-preview";
 import { FieldView } from "@/components/editor/field-renderer";
 import { SectionList } from "@/components/editor/section-list";
 import { Button, Input, cx } from "@/components/ui";
 
+/** Keep in sync with the inline read below — this is the only place the key lives. */
+const PREVIEW_STORAGE_KEY = "pc-content-preview";
+
 export default function EditorScreen() {
   const s = useStore();
   const params = useParams<{ projectId: string; pageId: string }>();
-  const [tab, setTab] = useState<"sections" | "content">("sections");
+  const [tab, setTab] = useState<"sections" | "content" | "preview">("sections");
   const base = `/projects/${params.projectId}/pages`;
+
+  // Defaults on: initialise false (SSR-safe, matches server output) then read
+  // the client's real choice once mounted — absent means "on" for a new client.
+  const [showPreview, setShowPreview] = useState(false);
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(PREVIEW_STORAGE_KEY);
+      setShowPreview(stored === null ? true : stored === "1");
+    } catch {
+      setShowPreview(true);
+    }
+  }, []);
+  const togglePreview = () => {
+    setShowPreview((current) => {
+      const next = !current;
+      try {
+        window.localStorage.setItem(PREVIEW_STORAGE_KEY, next ? "1" : "0");
+      } catch {
+        // Private mode / disabled storage — the choice still applies this session.
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (params.pageId) return s.openPage(params.pageId);
@@ -67,6 +94,21 @@ export default function EditorScreen() {
               Discard changes
             </Button>
           )}
+          <button
+            type="button"
+            aria-pressed={showPreview}
+            onClick={togglePreview}
+            title="Show or hide the content preview pane"
+            className={cx(
+              "hidden shrink-0 items-center gap-1.5 rounded-[7px] border px-[15px] py-[9px] text-label font-semibold transition-colors lg:flex",
+              showPreview
+                ? "border-accent-line bg-accent-soft text-accent"
+                : "border-btn bg-surface text-ink hover:border-btn-hover"
+            )}
+          >
+            <span aria-hidden="true">◨</span>
+            <span>Content preview</span>
+          </button>
           <Button onClick={() => void s.preview()}>Preview</Button>
           <button
             key={s.publishedNow ? "celebrate" : "idle"}
@@ -109,7 +151,7 @@ export default function EditorScreen() {
       )}
 
       <div className="flex shrink-0 gap-1.5 border-b border-line bg-surface px-3.5 py-2.5 lg:hidden">
-        {(["sections", "content"] as const).map((t) => (
+        {(["sections", "content", "preview"] as const).map((t) => (
           <button
             key={t}
             type="button"
@@ -192,6 +234,16 @@ export default function EditorScreen() {
               </div>
             </div>
           )}
+        </div>
+
+        <div
+          className={cx(
+            "w-full shrink-0 overflow-y-auto border-l border-line bg-rail lg:w-[380px] xl:w-[460px]",
+            tab === "preview" ? "block" : "hidden",
+            showPreview ? "lg:block" : "lg:hidden"
+          )}
+        >
+          <ContentPreview />
         </div>
       </div>
     </div>
