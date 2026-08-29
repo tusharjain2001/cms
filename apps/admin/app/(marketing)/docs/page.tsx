@@ -1,13 +1,19 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SECTION_REGISTRY, type FieldDef } from "@pagecraft/shared";
-import { Band, H2 } from "@/components/landing/bits";
+import { Band, ButtonLink, Eyebrow } from "@/components/landing/bits";
+import { Print } from "@/components/landing/motion";
 import { SiteFooter } from "@/components/landing/site-footer";
 import { SiteNav } from "@/components/landing/site-nav";
 import { links } from "@/lib/links";
 
 /**
- * The public developer documentation.
+ * The public developer documentation — the quietest page on the site
+ * (direction.md §5.12): Paper only, no bands, no marquee, no plate, no stage
+ * light. Content prints in once on reveal (<Print>) and then holds perfectly
+ * still; there is zero idle motion here. It reads fully with JavaScript
+ * disabled — the reveals are visible pre-hydration and the section reference is
+ * server-rendered.
  *
  * It exists because developers read docs BEFORE creating an account, and until
  * this page there was nothing to read — the only integration guide lived
@@ -41,13 +47,23 @@ export const metadata: Metadata = {
   },
 };
 
+const TOC: [string, string][] = [
+  ["idea", "How it fits together"],
+  ["start", "Quick start"],
+  ["api", "The API"],
+  ["sections", "Section types"],
+  ["notes", "Worth knowing"],
+];
+
 /* ------------------------------------------------------------------ pieces */
 
+/** A code block. The code sits on `--color-sunken` — quieter than a surface
+ *  card, the docs page's one nod to the press palette (direction.md §5.12). */
 function Code({ children, file }: { children: string; file?: string }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-line bg-surface">
+    <div className="overflow-hidden rounded-xl border border-line bg-sunken">
       {file && (
-        <div className="border-b border-line bg-sunken px-4 py-2 font-mono text-micro text-muted">
+        <div className="border-b border-line bg-surface px-4 py-2 font-mono text-micro text-muted">
           {file}
         </div>
       )}
@@ -58,6 +74,13 @@ function Code({ children, file }: { children: string; file?: string }) {
   );
 }
 
+/**
+ * A documentation section. Its heading is Karla, not the Bricolage display H2:
+ * these titles sit well below 32px and the display face is never set that small
+ * (direction.md §4). The whole section prints in once on reveal and then holds
+ * still — the `id` lives on the outer element so the TOC anchors still work
+ * with JS off.
+ */
 function Section({
   id,
   title,
@@ -69,8 +92,10 @@ function Section({
 }) {
   return (
     <section id={id} className="scroll-mt-20 pt-16">
-      <H2 className="text-[24px]! tracking-[-.6px]! sm:text-[28px]!">{title}</H2>
-      <div className="mt-4 flex flex-col gap-4">{children}</div>
+      <Print>
+        <h2 className="text-[24px] font-bold tracking-[-0.5px] sm:text-[27px]">{title}</h2>
+        <div className="mt-4 flex flex-col gap-4">{children}</div>
+      </Print>
     </section>
   );
 }
@@ -118,19 +143,19 @@ export default function DocsPage() {
       <SiteNav active="docs" />
 
       <main className="mx-auto max-w-[1160px] px-5 pb-24 sm:px-8">
-        <Band className="animate-rise px-0! pt-14 sm:pt-17">
-          <p className="text-label font-semibold tracking-[.06em] text-accent uppercase">
-            Developer docs
-          </p>
-          <h1 className="mt-3 max-w-[720px] text-[34px] leading-[1.08] font-bold tracking-[-1.1px] sm:text-[42px]">
-            Your design. Their words. No deploy in between.
-          </h1>
-          <p className="mt-4.5 max-w-[620px] text-[16px] leading-[1.65] text-quiet sm:text-[17px]">
-            Pagecraft serves content as plain JSON over four read-only endpoints. You write the
-            React; your client writes the words and presses Publish; the live page regenerates in
-            seconds. There is no template language, no theme system and nothing to learn beyond{" "}
-            <code className="font-mono text-mid text-slate">fetch</code>.
-          </p>
+        <Band className="px-0! pt-14 sm:pt-17">
+          <Print>
+            <Eyebrow>Developer docs</Eyebrow>
+            <h1 className="mt-3 max-w-[720px] text-[34px] leading-[1.08] font-bold tracking-[-1.1px] sm:text-[42px]">
+              Your design. Their words. No deploy in between.
+            </h1>
+            <p className="mt-4.5 max-w-[620px] text-[16px] leading-[1.65] text-quiet sm:text-[17px]">
+              Pagecraft serves content as plain JSON over four read-only endpoints. You write the
+              React; your client writes the words and presses Publish; the live page regenerates in
+              seconds. There is no template language, no theme system and nothing to learn beyond{" "}
+              <code className="font-mono text-mid text-slate">fetch</code>.
+            </p>
+          </Print>
         </Band>
 
         <div className="grid gap-12 lg:grid-cols-[1fr_220px]">
@@ -414,42 +439,43 @@ export async function POST(req) {
             </Section>
 
             {/* ---------------------------------------------------------- cta */}
-            <div className="mt-16 rounded-2xl border border-accent-line bg-[linear-gradient(180deg,var(--color-accent-wash),var(--color-accent-soft))] px-8 py-11 text-center">
-              <h2 className="text-[26px] font-bold tracking-[-.8px] sm:text-[30px]">
-                Get a key and try it
-              </h2>
-              <p className="mx-auto mt-3 max-w-[520px] text-[15px] leading-[1.6] text-slate">
-                Create a website, add a page, press Publish, and point your local dev server at it.
-                Fourteen days free, no card.
-              </p>
-              <Link
-                href={links.signUp}
-                className="mt-6 inline-block rounded-lg bg-accent px-6 py-3 text-[14.5px] font-semibold text-white transition-colors hover:bg-accent-dark"
-              >
-                Create an account
-              </Link>
-            </div>
+            <Print>
+              {/* Flat Press-Blue-soft panel — no gradient (direction.md §1, §7). */}
+              <div className="mt-16 rounded-2xl border border-accent-line bg-accent-soft px-8 py-11 text-center">
+                <h2 className="text-[26px] font-bold tracking-[-.8px] sm:text-[30px]">
+                  Get a key and try it
+                </h2>
+                <p className="mx-auto mt-3 max-w-[520px] text-[15px] leading-[1.6] text-slate">
+                  Create a website, add a page, press Publish, and point your local dev server at it.
+                  Fourteen days free, no card.
+                </p>
+                <div className="mt-6 flex justify-center">
+                  <ButtonLink href={links.signUp}>Create an account</ButtonLink>
+                </div>
+              </div>
+            </Print>
           </div>
 
           {/* --------------------------------------------------------- on this page */}
           <aside className="hidden lg:block">
             <nav className="sticky top-24 border-l border-line pl-5">
-              <p className="text-micro font-semibold tracking-[.06em] text-muted uppercase">
+              <p className="font-mono text-micro font-semibold tracking-[.08em] text-muted uppercase">
                 On this page
               </p>
-              <ul className="mt-3 flex flex-col gap-2">
-                {[
-                  ["idea", "How it fits together"],
-                  ["start", "Quick start"],
-                  ["api", "The API"],
-                  ["sections", "Section types"],
-                  ["notes", "Worth knowing"],
-                ].map(([id, label]) => (
+              <ul className="mt-3 flex flex-col gap-2.5">
+                {TOC.map(([id, label]) => (
                   <li key={id}>
                     <a
                       href={`#${id}`}
-                      className="text-label text-quiet transition-colors hover:text-accent"
+                      className="group flex items-center gap-2.5 font-mono text-[12px] tracking-[0.04em] text-quiet uppercase transition-colors hover:text-ink focus-visible:text-ink"
                     >
+                      {/* Hollow marker that fills Press Blue on hover/focus — the
+                          "active dot" (direction.md §5.12). CSS-only: no scrollspy,
+                          so the page stays motionless and works with JS off. */}
+                      <span
+                        aria-hidden
+                        className="h-[7px] w-[7px] shrink-0 rounded-full border border-grip transition-colors group-hover:border-accent group-hover:bg-accent group-focus-visible:border-accent group-focus-visible:bg-accent"
+                      />
                       {label}
                     </a>
                   </li>

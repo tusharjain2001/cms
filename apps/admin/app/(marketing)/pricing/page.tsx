@@ -3,11 +3,15 @@ import Link from "next/link";
 import { PricingPlans } from "@/components/landing/pricing-plans";
 import { SiteFooter } from "@/components/landing/site-footer";
 import { SiteNav } from "@/components/landing/site-nav";
-import { Band, H2 } from "@/components/landing/bits";
+import { Band, ButtonLink } from "@/components/landing/bits";
+import { Print, Stagger, StageController } from "@/components/landing/motion";
 import { links } from "@/lib/links";
 
 /**
- * The pricing page.
+ * The pricing page — the calm two-stage version of the system (direction.md
+ * §5.11): Paper → Sky at the plan grid → Paper, no marquee, no plate, no sticky
+ * sequence. Bands reveal with print-wipes; the only interactivity is the
+ * monthly/yearly toggle inside <PricingPlans>.
  *
  * One account is one website, and the website's owner pays for it. Two plans,
  * separated by how big the site is. See the header comment in
@@ -17,9 +21,6 @@ import { links } from "@/lib/links";
  * Copy is aimed at the person paying — a shop or practice owner, not a
  * developer. That is a deliberate shift from the landing page, which speaks to
  * whoever builds the site.
- *
- * Only the monthly/yearly toggle is interactive; everything below is a server
- * component.
  */
 
 const description =
@@ -85,162 +86,193 @@ const FAQS = [
   },
 ];
 
+/**
+ * Informational section heading. Deliberately Karla, not the Bricolage display
+ * H2: on this calm page the display face is reserved for the hero and the
+ * prices (direction.md §4 — display never below 32px, so a small heading is set
+ * in the body face rather than a shrunken display face).
+ */
+function SectionHead({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="text-[26px] font-bold tracking-[-0.5px] sm:text-[29px]">{children}</h2>
+  );
+}
+
 export default function PricingPage() {
   return (
     <div className="min-h-screen bg-canvas">
       <SiteNav active="pricing" />
 
-      <main>
-        <Band className="animate-rise pt-14 text-center sm:pt-17">
-          <h1 className="mx-auto max-w-[760px] text-[34px] leading-[1.08] font-bold tracking-[-1.1px] sm:text-[44px] lg:text-[48px] lg:tracking-[-1.4px]">
-            One website. One simple price.
-          </h1>
-          <p className="mx-auto mt-4.5 max-w-[600px] text-[16px] leading-[1.6] text-quiet sm:text-[17px]">
-            Less than a site builder, and your website stays exactly as your designer made it. Try
-            it for fourteen days without giving us a card.
-          </p>
-        </Band>
-
-        <Band className="pt-7">
-          <PricingPlans />
-
-          <div className="mx-auto mt-4 flex max-w-[760px] flex-wrap items-center gap-3.5 rounded-xl border border-line bg-rail px-5 py-4">
-            <p className="text-sub text-quiet">
-              Both plans include every section type, unlimited edits, preview links and automatic
-              publishing to your live website. Nothing about the product is held back on the
-              cheaper plan — you are only paying for a bigger site.
-            </p>
-            <Link
-              href={links.signUp}
-              className="ml-auto text-sub font-semibold text-accent hover:underline"
+      <StageController>
+        <main>
+          {/* -------------------------------------------------------- hero */}
+          <Band stage="paper" className="pt-14 pb-9 text-center sm:pt-17">
+            <Print
+              as="h1"
+              className="mx-auto max-w-[820px] font-display text-[clamp(2.75rem,6.5vw,4rem)] font-extrabold leading-[0.94] tracking-[-0.025em]"
             >
-              Start your 14 days →
-            </Link>
-          </div>
-        </Band>
-
-        {/* ------------------------------------------------------ comparison */}
-        <Band className="pt-19">
-          <H2 className="text-[26px]! tracking-[-.7px]! sm:text-[30px]!">
-            The details, side by side
-          </H2>
-          <div className="mt-5.5 overflow-x-auto rounded-2xl border border-line bg-surface">
-            <table className="w-full min-w-[560px] border-collapse text-left">
-              <thead>
-                <tr className="border-b border-line bg-sunken">
-                  <th scope="col" className="w-[46%] px-5.5 py-4">
-                    <span className="sr-only">Feature</span>
-                  </th>
-                  <th
-                    scope="col"
-                    className="border-l border-line-mid px-4 py-4 text-label font-semibold"
-                  >
-                    Starter
-                  </th>
-                  <th
-                    scope="col"
-                    className="border-l border-line-mid px-4 py-4 text-label font-bold text-accent"
-                  >
-                    Business
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {COMPARISON.map((row) => (
-                  <tr key={row.label} className="border-b border-line-soft last:border-b-0">
-                    <th
-                      scope="row"
-                      className="px-5.5 py-3.5 text-left text-sub font-medium text-ink"
-                    >
-                      {row.label}
-                    </th>
-                    <td className="border-l border-line-mid px-4 py-3.5 text-label text-quiet tabular-nums">
-                      {row.starter}
-                    </td>
-                    <td className="border-l border-line-mid px-4 py-3.5 text-label font-medium text-ink tabular-nums">
-                      {row.business}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <p className="mt-4 text-sub leading-[1.6] text-quiet">
-            Look after several websites and want them under one sign-in?{" "}
-            <a href={links.contact} className="font-semibold text-accent hover:underline">
-              Tell us what you need
-            </a>{" "}
-            — that is a conversation, not a column on a table.
-          </p>
-        </Band>
-
-        {/* --------------------------------------------------------- add-ons */}
-        <Band className="pt-19">
-          <ul className="grid gap-3.5 md:grid-cols-2">
-            {ADD_ONS.map((a) => (
-              <li key={a.title} className="rounded-xl border border-line bg-surface p-5.5">
-                <h2 className="text-[14.5px] font-semibold">{a.title}</h2>
-                <p className="mt-1.5 text-label leading-[1.55] text-quiet">{a.body}</p>
-                <p className="mt-3.5 text-[20px] font-bold tracking-[-.4px] tabular-nums">
-                  {a.price} <span className="text-mid font-normal text-muted">{a.unit}</span>
-                </p>
-              </li>
-            ))}
-          </ul>
-        </Band>
-
-        {/* ------------------------------------------------------------- faq */}
-        <Band className="pt-19">
-          <div className="grid gap-9 lg:grid-cols-[.8fr_1.2fr]">
-            <div>
-              <H2 className="text-[26px]! tracking-[-.7px]! sm:text-[30px]!">Billing questions</H2>
-              <p className="mt-3 text-[15px] leading-[1.6] text-quiet">
-                Anything unclear, mail{" "}
-                <a href={links.contact} className="font-medium text-accent hover:underline">
-                  hello@pagecraft.dev
-                </a>{" "}
-                before you pay, not after.
+              One website. One simple price.
+            </Print>
+            <Print delay={90} className="mx-auto mt-5 max-w-[600px]">
+              <p className="text-[16px] leading-[1.6] text-quiet sm:text-[17px]">
+                Less than a site builder, and your website stays exactly as your designer made it.
+                Try it for fourteen days without giving us a card.
               </p>
-            </div>
-            <dl className="overflow-hidden rounded-xl border border-line bg-surface">
-              {FAQS.map((f) => (
-                <div key={f.q} className="border-b border-line-soft px-6 py-5 last:border-b-0">
-                  <dt className="text-[14.5px] font-semibold">{f.q}</dt>
-                  <dd className="mt-1.5 text-sub leading-[1.6] text-quiet">{f.a}</dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-        </Band>
+            </Print>
+          </Band>
 
-        {/* ------------------------------------------------------ closing cta */}
-        <Band className="pt-19 pb-24">
-          <div className="rounded-2xl border border-accent-line bg-[linear-gradient(180deg,var(--color-accent-wash),var(--color-accent-soft))] px-8 py-12 text-center sm:px-10 sm:py-13">
-            <H2 className="text-[28px]! tracking-[-.9px]! sm:text-[34px]!">
-              Change your own website today.
-            </H2>
-            <p className="mx-auto mt-3.5 max-w-[540px] text-[15.5px] leading-[1.6] text-slate sm:text-[16px]">
-              Fourteen days free, no card. Change a headline, swap a photo, press Publish, and watch
-              your live website update itself.
+          {/* --------------------------------------------- plan grid (Sky) */}
+          <Band stage="sky" className="py-9">
+            <Print>
+              <PricingPlans />
+            </Print>
+
+            <Print delay={90}>
+              <div className="mx-auto mt-4 flex max-w-[760px] flex-wrap items-center gap-3.5 rounded-xl border border-line bg-surface px-5 py-4">
+                <p className="text-sub text-quiet">
+                  Both plans include every section type, unlimited edits, preview links and automatic
+                  publishing to your live website. Nothing about the product is held back on the
+                  cheaper plan — you are only paying for a bigger site.
+                </p>
+                <Link
+                  href={links.signUp}
+                  className="ml-auto text-sub font-semibold text-accent hover:underline"
+                >
+                  Start your 14 days →
+                </Link>
+              </div>
+            </Print>
+          </Band>
+
+          {/* --------------------------------------------------- comparison */}
+          <Band stage="paper" className="pt-19">
+            <Print as="header">
+              <SectionHead>The details, side by side</SectionHead>
+            </Print>
+            <Print delay={70}>
+              <div className="mt-5.5 overflow-x-auto rounded-2xl border border-line bg-surface">
+                <table className="w-full min-w-[560px] border-collapse text-left">
+                  <thead>
+                    <tr className="border-b border-line bg-sunken">
+                      <th scope="col" className="w-[46%] px-5.5 py-4">
+                        <span className="sr-only">Feature</span>
+                      </th>
+                      <th
+                        scope="col"
+                        className="border-l border-line-mid px-4 py-4 text-label font-semibold"
+                      >
+                        Starter
+                      </th>
+                      <th
+                        scope="col"
+                        className="border-l border-line-mid px-4 py-4 text-label font-bold text-accent"
+                      >
+                        Business
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {COMPARISON.map((row) => (
+                      <tr key={row.label} className="border-b border-line-soft last:border-b-0">
+                        <th
+                          scope="row"
+                          className="px-5.5 py-3.5 text-left text-sub font-medium text-ink"
+                        >
+                          {row.label}
+                        </th>
+                        <td className="border-l border-line-mid px-4 py-3.5 text-label text-quiet tabular-nums">
+                          {row.starter}
+                        </td>
+                        <td className="border-l border-line-mid px-4 py-3.5 text-label font-medium text-ink tabular-nums">
+                          {row.business}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Print>
+
+            <p className="mt-4 text-sub leading-[1.6] text-quiet">
+              Look after several websites and want them under one sign-in?{" "}
+              <a href={links.contact} className="font-semibold text-accent hover:underline">
+                Tell us what you need
+              </a>{" "}
+              — that is a conversation, not a column on a table.
             </p>
-            <div className="mt-6.5 flex flex-wrap justify-center gap-2.5">
-              <Link
-                href={links.signUp}
-                className="inline-block rounded-lg bg-accent px-6 py-3 text-[14.5px] font-semibold text-white transition-colors hover:bg-accent-dark"
-              >
-                Start 14 days free
-              </Link>
-              <Link
-                href="/"
-                className="inline-block rounded-lg border border-accent-line bg-surface px-6 py-3 text-[14.5px] font-semibold transition-colors hover:border-[#94aad9]"
-              >
-                Back to the overview
-              </Link>
+          </Band>
+
+          {/* ------------------------------------------------------ add-ons */}
+          <Band stage="paper" className="pt-19">
+            <div className="grid gap-3.5 md:grid-cols-2">
+              <Stagger>
+                {ADD_ONS.map((a) => (
+                  <div
+                    key={a.title}
+                    className="rounded-xl border border-line bg-surface p-5.5 transition-[transform,border-color] duration-150 hover:translate-y-px hover:border-btn-hover"
+                  >
+                    <h3 className="text-[14.5px] font-semibold">{a.title}</h3>
+                    <p className="mt-1.5 text-label leading-[1.55] text-quiet">{a.body}</p>
+                    <p className="mt-3.5 text-[20px] font-bold tracking-[-.4px] tabular-nums">
+                      {a.price} <span className="text-mid font-normal text-muted">{a.unit}</span>
+                    </p>
+                  </div>
+                ))}
+              </Stagger>
             </div>
-          </div>
-        </Band>
-      </main>
+          </Band>
+
+          {/* ---------------------------------------------------------- faq */}
+          <Band stage="paper" className="pt-19">
+            <div className="grid gap-9 lg:grid-cols-[.8fr_1.2fr]">
+              <div>
+                <Print as="header">
+                  <SectionHead>Billing questions</SectionHead>
+                </Print>
+                <p className="mt-3 text-[15px] leading-[1.6] text-quiet">
+                  Anything unclear, mail{" "}
+                  <a href={links.contact} className="font-medium text-accent hover:underline">
+                    hello@pagecraft.dev
+                  </a>{" "}
+                  before you pay, not after.
+                </p>
+              </div>
+              <Print delay={70}>
+                <dl className="overflow-hidden rounded-xl border border-line bg-surface">
+                  {FAQS.map((f) => (
+                    <div key={f.q} className="border-b border-line-soft px-6 py-5 last:border-b-0">
+                      <dt className="text-[14.5px] font-semibold">{f.q}</dt>
+                      <dd className="mt-1.5 text-sub leading-[1.6] text-quiet">{f.a}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </Print>
+            </div>
+          </Band>
+
+          {/* -------------------------------------------------- closing cta */}
+          <Band stage="paper" className="pt-19 pb-24">
+            <Print>
+              {/* Flat Press-Blue-soft panel — no gradient (direction.md §1, §7). */}
+              <div className="rounded-2xl border border-accent-line bg-accent-soft px-8 py-12 text-center sm:px-10 sm:py-13">
+                <h2 className="font-display text-[clamp(2rem,4.5vw,2.5rem)] font-extrabold leading-[0.95] tracking-[-0.025em]">
+                  Change your own website today.
+                </h2>
+                <p className="mx-auto mt-3.5 max-w-[540px] text-[15.5px] leading-[1.6] text-slate sm:text-[16px]">
+                  Fourteen days free, no card. Change a headline, swap a photo, press Publish, and
+                  watch your live website update itself.
+                </p>
+                <div className="mt-6.5 flex flex-wrap justify-center gap-2.5">
+                  <ButtonLink href={links.signUp}>Start 14 days free</ButtonLink>
+                  <ButtonLink href="/" tone="outline">
+                    Back to the overview
+                  </ButtonLink>
+                </div>
+              </div>
+            </Print>
+          </Band>
+        </main>
+      </StageController>
 
       <SiteFooter />
     </div>
