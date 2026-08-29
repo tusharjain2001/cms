@@ -540,15 +540,15 @@ export function StickySteps({ steps, className = "" }: { steps: Step[]; classNam
   return (
     <div className={`grid grid-cols-[1fr_1.1fr] gap-10 ${className}`}>
       <div>
-        <div className="sticky top-24 h-[60vh]">
+        <div className="sticky top-24 h-[62vh]">
           {steps.map((s, i) => (
             <div
               key={i}
-              className="absolute inset-0 transition-opacity duration-[450ms] ease-out"
+              className="absolute inset-0 flex items-center transition-opacity duration-[450ms] ease-out"
               style={{ opacity: active === i ? 1 : 0 }}
               aria-hidden={active !== i}
             >
-              {s.visual}
+              <div className="w-full">{s.visual}</div>
             </div>
           ))}
         </div>
@@ -560,7 +560,7 @@ export function StickySteps({ steps, className = "" }: { steps: Step[]; classNam
             ref={(el) => {
               blockRefs.current[i] = el;
             }}
-            className="flex min-h-[70vh] flex-col justify-center"
+            className="flex min-h-[62vh] flex-col justify-center"
           >
             <div
               className={`mb-3 font-mono text-[13px] font-semibold tracking-[0.08em] transition-colors duration-300 ${

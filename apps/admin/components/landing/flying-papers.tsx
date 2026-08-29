@@ -193,14 +193,23 @@ const SECTION_PRESETS: Record<string, SectionPaper[]> = {
     { w: 88,  kind: "photo", tone: "sun",   pos: { bottom: "0%", left: "6%" }, rot: 7,  par: 60, show: "hidden lg:block" },
   ],
   cta: [
-    { w: 100, kind: "page",  tone: "blue",  pos: { top: "8%",  left: "7%"   }, rot: -10, par: 46, show: "hidden sm:block" },
-    { w: 84,  kind: "page",  tone: "sun",   pos: { top: "16%", right: "9%"  }, rot: 9,   par: 58, show: "hidden sm:block" },
-    { w: 116, kind: "photo", tone: "mint",  pos: { bottom: "-8%", left: "15%" }, rot: 6, par: 70, show: "hidden lg:block" },
-    { w: 76,  kind: "page",  tone: "lilac", pos: { bottom: "4%", right: "17%" }, rot: -6, par: 32, show: "hidden lg:block" },
+    // Weighted left into an asymmetric cluster (echoing the hero), not centred.
+    { w: 112, kind: "photo", tone: "blue",  pos: { top: "4%",  left: "4%"   }, rot: -11, par: 52, show: "hidden sm:block" },
+    { w: 82,  kind: "page",  tone: "sun",   pos: { top: "24%", left: "17%"  }, rot: 7,   par: 38, show: "hidden lg:block" },
+    { w: 124, kind: "page",  tone: "mint",  pos: { bottom: "-8%", left: "9%" }, rot: 6,  par: 70, show: "hidden sm:block" },
+    { w: 74,  kind: "page",  tone: "lilac", pos: { bottom: "8%", right: "8%" }, rot: -6, par: 32, show: "hidden lg:block" },
   ],
   lilac: [
     { w: 96,  kind: "page",  tone: "sky",   pos: { top: "-5%", right: "2%"  }, rot: 8,  par: 44, show: "hidden lg:block" },
     { w: 80,  kind: "page",  tone: "sun",   pos: { bottom: "1%", left: "-2%" }, rot: -7, par: 58, show: "hidden lg:block" },
+  ],
+  stats: [
+    { w: 92,  kind: "page",  tone: "sun",   pos: { top: "3%",  right: "1%"  }, rot: 8,  par: 46, show: "hidden lg:block" },
+    { w: 76,  kind: "page",  tone: "mint",  pos: { top: "15%", right: "12%" }, rot: -6, par: 34, show: "hidden lg:block" },
+  ],
+  faq: [
+    { w: 122, kind: "photo", tone: "blue",  pos: { bottom: "7%", left: "2%"  }, rot: -8, par: 58, show: "hidden sm:block" },
+    { w: 80,  kind: "page",  tone: "mint",  pos: { bottom: "12%", right: "3%" }, rot: 7, par: 42, show: "hidden lg:block" },
   ],
 };
 

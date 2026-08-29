@@ -69,7 +69,7 @@ const STATS = [
     suffix: "s",
     title: "Publish to live",
     body:
-      "Publish fires the site's revalidate webhook. The static page regenerates itself — no deploy, no developer.",
+      "Publish fires the site's revalidate webhook. The static page regenerates itself. No deploy, no developer.",
   },
   {
     value: 9,
@@ -187,7 +187,7 @@ export default function LandingPage() {
                 <Eyebrow>How it works</Eyebrow>
               </Print>
               <Print delay={70}>
-                <H2 className="mt-3">You keep the design. They keep the words.</H2>
+                <H2 className="mt-3">You build it. They fill it in.</H2>
               </Print>
               <Print delay={140}>
                 <Lede className="mt-4">
@@ -201,7 +201,7 @@ export default function LandingPage() {
           </Band>
 
           {/* ------------------------------------- stats + can / cannot · paper */}
-          <Band stage="paper" className="py-20 sm:py-24">
+          <Band stage="paper" className="py-20 sm:py-24" bg={<SectionPapers preset="stats" />}>
             <div className="grid gap-10 sm:grid-cols-3">
               {STATS.map((s, i) => (
                 <Print key={s.title} delay={i * 70}>
@@ -240,7 +240,7 @@ export default function LandingPage() {
               <div className="flex flex-wrap items-center gap-3.5 border-t border-line-mid bg-sunken px-8 py-4.5">
                 <p className="text-[13.5px] text-quiet">
                   Blank required fields are tolerated while they type, and only checked the
-                  moment they press Publish — with the error shown on the field, in plain
+                  moment they press Publish, with the error shown on the field, in plain
                   English.
                 </p>
                 <a
@@ -387,8 +387,8 @@ export default function LandingPage() {
                 <Print delay={140}>
                   <Lede className="mt-4">
                     A section type is a set of fields plus your React component. The dashboard
-                    reads the field definitions and builds the form itself — you never write an
-                    admin screen again.
+                    reads the field definitions and builds the form itself, so you never write
+                    an admin screen again.
                   </Lede>
                 </Print>
               </div>
@@ -477,24 +477,41 @@ export default function LandingPage() {
           </Band>
 
           {/* ------------------------------------------------------- faq · paper */}
-          <Band stage="paper" className="py-20 sm:py-24">
-            <div className="grid gap-9 lg:grid-cols-[0.8fr_1.2fr]">
-              <div>
-                <H2 className="text-[26px]! tracking-[-0.03em]! sm:text-[32px]!">
+          <Band stage="paper" className="py-20 sm:py-24" bg={<SectionPapers preset="faq" />}>
+            <div className="grid gap-9 lg:grid-cols-[0.85fr_1.15fr]">
+              <div className="lg:sticky lg:top-24 lg:self-start">
+                <H2 className="text-[26px]! leading-[1.04]! tracking-[-0.02em]! sm:text-[32px]!">
                   Questions developers ask first
                 </H2>
-                <p className="mt-3 text-[15px] leading-[1.6] text-quiet">
+                <p className="mt-4 text-[15px] leading-[1.6] text-quiet">
                   Anything else, mail{" "}
                   <a href={links.contact} className="font-medium text-accent hover:underline">
                     hello@pagecraft.dev
                   </a>{" "}
                   and a human answers.
                 </p>
+
+                <a
+                  href={links.docs}
+                  className="pc-lift mt-6 block rounded-xl border border-line bg-surface p-5 hover:border-accent-line"
+                >
+                  <p className="font-mono text-[11px] tracking-[0.08em] text-muted uppercase">
+                    Prefer to read
+                  </p>
+                  <p className="mt-2 font-display text-[19px] font-bold tracking-[-0.01em] text-ink">
+                    The full documentation
+                  </p>
+                  <p className="mt-1.5 text-[13.5px] leading-[1.5] text-quiet">
+                    Setup, the SDK, every section type and the content API.{" "}
+                    <span className="font-semibold text-accent">Read the docs →</span>
+                  </p>
+                </a>
               </div>
               <dl className="overflow-hidden rounded-xl border border-line bg-surface">
-                {FAQS.map((f) => (
+                {FAQS.map((f, i) => (
                   <details
                     key={f.q}
+                    open={i === 0}
                     className="group border-b border-line-soft last:border-b-0 [&_summary::-webkit-details-marker]:hidden"
                   >
                     <summary className="flex cursor-pointer items-center justify-between gap-4 px-6 py-4.5 text-[14.5px] font-semibold transition-colors duration-150 select-none hover:bg-sunken">
