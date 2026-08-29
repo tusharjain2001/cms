@@ -161,13 +161,16 @@ const TYPES: { name: string; blurb: string; glyph: ReactNode }[] = [
 ];
 
 export function SectionTypeGrid() {
+  // A plain <div> grid, not <ul>/<li>: <Stagger> wraps each child in its own
+  // <div> for the reveal, so <ul> would nest <div> directly inside it (invalid).
+  // These are a decorative capability showcase, so list semantics aren't needed.
   return (
-    <ul className="mt-9 grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="mt-9 grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
       <Stagger sticker>
         {TYPES.map((t) => (
-          <li
+          <div
             key={t.name}
-            className="group relative rounded-[12px] border border-line bg-surface p-4 transition-[transform,border-color,box-shadow] duration-150 ease-out hover:translate-y-px hover:border-btn-hover hover:shadow-[inset_0_2px_6px_-4px_rgba(30,35,45,.2)]"
+            className="group relative h-full rounded-[12px] border border-line bg-surface p-4 transition-[transform,border-color,box-shadow] duration-150 ease-out hover:translate-y-px hover:border-btn-hover hover:shadow-[inset_0_2px_6px_-4px_rgba(30,35,45,.2)]"
           >
             {/* voltage dot — line colour at rest, publish green when pointed at */}
             <span
@@ -179,9 +182,9 @@ export function SectionTypeGrid() {
               {t.name}
             </span>
             <span className="mt-1.5 block text-mid leading-[1.5] text-quiet">{t.blurb}</span>
-          </li>
+          </div>
         ))}
       </Stagger>
-    </ul>
+    </div>
   );
 }

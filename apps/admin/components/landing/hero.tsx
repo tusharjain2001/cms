@@ -43,9 +43,10 @@ export function Hero() {
                 <Print
                   as="span"
                   delay={700}
-                  aria-hidden
                   className="absolute inset-x-[-0.08em] top-[0.16em] bottom-[0.14em] z-0 block -rotate-1 bg-sun"
-                />
+                >
+                  {null}
+                </Print>
                 <Print as="span" delay={330} className="relative z-10 inline">
                   client&rsquo;s words.
                 </Print>
