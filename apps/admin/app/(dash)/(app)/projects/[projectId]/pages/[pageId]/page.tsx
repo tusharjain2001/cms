@@ -45,6 +45,34 @@ export default function EditorScreen() {
     if (params.pageId) return s.openPage(params.pageId);
   }, [params.pageId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // App-level undo/redo shortcuts. Skipped while focus is on an editable
+  // element so the browser's native, character-level undo keeps working
+  // while a client is typing in a field — the buttons remain the primary
+  // affordance there. Doesn't touch the separate ⌘K listener.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      const editable =
+        tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || !!target?.isContentEditable;
+      if (editable) return;
+      if (!(e.metaKey || e.ctrlKey)) return;
+      const key = e.key.toLowerCase();
+      if (key === "z" && e.shiftKey) {
+        e.preventDefault();
+        s.redo();
+      } else if (key === "z") {
+        e.preventDefault();
+        s.undo();
+      } else if (key === "y") {
+        e.preventDefault();
+        s.redo();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [s.undo, s.redo]);
+
   const section = s.selectedSection;
   const def = s.selectedDef;
 
@@ -109,6 +137,28 @@ export default function EditorScreen() {
             <span aria-hidden="true">◨</span>
             <span>Content preview</span>
           </button>
+          <Button
+            disabled={!s.canUndo}
+            onClick={() => s.undo()}
+            aria-label="Undo"
+            title="Undo (Ctrl+Z)"
+          >
+            <span className="inline-flex items-center gap-1.5">
+              <span aria-hidden="true">↶</span>
+              <span className="hidden lg:inline">Undo</span>
+            </span>
+          </Button>
+          <Button
+            disabled={!s.canRedo}
+            onClick={() => s.redo()}
+            aria-label="Redo"
+            title="Redo (Ctrl+Shift+Z)"
+          >
+            <span className="inline-flex items-center gap-1.5">
+              <span aria-hidden="true">↷</span>
+              <span className="hidden lg:inline">Redo</span>
+            </span>
+          </Button>
           <Button onClick={() => void s.preview()}>Preview</Button>
           <button
             key={s.publishedNow ? "celebrate" : "idle"}

@@ -85,6 +85,11 @@ interface Store {
   draftContent: SectionContent;
   setFieldValue: (key: string, value: unknown) => void;
   previewFor: (section: SectionDTO) => string;
+  /** Undo/redo over the selected section's field edits (client-only, per section). */
+  undo: () => void;
+  redo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
 
   // section actions
   addSection: (type: string) => Promise<void>;
@@ -117,6 +122,8 @@ interface Store {
 const StoreContext = createContext<Store | null>(null);
 
 const SAVE_DEBOUNCE_MS = 600;
+/** Cap on undo/redo history for the selected section, so it can't grow unbounded. */
+const HISTORY_LIMIT = 100;
 
 function move<T>(list: T[], from: number, to: number): T[] {
   if (from === to || from < 0 || to < 0 || from >= list.length || to >= list.length) return list;
@@ -140,6 +147,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [loadingPage, setLoadingPage] = useState(false);
   const [selected, setSelected] = useState("");
   const [draftContent, setDraftContent] = useState<SectionContent>({});
+  // Kept fresh every render (same pattern as Modal's onCloseRef) so undo/redo
+  // and the coalescing check can read the latest draft without being a dep
+  // of setFieldValue's useCallback.
+  const draftRef = useRef<SectionContent>(draftContent);
+  draftRef.current = draftContent;
+
+  // Undo/redo history for the selected section's field edits only. Client-only,
+  // reset whenever the selected section changes.
+  const [past, setPast] = useState<SectionContent[]>([]);
+  const [future, setFuture] = useState<SectionContent[]>([]);
+  /** Consecutive edits to this field within SAVE_DEBOUNCE_MS coalesce into one step. */
+  const lastEditKey = useRef<string | null>(null);
+  const lastEditTime = useRef(0);
 
   const [saving, setSaving] = useState<SavingState>("saved");
   const [publishedNow, setPublishedNow] = useState(false);
@@ -276,9 +296,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   );
   const selectedDef = selectedSection ? typeFor(selectedSection.type) : undefined;
 
-  // Reset the local editing buffer whenever a different section is opened.
+  // Reset the local editing buffer — and its undo/redo history — whenever a
+  // different section is opened.
   useEffect(() => {
     setDraftContent(selectedSection ? { ...selectedSection.content } : {});
+    setPast([]);
+    setFuture([]);
+    lastEditKey.current = null;
   }, [selectedSection?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const previewFor = useCallback(
@@ -317,6 +341,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (!selectedSection) return;
       const sectionId = selectedSection.id;
 
+      // Record an undo step for the value as it stood before this edit —
+      // unless this is a rapid follow-up edit to the same field (typing),
+      // which coalesces into the step already recorded.
+      const now = Date.now();
+      const coalesces = key === lastEditKey.current && now - lastEditTime.current < SAVE_DEBOUNCE_MS;
+      if (!coalesces) {
+        setPast((p) => {
+          const next = [...p, draftRef.current];
+          return next.length > HISTORY_LIMIT ? next.slice(next.length - HISTORY_LIMIT) : next;
+        });
+        setFuture([]);
+      }
+      lastEditKey.current = key;
+      lastEditTime.current = now;
+
       setDraftContent((current) => {
         const next = { ...current, [key]: value } as SectionContent;
         if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -327,6 +366,46 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
     [selectedSection, flushSave]
   );
+
+  /**
+   * Step backward/forward through the selected section's edit history. Both
+   * bypass setFieldValue entirely — they read/write draftContent and the save
+   * path directly — so an undo/redo can never itself be recorded as a new
+   * undo step (no re-entrancy guard needed).
+   */
+  const undo = useCallback(() => {
+    if (!selectedSection || past.length === 0) return;
+    const sectionId = selectedSection.id;
+    const restored = past[past.length - 1];
+    // Drop any edit mid-debounce: it captured content from before this undo
+    // and would otherwise land after it and clobber the restored value.
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    setPast((p) => p.slice(0, -1));
+    setFuture((f) => {
+      const next = [...f, draftRef.current];
+      return next.length > HISTORY_LIMIT ? next.slice(next.length - HISTORY_LIMIT) : next;
+    });
+    setDraftContent(restored);
+    lastEditKey.current = null; // the next edit always starts a fresh step
+    setSaving("saving");
+    void flushSave(sectionId, restored);
+  }, [selectedSection, past, flushSave]);
+
+  const redo = useCallback(() => {
+    if (!selectedSection || future.length === 0) return;
+    const sectionId = selectedSection.id;
+    const restored = future[future.length - 1];
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    setFuture((f) => f.slice(0, -1));
+    setPast((p) => {
+      const next = [...p, draftRef.current];
+      return next.length > HISTORY_LIMIT ? next.slice(next.length - HISTORY_LIMIT) : next;
+    });
+    setDraftContent(restored);
+    lastEditKey.current = null;
+    setSaving("saving");
+    void flushSave(sectionId, restored);
+  }, [selectedSection, future, flushSave]);
 
   useEffect(
     () => () => {
@@ -706,6 +785,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     draftContent,
     setFieldValue,
     previewFor,
+    undo,
+    redo,
+    canUndo: past.length > 0,
+    canRedo: future.length > 0,
     addSection,
     deleteSection,
     toggleHidden,
