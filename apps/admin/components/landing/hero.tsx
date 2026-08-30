@@ -36,7 +36,7 @@ export function Hero() {
 
           <div className="relative z-10 max-w-[740px]">
             <Print delay={0} className="inline-block">
-              <Eyebrow>Headless CMS for client websites</Eyebrow>
+              <Eyebrow>For the developer who builds it and the owner who runs it</Eyebrow>
             </Print>
 
             <h1 className="mt-6 font-display text-[clamp(3rem,8.2vw,6.5rem)] leading-[0.86] font-extrabold tracking-[-0.035em] text-ink">
@@ -64,16 +64,20 @@ export function Hero() {
 
             <Print delay={600} className="block">
               <Lede className="mt-7 max-w-[480px]">
-                You build the site in React. Your client edits the words and photos, and never
-                touches a colour, a font or a layout.
+                A developer builds the site in React. The owner changes the words and photos
+                from their phone and presses one button. The design stays exactly as it was
+                shipped, and nobody has to email anybody.
               </Lede>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                 <ButtonLink href={links.signUp} className="w-full text-center sm:w-auto">
                   Create a free account
                 </ButtonLink>
-                <ButtonLink href="#demo" tone="outline" className="w-full text-center sm:w-auto">
-                  See it in action
+                <ButtonLink href="#owners" tone="outline" className="w-full text-center sm:w-auto">
+                  I run a website
+                </ButtonLink>
+                <ButtonLink href="#code" tone="outline" className="w-full text-center sm:w-auto">
+                  I build websites
                 </ButtonLink>
               </div>
             </Print>

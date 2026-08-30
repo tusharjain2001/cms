@@ -70,7 +70,34 @@ const STATS = [
       "Each website is a project with its own key, its own library, and its own allowed sections.",
   },
 ];
+const OWNER_PROMISES = [
+  {
+    title: "From your phone",
+    body: "Update today's specials or opening hours from the counter, before the doors open.",
+  },
+  {
+    title: "Nothing breaks",
+    body: "You change text and photos. Colours, fonts and layout are locked to the design you paid for.",
+  },
+  {
+    title: "Preview, then publish",
+    body: "See it privately first. One tap on Publish and the live site updates in seconds.",
+  },
+  {
+    title: "Nobody to wait for",
+    body: "Add a page, hide a section, swap a photo — without emailing anyone or paying for edits.",
+  },
+];
+
 const FAQS = [
+  {
+    q: "I run the website, not build it. Do I need to know any code?",
+    a: "No. You see plain fields — a headline, a paragraph, a photo — and a Publish button. Colours, fonts and layout are not yours to break, so there is nothing to learn and nothing to be careful about.",
+  },
+  {
+    q: "What if I make a mistake?",
+    a: "Nothing goes live until you press Publish, and you can preview privately first. Change your mind and Discard puts back exactly what the live site shows now.",
+  },
   {
     q: "Do I have to rebuild my client's existing site?",
     a: "No. Wrap the parts that change in section components and read them from the content API. Everything else stays as it is.",
@@ -89,6 +116,67 @@ const FAQS = [
   },
 ];
 
+/**
+ * A phone, drawn in markup: the owner's whole job in one screen — a section
+ * card, a headline field, a photo, and the blue button. Decorative; the copy
+ * beside it carries the meaning.
+ */
+function OwnerPhone() {
+  return (
+    <div aria-hidden className="relative mx-auto w-full max-w-[340px]">
+      {/* sheets behind, like the hero */}
+      <div className="absolute -top-4 -left-6 h-[120px] w-[92px] -rotate-[9deg] rounded-[7px] border border-ink/12 bg-wash-butter shadow-[0_10px_30px_-14px_rgba(27,30,36,0.45)]" />
+      <div className="absolute -right-8 bottom-6 h-[110px] w-[86px] rotate-[8deg] rounded-[7px] border border-ink/12 bg-wash-mint shadow-[0_10px_30px_-14px_rgba(27,30,36,0.45)]" />
+
+      <div className="relative rounded-[36px] border border-ink/20 bg-plate p-2.5 shadow-[0_44px_90px_-40px_rgba(27,30,36,0.55)]">
+        <div className="overflow-hidden rounded-[28px] bg-canvas">
+          {/* status bar */}
+          <div className="flex items-center justify-between px-5 pt-3 pb-1 font-mono text-[10px] text-quiet">
+            <span>7:42</span>
+            <span className="h-[5px] w-[54px] rounded-full bg-ink/70" />
+            <span>●●●</span>
+          </div>
+          {/* header */}
+          <div className="flex items-center justify-between px-4 py-2.5">
+            <span className="font-mono text-[10.5px] tracking-[0.08em] text-quiet uppercase">Home</span>
+            <span className="rounded-full bg-draft-bg px-2 py-[2px] font-mono text-[9.5px] font-semibold text-draft-ink">
+              Draft
+            </span>
+          </div>
+          {/* section cards */}
+          <div className="space-y-1.5 px-3">
+            <div className="rounded-lg border border-accent-line bg-accent-wash px-3 py-2 text-[12px] font-semibold text-ink">
+              Main banner
+            </div>
+            <div className="rounded-lg border border-line bg-surface px-3 py-2 text-[12px] text-quiet">
+              Today&apos;s specials
+            </div>
+          </div>
+          {/* the form */}
+          <div className="mt-3 border-t border-line bg-surface px-4 pt-3.5 pb-4">
+            <p className="font-mono text-[10px] tracking-[0.08em] text-quiet uppercase">Headline</p>
+            <div className="mt-1.5 rounded-lg border border-accent bg-surface px-3 py-2 text-[13px] text-ink shadow-[0_0_0_3px_var(--color-accent-soft)]">
+              Fresh sourdough, every morning
+              <span className="ml-[1px] inline-block h-[14px] w-[1.5px] translate-y-[2px] animate-heartbeat bg-accent" />
+            </div>
+            <p className="mt-3.5 font-mono text-[10px] tracking-[0.08em] text-quiet uppercase">Photo</p>
+            <div className="mt-1.5 flex items-center gap-2.5">
+              <span className="h-11 w-16 rounded-md bg-wash-sky" />
+              <span className="text-[11.5px] font-medium text-accent">Choose from camera roll</span>
+            </div>
+            <div className="mt-4 flex items-center justify-between">
+              <span className="text-[11px] text-quiet">Saved just now</span>
+              <span className="rounded-lg bg-accent px-4 py-2 text-[12.5px] font-semibold text-surface shadow-[0_6px_16px_-8px_var(--color-accent)]">
+                Publish
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function LandingPage() {
   return (
     <div id="top" className="min-h-screen">
@@ -104,6 +192,55 @@ export default function LandingPage() {
           {/* --------------------------- press run · sky (publish pipeline) */}
           <Band stage="sky" id="how" className="py-20 sm:py-24">
             <PressRun />
+          </Band>
+
+          {/* ------------------------------------- for site owners · paper */}
+          <Band stage="paper" id="owners" className="py-20 sm:py-24">
+            <div className="grid items-center gap-12 lg:grid-cols-[1.05fr_0.95fr]">
+              <div>
+                <Print>
+                  <Eyebrow>For site owners</Eyebrow>
+                </Print>
+                <Print delay={70}>
+                  <H2 className="mt-3">Change the words. Press Publish. Done.</H2>
+                </Print>
+                <Print delay={140}>
+                  <Lede className="mt-4">
+                    You do not need to be a computer person. Your website is a short list of
+                    sections, each with a few plain fields, and the only button that matters is
+                    the blue one.
+                  </Lede>
+                </Print>
+                <Print delay={200}>
+                  <ul className="mt-7 grid gap-3.5 sm:grid-cols-2">
+                    {OWNER_PROMISES.map((item) => (
+                      <li
+                        key={item.title}
+                        className="rounded-xl border border-line bg-surface p-4.5 transition-colors hover:border-accent-line"
+                      >
+                        <span className="flex items-center gap-2 font-mono text-[12px] font-semibold tracking-[0.06em] text-ink uppercase">
+                          <span aria-hidden className="text-published">✓</span>
+                          {item.title}
+                        </span>
+                        <p className="mt-1.5 text-[13.5px] leading-[1.55] text-quiet">{item.body}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </Print>
+                <Print delay={260}>
+                  <div className="mt-7 flex flex-wrap items-center gap-4">
+                    <ButtonLink href={links.signUp}>Create a free account</ButtonLink>
+                    <span className="text-[13.5px] text-quiet">
+                      14 days free, no card. Your developer connects the site once.
+                    </span>
+                  </div>
+                </Print>
+              </div>
+
+              <Print delay={180}>
+                <OwnerPhone />
+              </Print>
+            </div>
           </Band>
 
           {/* ------------------------------------- stats · paper */}
@@ -281,7 +418,7 @@ export default function LandingPage() {
                   <Eyebrow>FAQ</Eyebrow>
                 </Print>
                 <Print delay={70}>
-                  <H2 className="mt-3">Questions developers ask first.</H2>
+                  <H2 className="mt-3">Questions owners and developers ask first.</H2>
                 </Print>
               </div>
               <Print delay={140}>
@@ -362,22 +499,22 @@ export default function LandingPage() {
             <div className="mx-auto max-w-[720px] text-center">
               <Print>
                 <h2 className="font-display text-[clamp(3rem,7vw,4.5rem)] leading-[0.95] font-extrabold tracking-[-0.025em] text-ink">
-                  <Swash>Ship</Swash> the site.
+                  <Swash>One</Swash> site.
                   <br />
-                  Hand over the words.
+                  Two happy people.
                 </h2>
               </Print>
               <Print delay={90}>
                 <p className="mx-auto mt-6 max-w-[540px] text-[16.5px] leading-[1.6] text-slate">
-                  Create an account, bring one client website, and see whether they ever email
-                  you a headline change again.
+                  Developers: wire up one site in an afternoon. Owners: change a headline
+                  tonight without asking anyone. Either way, start here.
                 </p>
                 <div className="mt-8 flex flex-wrap justify-center gap-3">
                   <ButtonLink href={links.signUp} className="px-6! hover:animate-celebrate">
                     Create a free account
                   </ButtonLink>
-                  <ButtonLink href={links.signIn} tone="outline" className="px-6!">
-                    Explore the dashboard
+                  <ButtonLink href={links.docs} tone="outline" className="px-6!">
+                    Read the developer docs
                   </ButtonLink>
                 </div>
               </Print>

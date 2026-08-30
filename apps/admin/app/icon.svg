@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" width="72" height="72">
+  <!--
+    The Pagecraft app icon: the p+c mark on the ink tile from the brand
+    artboard. Colours are literal rather than the brand custom properties,
+    because a favicon renders outside the page and inherits none of them;
+    these are the spec's on-ink pair (lift and deep), which hold apart from
+    each other where the light pair would not.
+
+    The g element reuses the mark's own 114x100 geometry: scale 0.34 makes it
+    34 tall (the artboard's proportion inside a 72 tile) and the translate
+    centres it. Keep in sync with components/logo.tsx.
+  -->
+  <rect width="72" height="72" rx="17" fill="#191c22"/>
+  <g transform="translate(16.62 19) scale(0.34)" fill="none">
+    <rect width="16" height="100" rx="9" fill="#ff7a52"/>
+    <circle cx="34" cy="34" r="26" stroke="#ff7a52" stroke-width="16"/>
+    <path d="M96.5 43A9.5 9.5 0 1 1 106 33.5" stroke="#8f3d24" stroke-width="16"/>
+  </g>
+</svg>

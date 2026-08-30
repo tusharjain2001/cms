@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { Button, Input } from "@/components/ui";
 
@@ -10,6 +9,12 @@ import { Button, Input } from "@/components/ui";
  *
  * These are the only pages a stranger ever sees, so they get one consistent
  * card rather than four near-identical layouts drifting apart over time.
+ *
+ * The shell is just the card: the marketing nav above it (and with it the
+ * logo, and the way back to `/`) comes from `app/(dash)/(auth)/layout.tsx`,
+ * which is also where the coral accent and the light pin are applied. `flex-1`
+ * rather than `min-h-screen` because that layout is the flex column now — the
+ * card centres in whatever height is left under the nav.
  */
 export function AuthShell({
   title,
@@ -24,15 +29,8 @@ export function AuthShell({
   footer?: ReactNode;
 }) {
   return (
-    <main className="grid min-h-screen place-items-center bg-[radial-gradient(120%_90%_at_50%_0%,#fbfaf8_0%,#f2f1ed_60%,#eeece7_100%)] px-6 py-12">
+    <main className="grid flex-1 place-items-center bg-[radial-gradient(120%_90%_at_50%_0%,#fbfaf8_0%,#f2f1ed_60%,#eeece7_100%)] px-6 py-12">
       <div className="w-full max-w-[392px] animate-rise">
-        <Link href="/" className="mb-[26px] flex items-center justify-center gap-2.5">
-          <span className="grid h-[30px] w-[30px] place-items-center rounded-lg bg-accent text-[15px] font-bold text-white">
-            P
-          </span>
-          <span className="text-[19px] font-bold tracking-[-.2px]">Pagecraft</span>
-        </Link>
-
         <div className="rounded-[14px] border border-line bg-surface p-7 shadow-[0_1px_2px_rgba(30,35,45,.04),0_12px_32px_-18px_rgba(30,35,45,.18)]">
           <h1 className="mb-1 text-[17px] font-semibold">{title}</h1>
           {sub && <div className="mb-[22px] text-sub text-quiet">{sub}</div>}

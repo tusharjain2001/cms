@@ -48,15 +48,15 @@ const STAGES: Stage[] = [
   {
     tone: "dev",
     tag: "You",
-    title: "You build it once",
+    title: "The developer builds it once",
     body: "Section components in your own React project. Layout, colour and type live in your code.",
     visual: <CodeVisual />,
   },
   {
     tone: "client",
     tag: "Your client",
-    title: "They edit the words",
-    body: "A dashboard a shop owner can use. Plain fields for text and photos, nothing that breaks the design.",
+    title: "The owner edits the words",
+    body: "A dashboard you can use on your phone. Plain fields for text and photos, nothing that can break the design.",
     visual: <EditorVisual />,
   },
   {
@@ -64,7 +64,7 @@ const STAGES: Stage[] = [
     tag: "Live",
     live: true,
     title: "The site updates itself",
-    body: "One tap on Publish regenerates the live page in seconds, exactly as you built it.",
+    body: "One tap on Publish regenerates the live page in seconds, exactly as it was built.",
     visual: <PublishedVisual />,
   },
 ];

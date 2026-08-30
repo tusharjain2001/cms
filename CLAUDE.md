@@ -232,11 +232,16 @@ The route layout is the whole trick:
 ```
 app/
 ├── layout.tsx          <html>, fonts, tokens. NO providers.
-├── page.tsx            /  — the landing page
-└── (dash)/             route group: never appears in a URL
+├── icon.svg            the mark on its ink tile — the favicon
+├── (marketing)/        route group: never appears in a URL
+│   ├── layout.tsx      pins light + wears `brand-coat`
+│   └── page.tsx        /  — the landing page, + pricing/ docs/
+└── (dash)/
     ├── layout.tsx      AuthProvider > StoreProvider > MediaProvider + AppChrome
-    ├── login/          /login  — sign in
-    ├── signup/ verify-email/ forgot-password/ reset-password/
+    ├── (auth)/         the signed-out screens
+    │   ├── layout.tsx  SiteNav + pins light + wears `brand-coat`
+    │   ├── login/      /login  — sign in
+    │   └── signup/ verify-email/ forgot-password/ reset-password/
     └── (app)/          the signed-in shell: sidebar + /projects/…
 ```
 
@@ -244,11 +249,18 @@ app/
 
 **`(dash)` covers both the sign-in screens and the dashboard**, in one provider tree. They must share session state — splitting them would remount `AuthProvider` between typing a password and landing on `/projects`, forcing a second refresh mid-flow.
 
+**The signed-out screens carry the marketing nav**, from `(dash)/(auth)/layout.tsx` — a visitor who arrives at `/login` from an ad can get back to the pitch. It renders in that *server* layout rather than inside `auth-shell.tsx`, which is a client component: importing `SiteNav` there would pull the whole nav into the login bundle. Rendered from the layout it costs those pages no JavaScript, and moving the logo out of the card actually made `/login` smaller. `SiteNav`'s `showAuthCtas={false}` drops its Sign in / Create account buttons there, since each auth card already links to the other in its footer and one of the two would always point at the current page.
+
+**The public surfaces wear `brand-coat`; the dashboard does not.** Marketing and the signed-out screens override the accent tokens to the logo's coral, while everything behind the login keeps Press Blue — the artboard's own instruction, "coral is the brand's coat, not the buttons". It is a token override rather than new utilities, so every existing `bg-accent` / `text-accent` in those trees retunes with no markup change. **The accent is `#b93f20`, not the mark's `#e8542e`**: the mark's coral is 3.66:1 on white and fails AA for text, where the deeper coral matches the Press Blue ramp it replaces. `#e8542e` lives on as `--color-brand`, which the logo paints with. See the `.brand-coat` comment in `globals.css`.
+
+**The app is light-only. There is no dark palette and no theme toggle** — removed deliberately, not yet-to-be-built. `globals.css` defines one set of `--color-*` tokens and nothing redefines them; `lib/theme.ts`, `components/theme-toggle.tsx`, the sidebar's Theme row, the command palette's "Toggle theme" action and the root layout's no-flash script are all gone, as are the light pins that `(marketing)` and `(auth)` needed only because the dashboard could be dark. Do not re-add a `@media (prefers-color-scheme: dark)` block or a `[data-theme]` selector without asking. `--color-plate` is still a dark ink band inside the light palette — that is a tonal reset, not dark mode.
+
 | Path | What it is |
 |---|---|
-| `app/page.tsx` | The whole page. Bands: hero → editor mock → stats → how it works → can't/can → section types → for developers → comparison → testimonials → FAQ → closing CTA. Its own `metadata` overrides the root title template. |
+| `app/(marketing)/page.tsx` | The whole page. Bands: hero → editor mock → stats → how it works → can't/can → section types → for developers → comparison → testimonials → FAQ → closing CTA. Its own `metadata` overrides the root title template. |
 | `components/landing/editor-mock.tsx` | The product screenshot, in markup rather than a PNG — it stays sharp, weighs nothing, and cannot silently go stale when the real editor changes. `aria-hidden`: it is decorative, and the surrounding copy carries the meaning. |
 | `components/landing/section-types.tsx` | The nine types as tinted mini-page tiles — the hero's sheets, landed in a grid. **Mirrors `SECTION_REGISTRY`** — add a section type there, add it here. |
+| `components/logo.tsx` | The p+c mark, drawn from the artboard's construction spec as ratios of its own height. Shared by marketing, the auth screens and the dashboard sidebar, so there is one mark, not four. |
 | `lib/links.ts` | Every destination the landing page points at. Plain relative paths, since it is all one origin. |
 
 **`/` is the landing page, so signing in is at `/login`.** Anything that sends a signed-out user back to sign in — `signOut`, the lost-session handler in `lib/auth.tsx`, the `(app)` layout's guard — points at `/login`, not `/`. Sending them to `/` would drop them on a marketing page.
@@ -275,7 +287,7 @@ Plus a 14-day trial with no card, $2 per extra 10 GB, and $180 for a bespoke sec
 
 If invites are ever built, revisit this: per-developer pricing becomes possible and is worth more.
 
-`components/landing/pricing-plans.tsx` is the **only** `"use client"` component on any public page — the monthly/yearly toggle needs state, and isolating it keeps the table, add-ons and FAQ server-rendered. Note the audience shift: the landing page speaks to whoever *builds* the site, the pricing page to whoever *pays*.
+`components/landing/pricing-plans.tsx` is the **only** `"use client"` component on any public page — the monthly/yearly toggle needs state, and isolating it keeps the table, add-ons and FAQ server-rendered. The landing page speaks to **both** people — the developer who builds the site and the owner who runs it and pays for it (decided 30 Aug 2026; it used to address developers only, with the owner in third person). The hero names both, the "For site owners" band mirrors the "For developers" band, and the FAQ carries questions from each. Keep new copy two-voiced.
 
 **⚠ Nothing on that page is enforced.** There is no billing, no Stripe, no trial clock, no page cap and no media metering. A new signup today gets unlimited websites, unlimited pages, unlimited media, forever. Before this goes in front of anyone who can pay, at minimum: a page cap per project, media metering, a trial expiry, and Stripe. Until then the page is a design artefact, not an offer.
 

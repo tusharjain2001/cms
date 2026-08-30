@@ -40,6 +40,17 @@
   --color-accent-line-soft: #a8c7ea;
   --color-accent-wash: #f2f7fd;
 
+  /* Brand mark — the coral of the p+c ligature (components/logo.tsx).
+     Deliberately NOT --color-accent: coral is the brand's coat, worn by the
+     logo and marketing furniture only, while every interactive control stays
+     Press Blue and the dashboard keeps its calm ink-blue interior. The logo
+     construction spec calls these coral / tint / lift / deep / blush. */
+  --color-brand: #e8542e;
+  --color-brand-tint: #f5b7a4;
+  --color-brand-lift: #ff7a52; /* coral, lifted for ink backgrounds */
+  --color-brand-deep: #8f3d24; /* the hook on ink — holds apart from the lift */
+  --color-brand-wash: #fdf0eb;
+
   /* Marketing spot inks + stage washes (light only — marketing never renders
      dark). Flat ink, no gradients. See cms-redesign/direction.md §3. */
   --color-sun: #ffd731;      /* the highlighter — never a text colour */
@@ -137,123 +148,39 @@
   --ease-press: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* ------------------------------------------------------------------
-   Dark palette — same roles, warm near-black instead of warm paper.
-   Every --color-* above gets redefined here under two selectors so both
-   paths work:
-     - OS dark, unmoored by an explicit choice: the media query, guarded by
-       :not([data-theme="light"]) so an explicit light pick always wins.
-     - An explicit choice via the theme toggle (lib/theme.ts sets
-       data-theme="dark"|"light" on <html>; "system" removes the attribute
-       and leaves this to the media query above).
-   Stays warm on purpose — browns and ambers, not blue-grays — to match the
-   paper-and-ink character of the light palette. Keep both blocks in sync;
-   there is no third place these values live.
-   ------------------------------------------------------------------ */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    /* Surfaces */
-    --color-canvas: #17140f;
-    --color-surface: #221d15;
-    --color-rail: #1c1812;
-    --color-sunken: #110e0a;
 
-    /* Lines, from strongest to faintest */
-    --color-line: #3d362a;
-    --color-line-mid: #332c22;
-    --color-line-soft: #2a251c;
-    --color-field: #453e30;
-    --color-btn: #443c2f;
-    --color-btn-hover: #6b5f49;
-    --color-grip: #554c3c;
+/* ---------------------------------------------------------------------
+   .brand-coat — the coral retune, worn by the public surfaces only.
 
-    /* Text */
-    --color-ink: #f2ece0;
-    --color-quiet: #b8ae9c;
-    --color-muted: #998e79;
-    --color-faint: #938872;
-    --color-slate: #cfc3aa;
-    --color-placeholder: #6e6353;
+   The landing/pricing/docs pages and the signed-out auth screens paint their
+   accent in the logo's coral; the dashboard behind the login keeps Press Blue.
+   That split is the artboard's own instruction — "coral is the brand's coat,
+   not the buttons" — and it means the interface a client stares at all day
+   stays calm while the pages that sell it carry the brand.
 
-    /* Accent — Press Blue, dark sibling (keeps one brand voice in the dash) */
-    --color-accent: #6fb1ec;
-    --color-accent-dark: #5fa8e8;
-    --color-accent-soft: #1e2a38;
-    --color-accent-tint: #24344a;
-    --color-accent-line: #31537a;
-    --color-accent-line-soft: #2b4668;
-    --color-accent-wash: #181f28;
+   Scoping is a token override rather than new utilities, so every existing
+   bg-accent / text-accent / border-accent in those trees retunes with no
+   markup change, and nothing leaks into the dashboard.
 
-    /* Published (green) */
-    --color-published: #4fae82;
-    --color-published-bg: #1b2e24;
-    --color-published-line: #2f4d3c;
-    --color-published-ink: #8fd4ae;
+   The accent is #b93f20 (the artboard's deep coral), NOT the mark's #e8542e.
+   The mark's coral is gorgeous and fails AA as an interface colour: 3.66:1
+   against white and 3.36:1 as text on canvas, where small text needs 4.5:1.
+   #b93f20 lands at 5.53:1 and 5.08:1, tracking the Press Blue ramp it
+   replaces (5.89 / 5.41) so contrast never regresses on these pages. The
+   true #e8542e lives on in --color-brand, which the logo still paints with.
 
-    /* Draft (amber) */
-    --color-draft: #e0a94f;
-    --color-draft-bg: #2e2412;
-    --color-draft-ink: #f0c98a;
-
-    /* Destructive (rust) */
-    --color-destructive: #e2624c;
-    --color-destructive-dark: #c94a34;
-    --color-destructive-bg: #2e1a15;
-    --color-destructive-line: #5a3228;
-    --color-destructive-soft: #24140f;
-
-    /* Neutral chips */
-    --color-chip: #2a251c;
-    --color-chip-hover: #332c22;
-  }
+   The app is light-only, so there is no dark sibling to keep in sync.
+   --------------------------------------------------------------------- */
+.brand-coat {
+  --color-accent: #b93f20;
+  --color-accent-dark: #9c3319;
+  --color-accent-soft: #fdf0eb;  /* blush */
+  --color-accent-tint: #fce9e2;
+  --color-accent-line: #f5c9b8;
+  --color-accent-line-soft: #f0ddd4;
+  --color-accent-wash: #fdf7f4;
 }
-:root[data-theme="dark"] {
-  --color-canvas: #17140f;
-  --color-surface: #221d15;
-  --color-rail: #1c1812;
-  --color-sunken: #110e0a;
 
-  --color-line: #3d362a;
-  --color-line-mid: #332c22;
-  --color-line-soft: #2a251c;
-  --color-field: #453e30;
-  --color-btn: #443c2f;
-  --color-btn-hover: #6b5f49;
-  --color-grip: #554c3c;
-
-  --color-ink: #f2ece0;
-  --color-quiet: #b8ae9c;
-  --color-muted: #998e79;
-  --color-faint: #938872;
-  --color-slate: #cfc3aa;
-  --color-placeholder: #6e6353;
-
-  --color-accent: #6fb1ec;
-  --color-accent-dark: #5fa8e8;
-  --color-accent-soft: #1e2a38;
-  --color-accent-tint: #24344a;
-  --color-accent-line: #31537a;
-  --color-accent-line-soft: #2b4668;
-  --color-accent-wash: #181f28;
-
-  --color-published: #4fae82;
-  --color-published-bg: #1b2e24;
-  --color-published-line: #2f4d3c;
-  --color-published-ink: #8fd4ae;
-
-  --color-draft: #e0a94f;
-  --color-draft-bg: #2e2412;
-  --color-draft-ink: #f0c98a;
-
-  --color-destructive: #e2624c;
-  --color-destructive-dark: #c94a34;
-  --color-destructive-bg: #2e1a15;
-  --color-destructive-line: #5a3228;
-  --color-destructive-soft: #24140f;
-
-  --color-chip: #2a251c;
-  --color-chip-hover: #332c22;
-}
 
 @keyframes pcSpin {
   to {

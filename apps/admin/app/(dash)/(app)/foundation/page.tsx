@@ -2,6 +2,7 @@
 
 import { Button, Card, CardTitle, Chip, Input, Toggle, cx } from "@/components/ui";
 import { useState } from "react";
+import { PagecraftMark } from "@/components/logo";
 
 const COLOURS = [
   { name: "Canvas", hex: "#f6f5f2", ring: true },
@@ -13,6 +14,14 @@ const COLOURS = [
   { name: "Published", hex: "#2f7d5b" },
   { name: "Draft", hex: "#c68a2b" },
   { name: "Destructive", hex: "#b0402f" },
+];
+
+/* The mark's own palette — separate from COLOURS above, which is the UI. */
+const BRAND = [
+  { name: "coral", hex: "#e8542e" },
+  { name: "tint", hex: "#f5b7a4" },
+  { name: "lift (on ink)", hex: "#ff7a52" },
+  { name: "deep (on ink)", hex: "#8f3d24" },
 ];
 
 const TYPE = [
@@ -67,6 +76,61 @@ export default function FoundationScreen() {
                 <p className="font-mono text-tiny text-muted">{c.hex}</p>
               </div>
             ))}
+          </div>
+        </Card>
+
+        {/* -------------------------------------------------- brand mark */}
+        <Card>
+          <CardTitle>Brand mark — the p+c ligature</CardTitle>
+          <p className="mb-4 max-w-[62ch] text-helper text-quiet">
+            Drawn from ratios of its own height in{" "}
+            <code className="font-mono text-tiny">components/logo.tsx</code>, so it is sharp at
+            any size and recolours with the theme. Coral is the brand&apos;s coat, not the
+            interface: controls stay Press&nbsp;Blue. Below about 20px the tint hook merges
+            into the bowl by design — the silhouette still reads.
+          </p>
+
+          <div className="flex flex-wrap items-end gap-8">
+            <div>
+              <p className="mb-2.5 text-helper font-semibold text-muted">Sizes — 16 · 26 · 40</p>
+              <div className="flex items-end gap-5 rounded-lg border border-line p-4">
+                <PagecraftMark height={16} />
+                <PagecraftMark height={26} />
+                <PagecraftMark height={40} />
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-2.5 text-helper font-semibold text-muted">Tones</p>
+              <div className="flex items-center gap-3">
+                <div className="rounded-lg border border-line bg-surface p-4">
+                  <PagecraftMark height={26} />
+                </div>
+                <div className="rounded-lg bg-plate p-4">
+                  <PagecraftMark height={26} tone="ink" />
+                </div>
+                <div className="rounded-lg border border-line p-4 text-ink">
+                  <PagecraftMark height={26} tone="mono" />
+                </div>
+              </div>
+              <p className="mt-2 font-mono text-tiny text-muted">auto · ink · mono</p>
+            </div>
+
+            <div>
+              <p className="mb-2.5 text-helper font-semibold text-muted">Colour</p>
+              <div className="flex gap-2">
+                {BRAND.map((c) => (
+                  <div key={c.name} className="w-[86px]">
+                    <div
+                      className="h-10 rounded-lg border border-line"
+                      style={{ background: c.hex }}
+                    />
+                    <p className="mt-1.5 font-mono text-tiny text-muted">{c.hex}</p>
+                    <p className="text-tiny text-muted">{c.name}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </Card>
 

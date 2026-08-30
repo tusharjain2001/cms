@@ -15,6 +15,7 @@ const COLUMNS = [
   {
     heading: "Developers",
     items: [
+      { label: "For owners", href: links.owners },
       { label: "For developers", href: links.developers },
       { label: "Documentation", href: links.docs },
       { label: "SDK reference", href: links.sdkReference },
@@ -47,7 +48,7 @@ export function SiteFooter() {
               Pagecraft
             </div>
             <p className="mt-4 text-mid leading-[1.6] text-muted">
-              A content-only CMS for developers who would rather not build another admin panel.
+              A content-only CMS: developers keep the design in code, owners change the words themselves.
             </p>
           </div>
 

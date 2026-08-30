@@ -27,6 +27,7 @@ export const links = {
    */
   how: "/#how",
   sections: "/#sections",
+  owners: "/#owners",
   developers: "/#code",
 
   contact: "mailto:hello@pagecraft.dev",

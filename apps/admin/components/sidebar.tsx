@@ -6,7 +6,7 @@ import { useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
 import { cx } from "./ui";
-import { ThemeToggle } from "./theme-toggle";
+import { PagecraftMark } from "./logo";
 
 const navBase =
   "flex w-full items-center gap-2.5 rounded-[7px] px-2.5 py-2 text-left text-label font-medium cursor-pointer transition-colors";
@@ -78,12 +78,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <div className="flex h-full w-[236px] shrink-0 flex-col gap-[18px] border-r border-line bg-rail px-3.5 py-4">
       <Link href="/projects" className="flex items-center gap-2.5 px-1 py-0.5">
-        <span
-          aria-hidden="true"
-          className="grid h-[26px] w-[26px] place-items-center rounded-[7px] bg-accent text-label font-bold text-white"
-        >
-          P
-        </span>
+        <PagecraftMark height={22} className="shrink-0" />
         <span className="text-[15.5px] font-bold tracking-[-.2px]">Pagecraft</span>
       </Link>
 
@@ -233,10 +228,6 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         >
           Style &amp; states
         </NavLink>
-        <div className="flex items-center justify-between rounded-[7px] px-2.5 py-1">
-          <span className="text-label font-medium text-slate">Theme</span>
-          <ThemeToggle />
-        </div>
         <div className="h-px bg-line-mid" />
 
         <div className="flex items-center gap-2.5 px-1 py-0.5">

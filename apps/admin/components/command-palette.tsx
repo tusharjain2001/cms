@@ -5,7 +5,6 @@ import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
-import { useTheme } from "@/lib/theme";
 import { Input, cx } from "./ui";
 
 type Group = "Navigate" | "Actions";
@@ -36,7 +35,6 @@ interface Command {
 export function CommandPalette() {
   const { status } = useAuth();
   const s = useStore();
-  const theme = useTheme();
   const router = useRouter();
 
   const [open, setOpen] = useState(false);
@@ -173,15 +171,6 @@ export function CommandPalette() {
       run: () => router.push(`/projects/${s.projectId}/integration`),
     });
   }
-
-  commands.push({
-    id: "action:theme",
-    group: "Actions",
-    icon: theme.resolved === "dark" ? "☀" : "☾",
-    label: `Toggle theme (switch to ${theme.resolved === "dark" ? "light" : "dark"})`,
-    keywords: "light dark appearance",
-    run: () => theme.toggle(),
-  });
 
   const q = query.trim().toLowerCase();
   const filtered = q

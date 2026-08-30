@@ -5,6 +5,7 @@ import { Logo } from "./bits";
 const NAV = [
   { label: "How it works", href: links.how, key: "how" },
   { label: "Section types", href: links.sections, key: "sections" },
+  { label: "For owners", href: links.owners, key: "owners" },
   { label: "For developers", href: links.developers, key: "developers" },
   { label: "Docs", href: links.docs, key: "docs" },
   { label: "Pricing", href: links.pricing, key: "pricing" },
@@ -26,7 +27,20 @@ type NavKey = (typeof NAV)[number]["key"];
  *
  * No theme toggle here: marketing is single light mode (direction.md §3.1).
  */
-export function SiteNav({ active }: { active?: NavKey }) {
+export function SiteNav({
+  active,
+  showAuthCtas = true,
+}: {
+  active?: NavKey;
+  /**
+   * Off on the signed-out screens. The sign-in and sign-up cards already carry
+   * each other's link in their footer ("New here? Create an account"), so the
+   * nav buttons there are pure duplication — and one of the two always points
+   * at the page you are already on. Dropped, the nav still earns its place as
+   * the way back to the marketing site.
+   */
+  showAuthCtas?: boolean;
+}) {
   return (
     <header className="mkt-nav sticky top-0 z-30 border-b bg-canvas/[.92] backdrop-blur-[8px]">
       {/* Scoped, self-contained: keeps site-nav a server component and avoids
@@ -36,7 +50,7 @@ export function SiteNav({ active }: { active?: NavKey }) {
       <nav className="mx-auto flex h-16 max-w-[1160px] items-center gap-7 px-5 sm:px-8">
         <Link
           href="/"
-          className="flex shrink-0 items-center gap-2.5 text-ink"
+          className="flex shrink-0 items-center gap-[7px] text-ink"
           aria-label="Pagecraft home"
         >
           <Logo />
@@ -51,10 +65,12 @@ export function SiteNav({ active }: { active?: NavKey }) {
           ))}
         </div>
 
-        <div className="ml-auto hidden items-center gap-2.5 md:flex">
-          <SignIn />
-          <CreateAccount />
-        </div>
+        {showAuthCtas && (
+          <div className="ml-auto hidden items-center gap-2.5 md:flex">
+            <SignIn />
+            <CreateAccount />
+          </div>
+        )}
 
         {/* Mobile: native disclosure. Summary is the button; the panel is a
             sheet that prints its rows in on open. */}
@@ -101,13 +117,15 @@ export function SiteNav({ active }: { active?: NavKey }) {
               ))}
             </div>
 
-            <div
-              className="animate-print mt-2 flex flex-col gap-2 border-t border-line-soft pt-3"
-              style={{ animationDelay: `${NAV.length * 40}ms` }}
-            >
-              <SignIn block />
-              <CreateAccount block />
-            </div>
+            {showAuthCtas && (
+              <div
+                className="animate-print mt-2 flex flex-col gap-2 border-t border-line-soft pt-3"
+                style={{ animationDelay: `${NAV.length * 40}ms` }}
+              >
+                <SignIn block />
+                <CreateAccount block />
+              </div>
+            )}
           </div>
         </details>
       </nav>

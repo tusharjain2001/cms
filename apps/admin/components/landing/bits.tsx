@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { TODO } from "@/lib/links";
+import { PagecraftMark } from "@/components/logo";
 
 /**
  * The small, repeated pieces of the marketing site.
@@ -228,15 +229,13 @@ export function Cross({ children }: { children: ReactNode }) {
   );
 }
 
-/** The Pagecraft mark, at whatever size the surrounding chrome needs. */
-export function Logo({ size = 26 }: { size?: number }) {
-  return (
-    <span
-      aria-hidden
-      className="grid shrink-0 place-items-center rounded-[7px] bg-accent font-bold text-white"
-      style={{ width: size, height: size, fontSize: Math.round(size * 0.5) }}
-    >
-      P
-    </span>
-  );
+/**
+ * The Pagecraft mark, at whatever size the surrounding chrome needs.
+ *
+ * A thin alias over the shared `PagecraftMark` so the marketing pages import
+ * their logo from the same place as the dashboard. `size` is the mark's
+ * height; the mark is 1.14x as wide, so it is no longer a square.
+ */
+export function Logo({ size = 24 }: { size?: number }) {
+  return <PagecraftMark height={size} className="shrink-0" />;
 }
