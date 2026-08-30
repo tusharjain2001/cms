@@ -1,5 +1,5 @@
 import { api } from "./api";
-import type { BillingPeriod, CheckoutDTO, SubscriptionDTO } from "./dto";
+import type { BillingPeriod, CheckoutDTO, PaymentDTO, SubscriptionDTO } from "./dto";
 
 /**
  * Billing, from the browser's side.
@@ -41,12 +41,27 @@ export const cancelSubscription = () =>
   api<SubscriptionDTO>("/api/billing/cancel", { method: "POST" });
 
 /**
- * Paise → a rupee price: 99_900 → "₹999", 199_800 → "₹1,998".
+ * Every charge Razorpay actually took, newest first.
+ *
+ * Fetched separately from the subscription so a failure to load history never
+ * blocks the screen that lets someone buy or cancel — the money matters more
+ * than the receipt list.
+ */
+export const getPayments = () => api<PaymentDTO[]>("/api/billing/payments");
+
+/**
+ * **Paise** → a rupee price: 99_900 → "₹999", 199_800 → "₹1,998".
+ *
+ * The unit is in the name deliberately. `lib/pricing.ts` exports an `inr()`
+ * that takes *rupees*, and two identically-named money formatters with
+ * different units is precisely how a bill ends up a hundredfold wrong.
+ * Everything the API sends is in paise; everything in `lib/pricing.ts` is in
+ * rupees.
  *
  * `en-IN` grouping matters — rupees group as ₹1,00,000 rather than ₹100,000
  * past five digits, and the wrong grouping reads as a foreign site.
  */
-export function inr(paise: number): string {
+export function inrFromPaise(paise: number): string {
   const rupees = paise / 100;
   return `₹${rupees.toLocaleString("en-IN", {
     minimumFractionDigits: 0,

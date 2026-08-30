@@ -18,6 +18,7 @@ export type {
   PageDTO,
   PageStatus,
   PageSummaryDTO,
+  PaymentDTO,
   ProjectDTO,
   ProjectTokenDTO,
   QuotaUsageDTO,

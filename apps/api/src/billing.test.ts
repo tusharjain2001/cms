@@ -162,12 +162,23 @@ async function signIn(): Promise<string> {
   return cachedToken;
 }
 
-/** Posts a webhook signed the way Razorpay signs one. */
-function webhook(event: string, entity: Record<string, unknown>, createdAt: number) {
+/**
+ * Posts a webhook signed the way Razorpay signs one.
+ *
+ * `payment` mirrors the real `subscription.charged` payload, which carries the
+ * charge alongside the subscription — that is why a full billing history needs
+ * no `payment.*` subscription.
+ */
+function webhook(
+  event: string,
+  entity: Record<string, unknown>,
+  createdAt: number,
+  payment?: Record<string, unknown>
+) {
   const payload = JSON.stringify({
     event,
     created_at: createdAt,
-    payload: { subscription: { entity } },
+    payload: { subscription: { entity }, ...(payment ? { payment: { entity: payment } } : {}) },
   });
   return fetch(`${baseUrl}/api/billing/webhook`, {
     method: "POST",
@@ -408,6 +419,56 @@ describe("the webhook", () => {
       Math.floor(Date.now() / 1000) + 120
     );
     assert.equal((await api("/api/billing", { token })).json.data.websites, 4);
+  });
+
+  it("records the charge, not just the state", async () => {
+    const token = await signIn();
+    await webhook(
+      "subscription.charged",
+      { id: "sub_TEST123", status: "active", quantity: 4, plan_id: "plan_monthly_one_site" },
+      Math.floor(Date.now() / 1000) + 180,
+      {
+        id: "pay_CHARGE1",
+        amount: 400,
+        currency: "INR",
+        status: "captured",
+        method: "upi",
+        created_at: Math.floor(Date.now() / 1000) + 180,
+      }
+    );
+
+    const res = await api("/api/billing/payments", { token });
+    assert.equal(res.status, 200);
+    const row = (res.json.data as Json[]).find((p) => p.razorpayPaymentId === "pay_CHARGE1");
+    assert.ok(row, "the charge was recorded");
+    // The amount comes from Razorpay, not from our price list — recomputing it
+    // from today's prices is how a repricing rewrites history.
+    assert.equal(row.amountPaise, 400);
+    assert.equal(row.status, "captured");
+    assert.equal(row.method, "upi");
+    assert.equal(row.websites, 4);
+  });
+
+  it("does not double-count a redelivered charge", async () => {
+    const token = await signIn();
+    const before = (await api("/api/billing/payments", { token })).json.data.length;
+
+    // Razorpay retries for days; the same payment id must produce one row.
+    await webhook(
+      "subscription.charged",
+      { id: "sub_TEST123", status: "active", quantity: 4, plan_id: "plan_monthly_one_site" },
+      Math.floor(Date.now() / 1000) + 240,
+      { id: "pay_CHARGE1", amount: 400, currency: "INR", status: "captured", method: "upi" }
+    );
+
+    const after = (await api("/api/billing/payments", { token })).json.data.length;
+    assert.equal(after, before, "a redelivery updated the row rather than adding one");
+  });
+
+  it("keeps one account's payments away from another", async () => {
+    // No token at all: billing history is not a public endpoint.
+    const res = await api("/api/billing/payments");
+    assert.equal(res.status, 401);
   });
 
   it("stops the money when the account is closed", async () => {

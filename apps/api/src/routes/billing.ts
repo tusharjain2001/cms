@@ -18,6 +18,7 @@ import {
   websiteAllowance,
 } from "@pagecraft/shared";
 import { Project } from "../models/project.js";
+import { Payment, recordPayment, toPaymentDTO } from "../models/payment.js";
 import {
   User,
   type UserDoc,
@@ -66,6 +67,21 @@ import {
  * Both writers funnel into `applySubscription`, so there is exactly one place
  * where an account's entitlement can change.
  */
+/**
+ * The slice of Razorpay's payment entity we store. Deliberately partial — we
+ * keep what a customer or an accountant would ask for, and nothing that looks
+ * like card data (which never reaches this server anyway).
+ */
+interface RazorpayPaymentEntity {
+  id: string;
+  amount?: number;
+  currency?: string;
+  status?: string;
+  method?: string;
+  invoice_id?: string | null;
+  created_at?: number;
+}
+
 const router = Router();
 
 const periodSchema = z.enum(["monthly", "yearly"]);
@@ -364,10 +380,16 @@ razorpayWebhookRouter.post(
       const event = JSON.parse(raw.toString("utf8")) as {
         event?: string;
         created_at?: number;
-        payload?: { subscription?: { entity?: RazorpaySubscription } };
+        payload?: {
+          subscription?: { entity?: RazorpaySubscription };
+          /** `subscription.charged` carries the charge alongside the subscription. */
+          payment?: { entity?: RazorpayPaymentEntity };
+        };
       };
 
       const sub = event.payload?.subscription?.entity;
+      const payment = event.payload?.payment?.entity;
+
       if (sub?.id) {
         const eventAt = new Date((event.created_at ?? Math.floor(Date.now() / 1000)) * 1000);
         // `notes.userId` was stamped at creation, so the account comes from the
@@ -377,7 +399,35 @@ razorpayWebhookRouter.post(
           sub.notes?.userId ??
           (await User.findOne({ "subscription.razorpaySubscriptionId": sub.id }).select("_id"))
             ?._id;
-        if (userId) await applySubscription(userId, sub, eventAt);
+
+        if (userId) {
+          await applySubscription(userId, sub, eventAt);
+
+          /**
+           * Record the money, not just the state.
+           *
+           * `subscription.charged` carries both entities, which is why the
+           * webhook needs no `payment.*` subscription to build a full billing
+           * history. The amount comes from Razorpay rather than from our own
+           * price list on purpose: what was charged is a fact, and recomputing
+           * it from today's prices is how a repricing quietly rewrites history.
+           */
+          if (payment?.id) {
+            await recordPayment({
+              userId,
+              razorpayPaymentId: payment.id,
+              razorpaySubscriptionId: sub.id,
+              razorpayInvoiceId: payment.invoice_id ?? null,
+              amountPaise: payment.amount ?? 0,
+              currency: payment.currency ?? "INR",
+              status: payment.status ?? "captured",
+              method: payment.method ?? null,
+              websites: clampWebsites(sub.quantity ?? 1),
+              period: periodOfPlanId(sub.plan_id),
+              paidAt: new Date((payment.created_at ?? event.created_at ?? 0) * 1000),
+            });
+          }
+        }
       }
 
       // Always 200 once the signature checks out. A handler slip must not make
@@ -388,6 +438,24 @@ razorpayWebhookRouter.post(
     }
   }
 );
+
+/**
+ * This account's billing history — what the customer sees instead of emailing
+ * to ask when they were charged.
+ *
+ * Capped at 100 rows: a monthly subscription takes eight years to reach that,
+ * and an unbounded list is a slow query waiting to happen.
+ */
+router.get("/payments", requireAuth, async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) throw unauthorized();
+    const rows = await Payment.find({ userId: user._id }).sort({ paidAt: -1 }).limit(100);
+    ok(res, rows.map(toPaymentDTO));
+  } catch (err) {
+    next(err);
+  }
+});
 
 /**
  * The ladder, for anyone drawing a price. Public so the marketing pricing page

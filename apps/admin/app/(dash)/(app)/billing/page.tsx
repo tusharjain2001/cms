@@ -7,12 +7,13 @@ import { ONE_MONTH } from "@/lib/pricing";
 import { ApiError } from "@/lib/api";
 import {
   cancelSubscription,
+  getPayments,
   getSubscription,
   openCheckout,
   startSubscription,
-  inr,
+  inrFromPaise,
 } from "@/lib/billing";
-import type { BillingPeriod, SubscriptionDTO } from "@/lib/dto";
+import type { BillingPeriod, PaymentDTO, SubscriptionDTO } from "@/lib/dto";
 import { Button, Card, CardTitle, PageHeader } from "@/components/ui";
 
 /**
@@ -41,6 +42,7 @@ export default function BillingPage() {
   const params = useSearchParams();
 
   const [sub, setSub] = useState<SubscriptionDTO | null>(null);
+  const [payments, setPayments] = useState<PaymentDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,6 +67,13 @@ export default function BillingPage() {
       setError(err instanceof Error ? err.message : "Could not load your plan.");
     } finally {
       setLoading(false);
+    }
+    // Deliberately after, and deliberately swallowed: a receipt list that fails
+    // to load must not stop someone paying or cancelling.
+    try {
+      setPayments(await getPayments());
+    } catch {
+      /* history is a convenience, not a blocker */
     }
   }, [wanted]);
 
@@ -212,7 +221,7 @@ export default function BillingPage() {
           <div>
             <dt className="text-mid text-muted">Billing</dt>
             <dd className="mt-1 text-[22px] font-bold tabular-nums">
-              {live ? inr(sub.pricePerWebsitePaise[sub.period] * sub.websites) : "—"}
+              {live ? inrFromPaise(sub.pricePerWebsitePaise[sub.period] * sub.websites) : "—"}
               {live && (
                 <span className="text-label font-normal text-muted">
                   {sub.period === "yearly" ? " / year" : " / month"}
@@ -299,13 +308,13 @@ export default function BillingPage() {
 
           <div>
             <p className="text-[30px] font-bold leading-none tabular-nums">
-              {inr(total)}
+              {inrFromPaise(total)}
               <span className="text-label font-normal text-muted">
                 {period === "yearly" ? " / year" : " / month"}
               </span>
             </p>
             <p className="mt-1.5 text-mid text-muted tabular-nums">
-              {want} × {inr(perWebsite)} per website
+              {want} × {inrFromPaise(perWebsite)} per website
             </p>
           </div>
 
@@ -318,7 +327,7 @@ export default function BillingPage() {
             {busy
               ? "Working…"
               : !live
-                ? `Subscribe · ${inr(total)}`
+                ? `Subscribe · ${inrFromPaise(total)}`
                 : isChange
                   ? "Update my plan"
                   : "This is your plan"}
@@ -347,6 +356,65 @@ export default function BillingPage() {
           </p>
         )}
       </Card>
+
+      {/* ------------------------------------------------------------ history */}
+      {payments.length > 0 && (
+        <Card className="mt-4">
+          <CardTitle sub="Every charge Razorpay has taken. Quote the payment id if you ever need to ask us about one.">
+            Payments
+          </CardTitle>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[520px] border-collapse text-left">
+              <thead>
+                <tr className="border-b border-line">
+                  <th scope="col" className="pb-2.5 text-label font-semibold">
+                    Date
+                  </th>
+                  <th scope="col" className="pb-2.5 text-label font-semibold">
+                    For
+                  </th>
+                  <th scope="col" className="pb-2.5 text-label font-semibold">
+                    Amount
+                  </th>
+                  <th scope="col" className="pb-2.5 text-label font-semibold">
+                    Payment id
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {payments.map((p) => (
+                  <tr key={p.id} className="border-b border-line-soft last:border-b-0">
+                    <td className="py-3 text-label text-quiet tabular-nums">
+                      {new Date(p.paidAt).toLocaleDateString(undefined, {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </td>
+                    <td className="py-3 text-label text-quiet">
+                      {p.websites
+                        ? `${p.websites} website${p.websites === 1 ? "" : "s"}`
+                        : "Subscription"}
+                      {p.period ? ` · ${p.period}` : ""}
+                    </td>
+                    <td className="py-3 text-label font-medium text-ink tabular-nums">
+                      {inrFromPaise(p.amountPaise)}
+                      {/* Anything but a clean capture has to say so, or a failed
+                          charge reads as a successful one. */}
+                      {p.status !== "captured" && (
+                        <span className="ml-1.5 text-mid font-normal text-destructive">
+                          {p.status}
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-3 font-mono text-mid text-muted">{p.razorpayPaymentId}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
 
       <p className="mt-5 text-label text-quiet">
         Payments are handled by Razorpay — we never see your card. Billed in rupees to{" "}

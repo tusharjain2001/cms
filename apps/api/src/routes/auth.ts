@@ -412,6 +412,14 @@ router.delete("/me", requireAuth, async (req, res, next) => {
       }
     }
 
+    /**
+     * Payment rows are deliberately NOT deleted with the account. They are
+     * financial records: tax and accounting law requires keeping them for
+     * years, and the privacy policy says so explicitly ("Payment records: as
+     * long as tax and accounting law requires, which is longer than the rest").
+     * Their `userId` becomes a dangling reference on purpose — the account is
+     * gone, the receipt is not.
+     */
     await AuthToken.deleteMany({ userId: user._id });
     await user.deleteOne();
     clearRefreshCookie(res);

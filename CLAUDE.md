@@ -315,11 +315,19 @@ Where it lives:
 | `packages/shared/src/plans.ts` | **The source of truth.** Prices in cents, the ladder bounds, `SubscriptionStatus`, and `websiteAllowance()` — the only function that decides how many websites an account may own. |
 | `apps/api/src/lib/razorpay.ts` | The whole provider integration: raw `fetch` against Razorpay's REST API (no SDK), plus the two HMAC verifiers. Nothing else in the API knows payments exist. |
 | `apps/api/src/setup-razorpay.ts` | `npm run setup:razorpay` — creates the two Plans and prints their ids. |
-| `apps/api/src/routes/billing.ts` | `GET /api/billing`, `POST /subscription`, `POST /verify`, `POST /cancel`, `GET /plans`, and the webhook. `applySubscription` is the one place entitlement can change. |
+| `apps/api/src/routes/billing.ts` | `GET /api/billing`, `POST /subscription`, `POST /verify`, `POST /cancel`, `GET /payments`, `GET /plans`, and the webhook. `applySubscription` is the one place entitlement can change. |
+| `apps/api/src/models/payment.ts` | **The billing history** — one row per charge Razorpay actually took. |
 | `apps/admin/lib/billing.ts` | Browser side, including injecting Razorpay's Checkout script on demand. |
 | `apps/admin/app/(dash)/(app)/billing/page.tsx` | Plan & billing — a stepper, because the whole screen is one number. |
 | `apps/admin/lib/pricing.ts` | **The one place the dashboard and marketing quote a price.** Mirrors `plans.ts` rather than importing it — importing `@pagecraft/shared` would pull Zod into the public bundle. Change one, change the other. |
 | `apps/admin/components/landing/pricing-plans.tsx` | Still the **only** `"use client"` component on any public page. Derives every figure from `lib/pricing.ts`. |
+
+**State and history are stored separately, and both matter.** `user.subscription` holds the *current* entitlement — status, quantity, period end — which is what gates the product. It holds no history, so the `payments` collection records one row per charge (`amountPaise`, status, method, websites covered, Razorpay's payment id). Without it a renewal arrives every month, updates a status, and leaves no trace that money moved: you could not answer "when was I charged and how much?" from your own database, reconcile revenue, or defend a chargeback.
+
+- **The amount is stored, never derived.** Prices change — a subscriber charged ₹1 during a settlement test must stay distinguishable from one charged ₹999 later. Recomputing history from today's price list is how billing disputes are lost.
+- **`subscription.charged` carries the payment entity alongside the subscription**, which is why a full history needs no `payment.*` webhook subscription. Recording is an upsert on the payment id, so a webhook retried for three days still produces exactly one row.
+- **Payment rows survive account deletion on purpose.** They are financial records that tax law requires keeping, and the privacy policy says so. The `userId` becomes a dangling reference deliberately: the account is gone, the receipt is not.
+- **Two money formatters exist and their units differ.** `lib/billing.ts` exports `inrFromPaise()` (everything the API sends); `lib/pricing.ts` exports `inr()` (rupees). The unit is in the name because two identically-named formatters is how a bill ends up a hundredfold wrong.
 
 Four rules worth knowing before touching this code:
 

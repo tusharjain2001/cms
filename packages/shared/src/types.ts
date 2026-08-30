@@ -211,6 +211,28 @@ export interface SubscriptionDTO {
   manageUrl?: string | null;
 }
 
+/**
+ * One charge Razorpay actually took — the account's billing history.
+ *
+ * The amount is stored per row rather than derived from today's price list,
+ * because prices change and a charge must always explain itself.
+ */
+export interface PaymentDTO {
+  id: string;
+  /** Razorpay's payment id — what support asks for to find or refund a charge. */
+  razorpayPaymentId: string;
+  amountPaise: number;
+  currency: string;
+  /** Razorpay's own state: captured, failed, authorized, refunded. */
+  status: string;
+  /** "card", "upi", "netbanking" — never the card itself. */
+  method: string | null;
+  /** Websites this charge covered, so an old row explains its own amount. */
+  websites: number | null;
+  period: string | null;
+  paidAt: string;
+}
+
 /** What the dashboard needs to open Razorpay Checkout. */
 export interface CheckoutDTO {
   subscriptionId: string;
