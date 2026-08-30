@@ -45,10 +45,10 @@
   --color-sun: #ffd731;      /* the highlighter — never a text colour */
   --color-sun-ink: #5f4a06;  /* sun-family chips only (6.08:1 on sun) */
   --color-mint-pop: #55db9c; /* decorative in light; text-safe only on plate */
-  --color-wash-sky: #dcecfd;
-  --color-wash-butter: #fdeebc;
-  --color-wash-lilac: #e9e3f6;
-  --color-wash-mint: #e3f2db;
+  --color-wash-sky: #e8f0f7;    /* quiet tints, one step off paper — loud pastels read as cheap */
+  --color-wash-butter: #f7f0dc;
+  --color-wash-lilac: #eeebf4;
+  --color-wash-mint: #e8f1e6;
   --color-plate: #1b1e24;    /* the ink band (tonal reset) */
 
   /* Published (green) */

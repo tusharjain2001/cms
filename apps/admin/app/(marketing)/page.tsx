@@ -3,12 +3,11 @@ import { PressRun } from "@/components/landing/press-run";
 import { SectionTypeGrid } from "@/components/landing/section-types";
 import { SiteFooter } from "@/components/landing/site-footer";
 import { SiteNav } from "@/components/landing/site-nav";
-import { Band, ButtonLink, Check, Cross, Eyebrow, H2, Lede } from "@/components/landing/bits";
+import { Band, ButtonLink, Eyebrow, H2, Lede } from "@/components/landing/bits";
 import { SectionPapers } from "@/components/landing/flying-papers";
 import {
   CountUp,
   GhostDrift,
-  Marquee,
   Print,
   Stagger,
   StageController,
@@ -49,19 +48,6 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image", description },
 };
 
-/** The nine section types, as the marquee advertises them. */
-const SECTION_LABELS = [
-  "Hero",
-  "Features",
-  "Product Grid",
-  "Gallery",
-  "Testimonials",
-  "FAQ",
-  "Call to Action",
-  "Contact",
-  "Text Block",
-];
-
 const STATS = [
   {
     prefix: "~",
@@ -84,49 +70,6 @@ const STATS = [
       "Each website is a project with its own key, its own library, and its own allowed sections.",
   },
 ];
-
-const CANNOT = [
-  "Change a colour, a font or a spacing",
-  "Drag a layout apart or nest a container in a container",
-  "Paste twelve typefaces in from a Word document",
-  "Install a plugin that breaks the site at 11pm on a Friday",
-  "Add a section type you never built for them",
-];
-
-const CAN = [
-  "Change today's headline and prices before opening",
-  "Swap a photo from their camera roll",
-  "Add a new page and have it appear in the menu",
-  "Hide the testimonials section for a week",
-  "Preview privately, then publish when they are happy",
-];
-
-const COMPARISON = {
-  columns: ["Pagecraft", "WordPress", "Site builders"],
-  rows: [
-    ["Design stays exactly as you shipped it", "Guaranteed", "Until a plugin", "No"],
-    ["You write the front end in React", "Yes", "Headless, with effort", "No"],
-    ["Editing UI a non-technical owner enjoys", "Built for it", "Dashboard sprawl", "Mixed"],
-    ["Security patching on your Friday night", "None", "Ongoing", "None"],
-    ["Cost for one website", "From $9 a month", "Hosting, plugins, upkeep", "Typically more"],
-  ],
-};
-
-const TESTIMONIALS = [
-  {
-    quote:
-      "I used to charge for content edits and lose the client anyway. Now the bakery updates its own specials before 6am and my design still looks like my design.",
-    name: "Maya Kessler",
-    role: "Stella Digital · 11 client websites",
-  },
-  {
-    quote:
-      "I am not a computer person. I change the photo, press the blue button, and the website is right. That is the whole thing I needed.",
-    name: "Priya Raval",
-    role: "Owner, Rosewater Bakehouse",
-  },
-];
-
 const FAQS = [
   {
     q: "Do I have to rebuild my client's existing site?",
@@ -158,34 +101,12 @@ export default function LandingPage() {
             <Hero />
           </div>
 
-          {/* --------------------------------- marquee strip · Sun (opaque) */}
-          {/* No data-stage: Sun is a printed strip, not a wrapper wash. The
-              stage light transitions paper → sky around it. */}
-          <section
-            aria-label="The section types you get out of the box"
-            className="border-y border-ink/20 bg-sun py-3.5"
-          >
-            <Marquee>
-              {SECTION_LABELS.map((label) => (
-                <span
-                  key={label}
-                  className="flex shrink-0 items-center gap-6 pr-6 font-mono text-[12.5px] font-medium tracking-[0.08em] text-ink uppercase"
-                >
-                  {label}
-                  <span aria-hidden className="text-sun-ink">
-                    ✦
-                  </span>
-                </span>
-              ))}
-            </Marquee>
-          </section>
-
           {/* --------------------------- press run · sky (publish pipeline) */}
           <Band stage="sky" id="how" className="py-20 sm:py-24">
             <PressRun />
           </Band>
 
-          {/* ------------------------------------- stats + can / cannot · paper */}
+          {/* ------------------------------------- stats · paper */}
           <Band stage="paper" className="py-20 sm:py-24" bg={<SectionPapers preset="stats" />}>
             <div className="grid gap-10 sm:grid-cols-3">
               {STATS.map((s, i) => (
@@ -201,40 +122,6 @@ export default function LandingPage() {
                   <p className="mt-2 text-[14px] leading-[1.55] text-quiet">{s.body}</p>
                 </Print>
               ))}
-            </div>
-
-            <div className="mt-14 overflow-hidden rounded-2xl border border-line bg-surface">
-              <div className="grid md:grid-cols-2">
-                <div className="border-b border-line-mid p-8 md:border-r md:border-b-0 md:px-9 md:py-9">
-                  <Eyebrow tone="muted">What your client cannot do</Eyebrow>
-                  <ul className="mt-4 flex flex-col gap-3">
-                    {CANNOT.map((item) => (
-                      <Cross key={item}>{item}</Cross>
-                    ))}
-                  </ul>
-                </div>
-                <div className="p-8 md:px-9 md:py-9">
-                  <Eyebrow>What they can do, on their phone, unsupervised</Eyebrow>
-                  <ul className="mt-4 flex flex-col gap-3">
-                    {CAN.map((item) => (
-                      <Check key={item}>{item}</Check>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-              <div className="flex flex-wrap items-center gap-3.5 border-t border-line-mid bg-sunken px-8 py-4.5">
-                <p className="text-[13.5px] text-quiet">
-                  Blank required fields are tolerated while they type, and only checked the
-                  moment they press Publish, with the error shown on the field, in plain
-                  English.
-                </p>
-                <a
-                  href={links.signIn}
-                  className="ml-auto text-[13.5px] font-semibold text-accent hover:underline"
-                >
-                  Open the dashboard →
-                </a>
-              </div>
             </div>
           </Band>
 
@@ -354,9 +241,9 @@ export default function LandingPage() {
             </div>
           </section>
 
-          {/* ------------------------------------- section types · butter */}
+          {/* ------------------------- section types · paper (the sheets, landed) */}
           <Band
-            stage="butter"
+            stage="paper"
             id="sections"
             className="py-20 sm:py-24"
             bg={<SectionPapers preset="types" />}
@@ -386,133 +273,88 @@ export default function LandingPage() {
             <SectionTypeGrid />
           </Band>
 
-          {/* ------------------------------- comparison + testimonials · lilac */}
-          <Band stage="lilac" className="py-20 sm:py-24" bg={<SectionPapers preset="lilac" />}>
-            <Print>
-              <div className="overflow-x-auto rounded-2xl border border-line bg-surface">
-                <table className="w-full min-w-[640px] border-collapse text-left">
-                  <thead>
-                    <tr className="border-b border-line bg-sunken">
-                      <th
-                        scope="col"
-                        className="w-[34%] px-6 py-4 text-[13px] font-semibold text-muted"
-                      >
-                        Handing a client the keys
-                      </th>
-                      {COMPARISON.columns.map((c, i) => (
-                        <th
-                          key={c}
-                          scope="col"
-                          className={`border-l border-line-mid px-4.5 py-4 text-[13.5px] font-semibold ${
-                            i === 0 ? "bg-accent-wash font-bold text-accent" : "text-quiet"
-                          }`}
-                        >
-                          {c}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {COMPARISON.rows.map(([label, ours, ...theirs]) => (
-                      <tr
-                        key={label}
-                        className="border-b border-line-soft transition-colors duration-150 even:bg-sunken last:border-b-0 hover:bg-accent-wash"
-                      >
-                        <th
-                          scope="row"
-                          className="px-6 py-4 text-left text-[13.5px] font-medium text-ink"
-                        >
-                          {label}
-                        </th>
-                        <td className="border-l border-line-mid bg-accent-wash px-4.5 py-4 text-[13px] font-semibold text-published">
-                          {ours}
-                        </td>
-                        {theirs.map((cell, i) => (
-                          <td
-                            key={i}
-                            className="border-l border-line-mid px-4.5 py-4 text-[13px] text-muted"
-                          >
-                            {cell}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          {/* ------------------------------------------------------- faq · lilac */}
+          <Band stage="lilac" id="faq" className="py-20 sm:py-24" bg={<SectionPapers preset="faq" />}>
+            <div className="flex flex-wrap items-end justify-between gap-x-10 gap-y-5">
+              <div className="max-w-[560px]">
+                <Print>
+                  <Eyebrow>FAQ</Eyebrow>
+                </Print>
+                <Print delay={70}>
+                  <H2 className="mt-3">Questions developers ask first.</H2>
+                </Print>
               </div>
-            </Print>
-
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <Stagger sticker>
-                {TESTIMONIALS.map((t) => (
-                  <figure
-                    key={t.name}
-                    className="pc-lift h-full rounded-2xl border border-line bg-surface p-7 hover:border-accent-line sm:p-8"
-                  >
-                    <blockquote className="font-display text-[26px] leading-[1.2] font-semibold tracking-[-0.01em] sm:text-[32px]">
-                      &ldquo;{t.quote}&rdquo;
-                    </blockquote>
-                    <figcaption className="mt-6 font-mono text-[12px] tracking-[0.06em] text-muted uppercase">
-                      {t.name} — {t.role}
-                    </figcaption>
-                  </figure>
-                ))}
-              </Stagger>
-            </div>
-          </Band>
-
-          {/* ------------------------------------------------------- faq · paper */}
-          <Band stage="paper" className="py-20 sm:py-24" bg={<SectionPapers preset="faq" />}>
-            <div className="grid gap-9 lg:grid-cols-[0.85fr_1.15fr]">
-              <div className="lg:sticky lg:top-24 lg:self-start">
-                <H2 className="text-[26px]! leading-[1.04]! tracking-[-0.02em]! sm:text-[32px]!">
-                  Questions developers ask first
-                </H2>
-                <p className="mt-4 text-[15px] leading-[1.6] text-quiet">
+              <Print delay={140}>
+                <p className="max-w-[300px] text-[14.5px] leading-[1.55] text-quiet">
                   Anything else, mail{" "}
                   <a href={links.contact} className="font-medium text-accent hover:underline">
                     hello@pagecraft.dev
                   </a>{" "}
-                  and a human answers.
+                  and a human answers, usually the same day.
                 </p>
+              </Print>
+            </div>
 
-                <a
-                  href={links.docs}
-                  className="pc-lift mt-6 block rounded-xl border border-line bg-surface p-5 hover:border-accent-line"
-                >
-                  <p className="font-mono text-[11px] tracking-[0.08em] text-muted uppercase">
-                    Prefer to read
-                  </p>
-                  <p className="mt-2 font-display text-[19px] font-bold tracking-[-0.01em] text-ink">
-                    The full documentation
-                  </p>
-                  <p className="mt-1.5 text-[13.5px] leading-[1.5] text-quiet">
-                    Setup, the SDK, every section type and the content API.{" "}
-                    <span className="font-semibold text-accent">Read the docs →</span>
-                  </p>
-                </a>
-              </div>
-              <dl className="overflow-hidden rounded-xl border border-line bg-surface">
+            {/* The ledger: no card, just ink rules on the wash. Each row is a
+                native <details>; the open question earns a highlighter stroke
+                (sun — the one place it is allowed to touch text). */}
+            <dl className="mt-10 border-t border-ink/20">
+              <Stagger>
                 {FAQS.map((f, i) => (
                   <details
                     key={f.q}
                     open={i === 0}
-                    className="group border-b border-line-soft last:border-b-0 [&_summary::-webkit-details-marker]:hidden"
+                    className="group border-b border-ink/15 [&_summary::-webkit-details-marker]:hidden"
                   >
-                    <summary className="flex cursor-pointer items-center justify-between gap-4 px-6 py-4.5 text-[14.5px] font-semibold transition-colors duration-150 select-none hover:bg-sunken">
-                      {f.q}
+                    <summary className="flex cursor-pointer items-start gap-5 py-6 select-none sm:gap-8 sm:py-7">
+                      <span className="mt-[5px] inline-flex shrink-0 rounded-[4px] bg-surface px-1.5 py-[3px] font-mono text-[11px] font-semibold tracking-[0.08em] text-quiet transition-colors duration-200 group-open:bg-sun group-open:text-sun-ink sm:mt-[9px]">
+                        {String(i + 1).padStart(2, "0")}
+                      </span>
+                      <span className="flex-1 font-display text-[20px] leading-[1.15] font-bold tracking-[-0.015em] text-ink sm:text-[27px]">
+                        <span className="bg-[linear-gradient(transparent_62%,var(--color-sun)_62%,var(--color-sun)_92%,transparent_92%)] bg-[length:0%_100%] bg-left bg-no-repeat transition-[background-size] duration-500 ease-out group-open:bg-[length:100%_100%]">
+                          {f.q}
+                        </span>
+                      </span>
                       <span
                         aria-hidden
-                        className="shrink-0 text-accent transition-transform duration-200 group-open:rotate-45"
+                        className="mt-[2px] flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-ink/20 text-[18px] leading-none text-ink transition-[transform,background-color,color,border-color] duration-200 group-hover:border-accent group-hover:text-accent group-open:rotate-45 group-open:border-accent group-open:bg-accent group-open:text-surface sm:mt-[6px]"
                       >
                         +
                       </span>
                     </summary>
-                    <dd className="px-6 pb-5 text-[13.5px] leading-[1.6] text-quiet">{f.a}</dd>
+                    <dd className="flex gap-5 pb-7 sm:gap-8">
+                      <span
+                        aria-hidden
+                        className="w-[26px] shrink-0 text-right font-display text-[27px] leading-none font-extrabold text-accent sm:w-[30px]"
+                      >
+                        A
+                      </span>
+                      <p className="max-w-[640px] text-[15.5px] leading-[1.6] text-slate sm:text-[16.5px]">
+                        {f.a}
+                      </p>
+                    </dd>
                   </details>
                 ))}
-              </dl>
-            </div>
+              </Stagger>
+            </dl>
+
+            {/* The last line of the ledger: the docs, for people who would rather read. */}
+            <Print delay={120}>
+              <a
+                href={links.docs}
+                className="group flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-ink/15 py-6 sm:gap-8 sm:py-7"
+              >
+                <span className="inline-flex shrink-0 rounded-[4px] bg-surface px-1.5 py-[3px] font-mono text-[11px] font-semibold tracking-[0.08em] text-quiet uppercase">
+                  Docs
+                </span>
+                <span className="flex-1 font-display text-[20px] leading-[1.15] font-bold tracking-[-0.015em] text-ink sm:text-[27px]">
+                  Prefer to read? The full documentation.
+                </span>
+                <span className="font-mono text-[12.5px] font-semibold tracking-[0.04em] text-accent transition-transform duration-200 group-hover:translate-x-1">
+                  Read the docs →
+                </span>
+              </a>
+            </Print>
           </Band>
 
           {/* --------------------------------------------- final cta · mint */}

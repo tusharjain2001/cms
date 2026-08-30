@@ -248,7 +248,7 @@ app/
 |---|---|
 | `app/page.tsx` | The whole page. Bands: hero → editor mock → stats → how it works → can't/can → section types → for developers → comparison → testimonials → FAQ → closing CTA. Its own `metadata` overrides the root title template. |
 | `components/landing/editor-mock.tsx` | The product screenshot, in markup rather than a PNG — it stays sharp, weighs nothing, and cannot silently go stale when the real editor changes. `aria-hidden`: it is decorative, and the surrounding copy carries the meaning. |
-| `components/landing/section-types.tsx` | The nine cards. **Mirrors `SECTION_REGISTRY`** — add a section type there, add it here. |
+| `components/landing/section-types.tsx` | The nine types as tinted mini-page tiles — the hero's sheets, landed in a grid. **Mirrors `SECTION_REGISTRY`** — add a section type there, add it here. |
 | `lib/links.ts` | Every destination the landing page points at. Plain relative paths, since it is all one origin. |
 
 **`/` is the landing page, so signing in is at `/login`.** Anything that sends a signed-out user back to sign in — `signOut`, the lost-session handler in `lib/auth.tsx`, the `(app)` layout's guard — points at `/login`, not `/`. Sending them to `/` would drop them on a marketing page.
