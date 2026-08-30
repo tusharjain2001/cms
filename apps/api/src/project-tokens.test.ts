@@ -280,7 +280,7 @@ describe("the website ceiling", () => {
     assert.equal(res.json.code, "subscription_required");
     // The refusal has to name the price, or the person reading it has no idea
     // what to do next.
-    assert.match(res.json.error, /₹999 a month/);
+    assert.match(res.json.error, /₹1 a month/);
     assert.match(res.json.error, /no free trial/i);
   });
 
@@ -298,7 +298,7 @@ describe("the website ceiling", () => {
     assert.equal(second.json.code, "subscription_required");
     // And it quotes the price of the next rung, not a generic "upgrade".
     assert.match(second.json.error, /covers 1 website/);
-    assert.match(second.json.error, /₹1,998 a month/);
+    assert.match(second.json.error, /₹2 a month/);
   });
 
   it("lets a bigger subscription hold more websites", async () => {
@@ -313,7 +313,7 @@ describe("the website ceiling", () => {
     }
     const fourth = await api("/api/projects", { method: "POST", token, body: { name: "Four" } });
     assert.equal(fourth.status, 402);
-    assert.match(fourth.json.error, /₹3,996 a month/);
+    assert.match(fourth.json.error, /₹4 a month/);
   });
 
   it("stops counting once the subscription lapses", async () => {

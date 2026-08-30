@@ -2,14 +2,18 @@
  * Subscription plans and the per-tenant quotas they carry.
  *
  * THE MODEL (decided 30 Aug 2026, replacing the old free/pro/business tiers):
- * **you pay per website.** One website is ₹999 a month, two is ₹1,998, three
- * is ₹2,997 — a plain ladder, not a set of feature tiers. Everything the
- * product can do is on every paid account; the only thing money buys is how
- * many websites you may own.
+ * **you pay per website.** Two websites cost twice one, three cost three times
+ * — a plain ladder, not a set of feature tiers. Everything the product can do
+ * is on every paid account; the only thing money buys is how many websites you
+ * may own.
+ *
+ * ⚠️ The price is currently set to a **temporary ₹1 test amount** so a real
+ * payment can be put through end to end. The intended price is ₹999/month. See
+ * the constants below.
  *
  * **The price is strictly linear, and it has to be.** Razorpay bills a
- * subscription as `plan amount × quantity`, so a ladder that bent — ₹1,999 for
- * two rather than ₹1,998 — could not be one plan bought twice. It would need a
+ * subscription as `plan amount × quantity`, so a ladder that bent — charging
+ * ₹1,999 for two when one is ₹999 — could not be one plan bought twice. It would need a
  * separate plan per rung, and because Razorpay cannot swap the plan on a live
  * subscription, every change to a customer's website count would mean
  * cancelling and re-authorising their mandate. Nobody should re-enter their
@@ -110,11 +114,22 @@ export const PAID_PLAN: PlanId = "starter";
  */
 export const CURRENCY = "INR" as const;
 
-/** ₹999 per website per month. */
-export const PRICE_PER_WEBSITE_MONTHLY_PAISE = 99_900;
+/**
+ * ⚠️ **TEMPORARY TEST PRICE — ₹1, not ₹999.**
+ *
+ * Set deliberately low so a real payment can be made end to end to confirm the
+ * money actually reaches the bank account. The intended price is ₹999 a month
+ * and ₹9,990 a year; restore `99_900` and `999_000` here, mirror them in
+ * `apps/admin/lib/pricing.ts`, and re-run `npm run setup:razorpay` to create
+ * Razorpay plans at the real amounts.
+ *
+ * Razorpay plan amounts are immutable, so changing these means creating new
+ * plans — the old ones cannot be repriced.
+ */
+export const PRICE_PER_WEBSITE_MONTHLY_PAISE = 100;
 
-/** ₹9,990 per website per year — twelve months for the price of ten. */
-export const PRICE_PER_WEBSITE_YEARLY_PAISE = 999_000;
+/** ⚠️ Temporary test price — ₹10, not ₹9,990. See above. */
+export const PRICE_PER_WEBSITE_YEARLY_PAISE = 1_000;
 
 export const MIN_WEBSITES = 1;
 

@@ -57,8 +57,19 @@ export function SiteFooter() {
       <div className="mx-auto max-w-[1160px] px-5 sm:px-8">
         <div className="flex flex-col gap-12 py-12 lg:flex-row lg:items-start lg:justify-between lg:py-14">
           <div className="max-w-[380px]">
-            <div className="font-display text-[clamp(2.75rem,9vw,4.5rem)] font-bold leading-[0.9] tracking-[-0.03em] text-ink">
-              Pagecraft
+            {/* The closing statement is the wordmark itself, at display scale:
+                "my" stays light and grey, so the lockup reads the same here as
+                it does 15px tall in the sidebar. */}
+            <div
+              aria-label="mypagecraft"
+              className="font-display text-[clamp(2.75rem,9vw,4.5rem)] leading-[0.9] tracking-[-0.04em] text-ink"
+            >
+              <span aria-hidden className="font-normal text-brand-my">
+                my
+              </span>
+              <span aria-hidden className="font-bold">
+                pagecraft
+              </span>
             </div>
             <p className="mt-4 text-mid leading-[1.6] text-muted">
               A content-only CMS: developers keep the design in code, owners change the words themselves.

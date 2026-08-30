@@ -50,6 +50,13 @@
   --color-brand-lift: #ff7a52; /* coral, lifted for ink backgrounds */
   --color-brand-deep: #8f3d24; /* the hook on ink — holds apart from the lift */
   --color-brand-wash: #fdf0eb;
+  /*
+   * The "my" in the mypagecraft wordmark — logotype only, never body text.
+   * It sits at ~3.2:1 on paper, which WCAG 1.4.3 exempts for logotypes but
+   * which would fail anywhere else, so it deliberately has no general-purpose
+   * name. Use --color-muted for grey text.
+   */
+  --color-brand-my: #8b8e96;
 
   /* Marketing spot inks + stage washes (light only — marketing never renders
      dark). Flat ink, no gradients. See cms-redesign/direction.md §3. */

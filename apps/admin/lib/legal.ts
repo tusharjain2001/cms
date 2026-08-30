@@ -1,3 +1,5 @@
+import { ONE_MONTH, ONE_YEAR } from "./pricing";
+
 /**
  * The business behind Pagecraft, in one place.
  *
@@ -103,8 +105,8 @@ export const refunds = {
 
 /** Everything a customer's money buys, restated so the policies stay accurate. */
 export const commercials = {
-  pricePerWebsiteMonthly: "₹999",
-  pricePerWebsiteYearly: "₹9,990",
+  pricePerWebsiteMonthly: ONE_MONTH,
+  pricePerWebsiteYearly: ONE_YEAR,
   currency: "Indian Rupees (INR)",
   maxWebsites: 20,
   /** Kept true by `websiteAllowance()` in packages/shared/src/plans.ts. */

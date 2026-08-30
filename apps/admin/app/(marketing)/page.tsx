@@ -15,6 +15,7 @@ import {
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { links } from "@/lib/links";
+import { ONE_MONTH } from "@/lib/pricing";
 
 /**
  * The landing page — the front door of the same app that serves the dashboard,
@@ -229,9 +230,9 @@ export default function LandingPage() {
                 </Print>
                 <Print delay={260}>
                   <div className="mt-7 flex flex-wrap items-center gap-4">
-                    <ButtonLink href={links.signUp}>Get started · ₹999 a month</ButtonLink>
+                    <ButtonLink href={links.signUp}>Get started · {ONE_MONTH} a month</ButtonLink>
                     <span className="text-[13.5px] text-quiet">
-                      ₹999 a month for one website. Your developer connects the site once.
+                      {ONE_MONTH} a month for one website. Your developer connects the site once.
                     </span>
                   </div>
                 </Print>
@@ -511,7 +512,7 @@ export default function LandingPage() {
                 </p>
                 <div className="mt-8 flex flex-wrap justify-center gap-3">
                   <ButtonLink href={links.signUp} className="px-6! hover:animate-celebrate">
-                    Get started · ₹999 a month
+                    Get started · {ONE_MONTH} a month
                   </ButtonLink>
                   <ButtonLink href={links.docs} tone="outline" className="px-6!">
                     Read the developer docs

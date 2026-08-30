@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { links } from "@/lib/links";
+import { PRICE_PER_WEBSITE, inr, price } from "@/lib/pricing";
 
 /**
  * The price ladder and the monthly/yearly toggle.
@@ -12,8 +13,8 @@ import { links } from "@/lib/links";
  * here means the rest of the pricing page — stages, table, FAQ — stays
  * server-rendered (direction.md §5.11).
  *
- * THE MODEL (decided 30 Aug 2026): **you pay per website.** One is ₹999 a
- * month, two is ₹1,998, three is ₹2,997. That is the whole price list. It replaced a
+ * THE MODEL (decided 30 Aug 2026): **you pay per website.** Two cost twice
+ * one, three cost three times. That is the whole price list. It replaced a
  * two-tier Starter/Business table, and the reasons the old one existed are
  * worth knowing before anyone reinstates it:
  *
@@ -43,13 +44,13 @@ import { links } from "@/lib/links";
 type Billing = "monthly" | "yearly";
 
 /**
- * ₹999 per website per month; ₹9,990 per year — twelve months for the price
- * of ten. Strictly linear, because Razorpay bills a subscription as plan amount
- * × quantity: a ladder that bent (₹1,999 for two) could not be one plan bought
+ * The figures come from `lib/pricing.ts`, which is also where the temporary
+ * ₹1 test price is set. Strictly linear, because Razorpay bills a subscription
+ * as plan amount × quantity: a ladder that bent could not be one plan bought
  * twice, and would force a re-authorised mandate on every change. See
  * `packages/shared/src/plans.ts`.
  */
-const PER_WEBSITE: Record<Billing, number> = { monthly: 999, yearly: 9990 };
+const PER_WEBSITE = PRICE_PER_WEBSITE;
 
 const MIN_WEBSITES = 1;
 const MAX_WEBSITES = 20;
@@ -65,17 +66,6 @@ const INCLUDED = [
   "Your site republishes itself the moment you press Publish",
   "Download everything as a file, whenever you like",
 ];
-
-/**
- * Rupees with Indian digit grouping: 999 → "999", 1998 → "1,998".
- * `en-IN` matters — rupees group as 1,00,000, and the wrong grouping reads as a
- * foreign site.
- */
-const money = (n: number) =>
-  n.toLocaleString("en-IN", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: Number.isInteger(n) ? 0 : 2,
-  });
 
 /**
  * A two-option segmented control. The active pill is a coral thumb that springs
@@ -167,7 +157,7 @@ function RungCard({
       <div>
         <p className="flex items-baseline gap-1.5">
           <span className="font-display text-[38px] font-bold leading-none tracking-[-0.02em] tabular-nums">
-            ₹{money(billing === "yearly" ? total / 12 : total)}
+            {inr(billing === "yearly" ? total / 12 : total)}
           </span>
           <span className="text-label text-muted">
             {billing === "yearly" ? "/ month, billed yearly" : "/ month"}
@@ -175,8 +165,8 @@ function RungCard({
         </p>
         <p className="mt-1.5 text-helper text-muted tabular-nums">
           {billing === "yearly"
-            ? `₹${money(total)} billed once a year`
-            : `or ₹${money(websites * PER_WEBSITE.yearly)} a year`}
+            ? `${inr(total)} billed once a year`
+            : `or ${price(websites, "yearly")} a year`}
         </p>
       </div>
 
@@ -218,7 +208,7 @@ export function PricingPlans() {
           <div className="min-w-[200px]">
             <h3 className="text-[15px] font-semibold">Look after more than three?</h3>
             <p className="mt-1 text-mid leading-normal text-muted">
-              It keeps going at ₹{money(PER_WEBSITE[billing])} each. Add and remove websites
+              It keeps going at {inr(PER_WEBSITE[billing])} each. Add and remove websites
               whenever you like.
             </p>
           </div>
@@ -256,7 +246,7 @@ export function PricingPlans() {
           </div>
 
           <p className="font-display text-[32px] font-bold leading-none tracking-[-0.02em] tabular-nums">
-            ₹{money(custom)}
+            {inr(custom)}
             <span className="ml-1.5 font-sans text-label font-normal text-muted">
               {billing === "yearly" ? "/ year" : "/ month"}
             </span>

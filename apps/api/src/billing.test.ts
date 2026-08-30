@@ -182,14 +182,14 @@ function webhook(event: string, entity: Record<string, unknown>, createdAt: numb
 /* ------------------------------------------------------------------- tests */
 
 describe("the price ladder", () => {
-  it("quotes ₹999 a website, publicly, without an account", async () => {
+  it("quotes the per-website price publicly, without an account", async () => {
     const res = await api("/api/billing/plans");
     assert.equal(res.status, 200);
     assert.equal(res.json.data.currency, "INR");
-    assert.equal(res.json.data.pricePerWebsitePaise.monthly, 99_900);
+    assert.equal(res.json.data.pricePerWebsitePaise.monthly, 100);
     assert.deepEqual(
       res.json.data.examples.map((e: Json) => e.monthly),
-      ["₹999", "₹1,998", "₹2,997"]
+      ["₹1", "₹2", "₹3"]
     );
   });
 
@@ -213,7 +213,7 @@ describe("buying websites", () => {
     });
 
     assert.equal(res.status, 201);
-    assert.equal(res.json.data.checkout.amountPaise, 299_700, "3 websites is ₹2,997");
+    assert.equal(res.json.data.checkout.amountPaise, 300, "3 websites is 3x the unit price");
     assert.equal(res.json.data.checkout.websites, 3);
 
     // The ladder is one plan bought three times, never a third plan.
@@ -289,7 +289,7 @@ describe("buying websites", () => {
     const fourth = await api("/api/projects", { method: "POST", token, body: { name: "Four" } });
     assert.equal(fourth.status, 402);
     assert.equal(fourth.json.code, "subscription_required");
-    assert.match(fourth.json.error, /₹3,996 a month/);
+    assert.match(fourth.json.error, /₹4 a month/);
   });
 
   it("adds a website by amending the mandate, not by asking for the card again", async () => {

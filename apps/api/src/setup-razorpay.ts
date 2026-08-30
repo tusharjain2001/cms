@@ -34,22 +34,24 @@ const BASE = process.env.RAZORPAY_API_BASE ?? "https://api.razorpay.com/v1";
  * The plans, keyed by the env var each id belongs in. `name` doubles as the
  * idempotency key — it is what an existing plan is matched on.
  */
-const WANTED = [
-  {
-    envVar: "RAZORPAY_PLAN_ID_MONTHLY",
-    name: "Pagecraft — one website (monthly)",
-    period: "monthly" as const,
-    interval: 1,
-    amount: PRICE_PER_WEBSITE_MONTHLY_PAISE,
-  },
-  {
-    envVar: "RAZORPAY_PLAN_ID_YEARLY",
-    name: "Pagecraft — one website (yearly)",
-    period: "yearly" as const,
-    interval: 1,
-    amount: PRICE_PER_WEBSITE_YEARLY_PAISE,
-  },
-];
+const WANTED = (
+  [
+    { envVar: "RAZORPAY_PLAN_ID_MONTHLY", period: "monthly" as const, amount: PRICE_PER_WEBSITE_MONTHLY_PAISE },
+    { envVar: "RAZORPAY_PLAN_ID_YEARLY", period: "yearly" as const, amount: PRICE_PER_WEBSITE_YEARLY_PAISE },
+  ]
+).map((p) => ({
+  ...p,
+  interval: 1,
+  /**
+   * **The amount is part of the name on purpose.** Razorpay plan amounts are
+   * immutable, so changing the price means creating a *new* plan. If the name
+   * stayed the same, this script would find the old plan, see a different
+   * amount and refuse — leaving no way to reprice at all. Naming them
+   * "… (monthly · ₹999)" and "… (monthly · ₹1)" lets both exist side by side,
+   * so switching price is just swapping the plan id in .env.
+   */
+  name: `Pagecraft — one website (${p.period} · ₹${formatInr(p.amount)})`,
+}));
 
 interface Plan {
   id: string;

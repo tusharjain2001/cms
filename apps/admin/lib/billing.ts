@@ -4,7 +4,7 @@ import type { BillingPeriod, CheckoutDTO, SubscriptionDTO } from "./dto";
 /**
  * Billing, from the browser's side.
  *
- * THE MODEL: ₹999 per website per month, ₹9,990 per website per year. Three
+ * THE MODEL: one price per website per month (see `lib/pricing.ts`). Three
  * websites is quantity 3 of one subscription, not a third plan. There is **no
  * free trial** — a new account may own zero websites until it pays.
  *

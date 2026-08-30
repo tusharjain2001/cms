@@ -6,7 +6,7 @@ import { useAuth } from "@/lib/auth";
 import { Sidebar } from "@/components/sidebar";
 import { Tour } from "@/components/tour";
 import { McpWidget } from "@/components/mcp-widget";
-import { PagecraftMark } from "@/components/logo";
+import { PagecraftMark, PagecraftWordmark } from "@/components/logo";
 
 /**
  * The signed-in shell: a fixed sidebar on desktop, a slide-over drawer on
@@ -71,7 +71,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             ☰
           </button>
           <PagecraftMark height={19} className="shrink-0" />
-          <span className="text-label font-bold">Pagecraft</span>
+          <PagecraftWordmark size={14} />
         </div>
 
         <main className="min-w-0 flex-1">{children}</main>

@@ -260,6 +260,15 @@ app/
 
 **The public surfaces wear `brand-coat`; the dashboard does not.** Marketing and the signed-out screens override the accent tokens to the logo's coral, while everything behind the login keeps Press Blue — the artboard's own instruction, "coral is the brand's coat, not the buttons". It is a token override rather than new utilities, so every existing `bg-accent` / `text-accent` in those trees retunes with no markup change. **The accent is `#b93f20`, not the mark's `#e8542e`**: the mark's coral is 3.66:1 on white and fails AA for text, where the deeper coral matches the Press Blue ramp it replaces. `#e8542e` lives on as `--color-brand`, which the logo paints with. See the `.brand-coat` comment in `globals.css`.
 
+**The wordmark is `mypagecraft`, not `Pagecraft`** (updated 31 Aug 2026 from the brand artboard). Lowercase throughout, with `my` set at weight 400 in `--color-brand-my` (#8b8e96) and `pagecraft` at 700 in the surrounding text colour, letter-spacing -0.04em. The `my` is the whole point of the change: the product lives at mypagecraft.com, and a wordmark reading "pagecraft" made the domain look like a different company. `PagecraftWordmark` in `components/logo.tsx` is the only place it is built — the nav, the sidebar, the mobile header and the footer all render it, so it cannot drift.
+
+Two deliberate deviations from the artboard, both inherited from when the mark was first built:
+
+- **The typeface stays Bricolage, not the artboard's Space Grotesk.** A fourth family for one word costs a font download on every page, and Bricolage carries the same geometric lowercase.
+- **A logotype is exempt from the "display face is headlines >=32px, never dashboard" rule.** A logo that changes typeface between marketing and the sidebar is not one logo. `--color-brand-my` is likewise exempt from the AA floor — it sits at ~3.2:1, which WCAG 1.4.3 exempts for logotypes and which would fail anywhere else, so the token is named for the wordmark rather than given a general-purpose grey name.
+
+**The wordmark is ahead of the copy.** The logo says `mypagecraft`; the page title, the footer copyright, the policy pages and the emails still say "Pagecraft". That is a product-naming decision, not a logo one — decide it deliberately rather than letting a find-and-replace make it.
+
 **The app is light-only. There is no dark palette and no theme toggle** — removed deliberately, not yet-to-be-built. `globals.css` defines one set of `--color-*` tokens and nothing redefines them; `lib/theme.ts`, `components/theme-toggle.tsx`, the sidebar's Theme row, the command palette's "Toggle theme" action and the root layout's no-flash script are all gone, as are the light pins that `(marketing)` and `(auth)` needed only because the dashboard could be dark. Do not re-add a `@media (prefers-color-scheme: dark)` block or a `[data-theme]` selector without asking. `--color-plate` is still a dark ink band inside the light palette — that is a tonal reset, not dark mode.
 
 | Path | What it is |
@@ -267,7 +276,7 @@ app/
 | `app/(marketing)/page.tsx` | The whole page. Bands: hero → editor mock → stats → how it works → can't/can → section types → for developers → comparison → testimonials → FAQ → closing CTA. Its own `metadata` overrides the root title template. |
 | `components/landing/editor-mock.tsx` | The product screenshot, in markup rather than a PNG — it stays sharp, weighs nothing, and cannot silently go stale when the real editor changes. `aria-hidden`: it is decorative, and the surrounding copy carries the meaning. |
 | `components/landing/section-types.tsx` | The nine types as tinted mini-page tiles — the hero's sheets, landed in a grid. **Mirrors `SECTION_REGISTRY`** — add a section type there, add it here. |
-| `components/logo.tsx` | The p+c mark, drawn from the artboard's construction spec as ratios of its own height. Shared by marketing, the auth screens and the dashboard sidebar, so there is one mark, not four. |
+| `components/logo.tsx` | The p+c mark **and the `mypagecraft` wordmark**, drawn from the artboard's construction spec as ratios of its own height. Shared by marketing, the auth screens and the dashboard sidebar, so there is one mark, not four. |
 | `lib/links.ts` | Every destination the landing page points at. Plain relative paths, since it is all one origin. |
 
 **`/` is the landing page, so signing in is at `/login` — but "signed out" has two meanings and they go to different places.** (Revised 31 Aug 2026; it used to send all of them to `/login`.)
@@ -285,7 +294,9 @@ Both use `router.replace`, not `push`: Back must not walk into a dashboard shell
 
 ## Pricing & billing — BUILT (Razorpay, live-capable)
 
-**The business model — decided 30 Aug 2026, do not re-derive.** *You pay per website: ₹999 a month each.* One website is ₹999, two is ₹1,998, three is ₹2,997, up to twenty. Yearly is ₹9,990 per website — twelve months for the price of ten. Billed in **INR** through **Razorpay**, plus ₹199 per extra 10 GB and ₹14,999 for a bespoke section type.
+⚠️ **THE PRICE IS CURRENTLY A TEMPORARY ₹1 TEST AMOUNT** (set 31 Aug 2026), so a real payment can be put through end to end and confirmed as reaching the bank. The intended price is ₹999/month. To restore it, change the two constants in `packages/shared/src/plans.ts` (`99_900` / `999_000` paise) **and** the two in `apps/admin/lib/pricing.ts` (`999` / `9990`), then re-run `npm run setup:razorpay` and swap the new plan ids into `.env`. Every figure the product quotes derives from those four numbers, so that is the whole change — the price used to be written out in about thirty places and `apps/admin/lib/pricing.ts` exists so it never is again.
+
+**The business model — decided 30 Aug 2026, do not re-derive.** *You pay per website.* Two websites cost twice one, three cost three times, up to twenty. Yearly is twelve months for the price of ten. Billed in **INR** through **Razorpay**, plus ₹199 per extra 10 GB and ₹14,999 for a bespoke section type.
 
 **The price is strictly linear, and it has to be.** Razorpay bills a subscription as `plan amount × quantity`, so a ladder that bent — ₹1,999 for two rather than ₹1,998 — could not be one plan bought twice. It would need a plan per rung, and since Razorpay cannot swap the plan on a live subscription, every change to a customer's website count would force them to re-authorise their mandate. Nobody re-enters a card over ₹1. **INR, not USD**, because Razorpay's auto-debit machinery (UPI AutoPay, e-NACH, card mandates under the RBI e-mandate framework) is built for Indian rails; USD recurring is not something a standard account can rely on.
 
@@ -295,7 +306,7 @@ Both use `router.replace`, not `push`: Back must not walk into a dashboard shell
 
 This also **reverses** the old "one account is one website" constraint. An account may now own as many websites as it pays for, which is what makes the developer-with-several-clients case work — it was previously ruled out for want of invites. Invites are still not built, so those clients still share one sign-in; what changed is that the *account* is no longer capped at one site.
 
-**The ladder is a Razorpay `quantity`, not twenty plans.** There are exactly **two** Razorpay Plans — "one website, monthly" (₹999) and "one website, yearly" (₹9,990) — and three websites is quantity 3 of one of them. `npm run setup:razorpay` creates both at the right amounts and prints the ids for `.env`; it is idempotent and refuses loudly if a plan already exists at the wrong price, because **Razorpay plan amounts cannot be edited after creation**. That is why adding a fourth website amends the existing mandate (`schedule_change_at: "now"`, prorated) instead of asking for the card again, and why the ladder can extend without touching Razorpay.
+**The ladder is a Razorpay `quantity`, not twenty plans.** There are exactly **two** Razorpay Plans — "one website, monthly" and "one website, yearly" — and three websites is quantity 3 of one of them. Their names carry the amount (`… (monthly · ₹999)`), because plan amounts are immutable: repricing means a *new* plan, and identical names would make the script find the old one and refuse on the mismatch. `npm run setup:razorpay` creates both at the right amounts and prints the ids for `.env`; it is idempotent and refuses loudly if a plan already exists at the wrong price, because **Razorpay plan amounts cannot be edited after creation**. That is why adding a fourth website amends the existing mandate (`schedule_change_at: "now"`, prorated) instead of asking for the card again, and why the ladder can extend without touching Razorpay.
 
 Where it lives:
 
@@ -307,7 +318,8 @@ Where it lives:
 | `apps/api/src/routes/billing.ts` | `GET /api/billing`, `POST /subscription`, `POST /verify`, `POST /cancel`, `GET /plans`, and the webhook. `applySubscription` is the one place entitlement can change. |
 | `apps/admin/lib/billing.ts` | Browser side, including injecting Razorpay's Checkout script on demand. |
 | `apps/admin/app/(dash)/(app)/billing/page.tsx` | Plan & billing — a stepper, because the whole screen is one number. |
-| `apps/admin/components/landing/pricing-plans.tsx` | Still the **only** `"use client"` component on any public page. Its numbers **mirror** `plans.ts` rather than importing it — importing `@pagecraft/shared` would pull Zod into the public bundle. Change one, change the other. |
+| `apps/admin/lib/pricing.ts` | **The one place the dashboard and marketing quote a price.** Mirrors `plans.ts` rather than importing it — importing `@pagecraft/shared` would pull Zod into the public bundle. Change one, change the other. |
+| `apps/admin/components/landing/pricing-plans.tsx` | Still the **only** `"use client"` component on any public page. Derives every figure from `lib/pricing.ts`. |
 
 Four rules worth knowing before touching this code:
 
@@ -389,7 +401,7 @@ Tests run every handler against `src/stub-api.ts` — a stand-in that enforces t
    - ⬜ **Two Cloudflare-admin jobs remain, and media does not display until the second is done**:
      the bucket CORS rule, and connecting `media.mypagecraft.com` as an R2 custom domain (its
      DNS currently points at the VPS, so every stored media URL is unreachable).
-   - ✅ **Per-account limits and payment.** Websites are capped at the number a Razorpay subscription covers (₹999 each per month), with no free trial — a public signup form can no longer run up an open-ended bill. Pages, storage and content-API calls are metered per website too. See "Pricing & billing" above.
+   - ✅ **Per-account limits and payment.** Websites are capped at the number a Razorpay subscription covers, with no free trial — a public signup form can no longer run up an open-ended bill. Pages, storage and content-API calls are metered per website too. See "Pricing & billing" above.
    - ⬜ Two Razorpay-admin jobs remain: create the two Plans ("one website" monthly and yearly) and point a webhook at `/api/billing/webhook`, then fill the five `RAZORPAY_*` vars. Until then `billingEnabled` is false and nobody but the seeded admin can create a website.
    - ⬜ SEO fields surfaced in the dashboard, and the deployment run-through.
 

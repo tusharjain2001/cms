@@ -6,6 +6,7 @@ import { SiteNav } from "@/components/landing/site-nav";
 import { Band, ButtonLink } from "@/components/landing/bits";
 import { Print, Stagger, StageController } from "@/components/landing/motion";
 import { links } from "@/lib/links";
+import { ONE_MONTH, ONE_YEAR, price } from "@/lib/pricing";
 
 /**
  * The pricing page — the calm two-stage version of the system (direction.md
@@ -13,8 +14,8 @@ import { links } from "@/lib/links";
  * sequence. Bands reveal with print-wipes; the only interactivity is the
  * monthly/yearly toggle inside <PricingPlans>.
  *
- * THE MODEL: you pay per website. One is ₹999 a month, two is ₹1,998, three
- * is ₹2,997 — a ladder, not a set of feature tiers, because website count is the one
+ * THE MODEL: you pay per website. Two cost twice one, three cost three times
+ * — a ladder, not a set of feature tiers, because website count is the one
  * number a customer knows before they buy. **There is no free trial**, and the
  * API genuinely enforces that: a fresh account may own zero websites. See the
  * header comment in `components/landing/pricing-plans.tsx` for why the old
@@ -26,8 +27,7 @@ import { links } from "@/lib/links";
  * whoever builds the site.
  */
 
-const description =
-  "₹999 a month per website. Edit your own words and photos, and your site updates itself. Add a second website for another ₹999 — no tiers, no trial, no surprises.";
+const description = `${ONE_MONTH} a month per website. Edit your own words and photos, and your site updates itself. Add a second website for another ${ONE_MONTH} — no tiers, no trial, no surprises.`;
 
 export const metadata: Metadata = {
   title: "Pricing",
@@ -42,8 +42,8 @@ export const metadata: Metadata = {
  */
 const LADDER = [1, 2, 3, 5, 10].map((websites) => ({
   websites,
-  monthly: `₹${(websites * 999).toLocaleString("en-IN")}`,
-  yearly: `₹${(websites * 9990).toLocaleString("en-IN")}`,
+  monthly: price(websites, "monthly"),
+  yearly: price(websites, "yearly"),
 }));
 
 /** What a website includes, at every rung. */
@@ -77,11 +77,11 @@ const ADD_ONS = [
 const FAQS = [
   {
     q: "Is there a free trial?",
-    a: "No. Signing up, looking around the dashboard and reading the developer docs cost nothing, but creating a website is a purchase — ₹999 for the first month. We would rather charge honestly on day one than run a clock you have to remember to cancel.",
+    a: `No. Signing up, looking around the dashboard and reading the developer docs cost nothing, but creating a website is a purchase — ${ONE_MONTH} for the first month. We would rather charge honestly on day one than run a clock you have to remember to cancel.`,
   },
   {
     q: "What counts as one website?",
-    a: "Everything at one address — every page, every section, every photo. A second website is a second ₹999 a month, on the same account and the same bill.",
+    a: `Everything at one address — every page, every section, every photo. A second website is a second ${ONE_MONTH} a month, on the same account and the same bill.`,
   },
   {
     q: "Can I add a website later?",
@@ -101,7 +101,7 @@ const FAQS = [
   },
   {
     q: "Which currency, and how is it charged?",
-    a: "Indian rupees, through Razorpay — cards, UPI AutoPay, net banking. We never see your card. Monthly renews every month; yearly is ₹9,990 a website, twelve months for the price of ten.",
+    a: `Indian rupees, through Razorpay — cards, UPI AutoPay, net banking. We never see your card. Monthly renews every month; yearly is ${ONE_YEAR} a website, twelve months for the price of ten.`,
   },
 ];
 
@@ -130,12 +130,12 @@ export default function PricingPage() {
               as="h1"
               className="mx-auto max-w-[820px] font-display text-[clamp(2.75rem,6.5vw,4rem)] font-extrabold leading-[0.94] tracking-[-0.025em]"
             >
-              ₹999 a month. Per website.
+              {ONE_MONTH} a month. Per website.
             </Print>
             <Print delay={90} className="mx-auto mt-5 max-w-[620px]">
               <p className="text-[16px] leading-[1.6] text-quiet sm:text-[17px]">
                 Less than a site builder, and your website stays exactly as your designer made it.
-                Two websites is ₹1,998, three is ₹2,997 — no tiers to decode, and nothing held back on a
+                Two websites is {price(2)}, three is {price(3)} — no tiers to decode, and nothing held back on a
                 cheaper one.
               </p>
             </Print>
@@ -214,7 +214,7 @@ export default function PricingPage() {
             </Print>
 
             <p className="mt-4 text-sub leading-[1.6] text-quiet">
-              It carries on at ₹999 each up to twenty websites. Past that,{" "}
+              It carries on at {ONE_MONTH} each up to twenty websites. Past that,{" "}
               <a href={links.contact} className="font-semibold text-accent hover:underline">
                 tell us what you need
               </a>{" "}
@@ -307,11 +307,11 @@ export default function PricingPage() {
                   Change your own website today.
                 </h2>
                 <p className="mx-auto mt-3.5 max-w-[540px] text-[15.5px] leading-[1.6] text-slate sm:text-[16px]">
-                  ₹999 a month, cancel whenever. Change a headline, swap a photo, press Publish,
+                  {ONE_MONTH} a month, cancel whenever. Change a headline, swap a photo, press Publish,
                   and watch your live website update itself.
                 </p>
                 <div className="mt-6.5 flex flex-wrap justify-center gap-2.5">
-                  <ButtonLink href={links.signUp}>Get started · ₹999 a month</ButtonLink>
+                  <ButtonLink href={links.signUp}>Get started · {ONE_MONTH} a month</ButtonLink>
                   <ButtonLink href="/" tone="outline">
                     Back to the overview
                   </ButtonLink>

@@ -6,6 +6,7 @@ import { Print } from "@/components/landing/motion";
 import { SiteFooter } from "@/components/landing/site-footer";
 import { SiteNav } from "@/components/landing/site-nav";
 import { links } from "@/lib/links";
+import { ONE_MONTH } from "@/lib/pricing";
 
 /**
  * The public developer documentation — the quietest page on the site
@@ -447,7 +448,7 @@ export async function POST(req) {
                 </h2>
                 <p className="mx-auto mt-3 max-w-[520px] text-[15px] leading-[1.6] text-slate">
                   Create a website, add a page, press Publish, and point your local dev server at it.
-                  ₹999 a month for one website, ₹999 for each one after that.
+                  {ONE_MONTH} a month for one website, {ONE_MONTH} for each one after that.
                 </p>
                 <div className="mt-6 flex justify-center">
                   <ButtonLink href={links.signUp}>Create an account</ButtonLink>

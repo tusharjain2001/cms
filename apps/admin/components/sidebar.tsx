@@ -6,7 +6,7 @@ import { useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
 import { cx } from "./ui";
-import { PagecraftMark } from "./logo";
+import { PagecraftMark, PagecraftWordmark } from "./logo";
 
 const navBase =
   "flex w-full items-center gap-2.5 rounded-[7px] px-2.5 py-2 text-left text-label font-medium cursor-pointer transition-colors";
@@ -79,7 +79,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     <div className="flex h-full w-[236px] shrink-0 flex-col gap-[18px] border-r border-line bg-rail px-3.5 py-4">
       <Link href="/projects" className="flex items-center gap-2.5 px-1 py-0.5">
         <PagecraftMark height={22} className="shrink-0" />
-        <span className="text-[15.5px] font-bold tracking-[-.2px]">Pagecraft</span>
+        <PagecraftWordmark size={15.5} />
       </Link>
 
       {/* project switcher */}

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
+import { ONE_MONTH } from "@/lib/pricing";
 import { ApiError } from "@/lib/api";
 import {
   cancelSubscription,
@@ -18,7 +19,7 @@ import { Button, Card, CardTitle, PageHeader } from "@/components/ui";
  * Plan & billing.
  *
  * THE WHOLE SCREEN IS ONE NUMBER: how many websites this account pays for.
- * ₹999 each per month, ₹9,990 each per year — so the control is a stepper, not a
+ * One website per unit — so the control is a stepper, not a
  * grid of tiers, and the price is arithmetic the customer can check in their
  * head. There is no free trial and nothing here pretends otherwise.
  *
@@ -163,7 +164,7 @@ export default function BillingPage() {
     <div className="max-w-[860px] px-6 py-10 lg:px-11">
       <PageHeader
         title="Plan &amp; billing"
-        sub="One website is ₹999 a month. Every extra website is another ₹999."
+        sub={`One website is ${ONE_MONTH} a month. Every extra website is another ${ONE_MONTH}.`}
       />
 
       {/* Payments switched off on the server — the same courtesy the media

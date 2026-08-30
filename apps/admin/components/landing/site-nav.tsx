@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { links } from "@/lib/links";
 import { Logo } from "./bits";
+import { PagecraftWordmark } from "@/components/logo";
 
 const NAV = [
   { label: "How it works", href: links.how, key: "how" },
@@ -54,7 +55,7 @@ export function SiteNav({
           aria-label="Pagecraft home"
         >
           <Logo />
-          <span className="font-display text-[18px] font-bold tracking-[-0.02em]">Pagecraft</span>
+          <PagecraftWordmark size={18} />
         </Link>
 
         <div className="ml-3.5 hidden items-center gap-[26px] md:flex">

@@ -73,12 +73,50 @@ export function PagecraftMark({
 }
 
 /**
- * Mark + wordmark, the primary lockup. The gap is 0.28H per the spec.
+ * The wordmark: **mypagecraft**, lowercase, with "my" set lighter and grey.
  *
- * The wordmark stays in the site's own display face rather than the
- * artboard's Space Grotesk: swapping the typeface of every "Pagecraft" on the
- * site is a typographic decision well beyond adopting a logo, and Bricolage is
- * already the marketing display voice.
+ * The "my" is the point of it — the product is mypagecraft.com, and a
+ * wordmark reading "pagecraft" left the domain looking like a different
+ * company. Per the artboard: lowercase throughout, "my" at 400 in
+ * `--color-brand-my`, "pagecraft" at 700 in the surrounding text colour,
+ * letter-spacing -0.04em.
+ *
+ * `size` is the font size in px. The two halves are separate spans rather than
+ * one string so the weight and colour change mid-word without a second font
+ * load, and `aria-label` restores it to one word for screen readers — which
+ * would otherwise announce "my" and "pagecraft" as two.
+ *
+ * **The typeface is deliberately not the artboard's Space Grotesk.** Adding a
+ * fourth family for one word costs a font download on every page; Bricolage is
+ * already the display voice and carries the same geometric lowercase. That was
+ * the call when the mark was first built and it still holds.
+ */
+export function PagecraftWordmark({
+  size = 18,
+  className,
+}: {
+  /** Font size in px. The spec pairs a mark of height H with ~0.54H cap height. */
+  size?: number;
+  className?: string;
+}) {
+  return (
+    <span
+      aria-label="mypagecraft"
+      className={`font-display tracking-[-0.04em] whitespace-nowrap ${className ?? ""}`}
+      style={{ fontSize: size }}
+    >
+      <span aria-hidden className="font-normal text-brand-my">
+        my
+      </span>
+      <span aria-hidden className="font-bold">
+        pagecraft
+      </span>
+    </span>
+  );
+}
+
+/**
+ * Mark + wordmark, the primary lockup. The gap is 0.28H per the spec.
  */
 export function PagecraftLockup({
   height = 24,
@@ -94,11 +132,10 @@ export function PagecraftLockup({
   return (
     <span className={`inline-flex items-center ${className ?? ""}`}>
       <PagecraftMark height={height} tone={tone} />
-      <span
-        className="font-display font-bold tracking-[-0.02em]"
-        style={{ fontSize: wordmark, marginLeft: height * 0.28 }}
-      >
-        Pagecraft
+      {/* The gap is a ratio of the mark's height, so the lockup holds together
+          at any size — hence an inline style rather than a utility class. */}
+      <span style={{ marginLeft: height * 0.28 }}>
+        <PagecraftWordmark size={wordmark} />
       </span>
     </span>
   );

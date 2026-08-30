@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
+import { ONE_MONTH } from "@/lib/pricing";
 import { Button, EmptyState, Input, Modal, ModalActions, PageHeader } from "@/components/ui";
 
 const initials = (name: string) =>
@@ -70,7 +71,7 @@ export default function ProjectsPage() {
         sub="Websites you own, and any you have been invited to edit."
         action={
           <Button variant="primary" data-tour="new-website" onClick={startCreating}>
-            {canAdd ? "+ New website" : "+ Add a website · ₹999/mo"}
+            {canAdd ? "+ New website" : `+ Add a website · ${ONE_MONTH}/mo`}
           </Button>
         }
       />
@@ -84,7 +85,7 @@ export default function ProjectsPage() {
             {allowance === 0
               ? "These websites are not covered by a plan, so you cannot add another."
               : `Your plan covers ${allowance} website${allowance === 1 ? "" : "s"} and you are using ${owned}.`}{" "}
-            Another one is ₹999 a month.
+            Another one is {ONE_MONTH} a month.
           </p>
           <Link
             href={upgradeHref}
@@ -102,11 +103,11 @@ export default function ProjectsPage() {
           body={
             canAdd
               ? "Create your first website and you will get a public key to drop into your React or Next.js project. If someone has invited you to edit theirs, it will appear here instead."
-              : "Pagecraft is ₹999 a month for one website, and another ₹999 for each one after that. There is no free trial — pick a plan and your first website is ready in a moment. If someone has invited you to edit theirs, it will appear here instead."
+              : `Pagecraft is ${ONE_MONTH} a month for one website, and another ${ONE_MONTH} for each one after that. There is no free trial — pick a plan and your first website is ready in a moment. If someone has invited you to edit theirs, it will appear here instead.`
           }
           action={
             <Button variant="primary" onClick={startCreating}>
-              {canAdd ? "+ New website" : "Choose a plan · ₹999/mo"}
+              {canAdd ? "+ New website" : `Choose a plan · ${ONE_MONTH}/mo`}
             </Button>
           }
         />
