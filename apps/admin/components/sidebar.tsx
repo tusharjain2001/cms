@@ -204,6 +204,17 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       </nav>
 
       <div className="mt-auto flex flex-col gap-2.5">
+        {/* Account-level, not per-website: what you pay for is a number of
+            websites, so this sits below the per-website links rather than
+            inside them. */}
+        <NavLink
+          href="/billing"
+          icon="◈"
+          active={pathname === "/billing"}
+          onNavigate={onNavigate}
+        >
+          Plan &amp; billing
+        </NavLink>
         {/* Skipping the tour must not be a one-way door. */}
         {user?.onboardingComplete && (
           <button

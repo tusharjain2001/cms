@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
@@ -27,6 +28,26 @@ export default function ProjectsPage() {
     if (onlyInvited) router.replace(`/projects/${s.projects[0].id}/pages`);
   }, [onlyInvited, s.projects, router]);
 
+  /**
+   * Websites are what money buys: an account may own exactly as many as its
+   * subscription covers, and a brand-new account covers **none** — there is no
+   * free trial. `websiteAllowance` comes from the account itself, so this is
+   * the same number the API enforces rather than a second guess at it.
+   *
+   * Only owned websites count. Being invited to edit somebody else's costs
+   * nothing and must not eat into what you paid for.
+   */
+  const owned = s.projects.filter((p) => p.role === "owner").length;
+  const allowance = user?.websiteAllowance ?? 0;
+  const canAdd = owned < allowance;
+  /** Where "New website" goes when there is no room: buy the next rung. */
+  const upgradeHref = `/billing?want=${owned + 1}`;
+
+  const startCreating = () => {
+    if (canAdd) setCreating(true);
+    else router.push(upgradeHref);
+  };
+
   const open = (id: string) => {
     s.setProjectId(id);
     router.push(`/projects/${id}/pages`);
@@ -48,20 +69,44 @@ export default function ProjectsPage() {
         title="Your websites"
         sub="Websites you own, and any you have been invited to edit."
         action={
-          <Button variant="primary" data-tour="new-website" onClick={() => setCreating(true)}>
-            + New website
+          <Button variant="primary" data-tour="new-website" onClick={startCreating}>
+            {canAdd ? "+ New website" : "+ Add a website · ₹999/mo"}
           </Button>
         }
       />
+
+      {/* At the ceiling, with websites already built. Said here rather than
+          only on the button, because "why is this greyed out" is the question
+          the button alone cannot answer. */}
+      {s.projects.length > 0 && !canAdd && (
+        <div className="mb-6 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-sunken px-4 py-3.5">
+          <p className="text-label text-quiet">
+            {allowance === 0
+              ? "These websites are not covered by a plan, so you cannot add another."
+              : `Your plan covers ${allowance} website${allowance === 1 ? "" : "s"} and you are using ${owned}.`}{" "}
+            Another one is ₹999 a month.
+          </p>
+          <Link
+            href={upgradeHref}
+            className="ml-auto text-label font-semibold text-accent hover:underline"
+          >
+            Add a website →
+          </Link>
+        </div>
+      )}
 
       {s.projects.length === 0 ? (
         <EmptyState
           icon="◫"
           title={`Welcome, ${user?.name?.split(" ")[0] ?? "there"}`}
-          body="Create your first website and you will get a public key to drop into your React or Next.js project. If someone has invited you to edit theirs, it will appear here instead."
+          body={
+            canAdd
+              ? "Create your first website and you will get a public key to drop into your React or Next.js project. If someone has invited you to edit theirs, it will appear here instead."
+              : "Pagecraft is ₹999 a month for one website, and another ₹999 for each one after that. There is no free trial — pick a plan and your first website is ready in a moment. If someone has invited you to edit theirs, it will appear here instead."
+          }
           action={
-            <Button variant="primary" onClick={() => setCreating(true)}>
-              + New website
+            <Button variant="primary" onClick={startCreating}>
+              {canAdd ? "+ New website" : "Choose a plan · ₹999/mo"}
             </Button>
           }
         />

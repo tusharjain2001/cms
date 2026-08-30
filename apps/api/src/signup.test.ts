@@ -21,6 +21,7 @@ let server: Server;
 let baseUrl: string;
 let disconnect: () => Promise<void>;
 let resetRateLimits: () => void;
+let User: typeof import("./models/user.js").User;
 const outbox: SentMail[] = [];
 
 before(async () => {
@@ -42,6 +43,7 @@ before(async () => {
   const { createApp } = await import("./app.js");
   const { captureMail } = await import("./lib/mailer.js");
   ({ resetRateLimits } = await import("./middleware/rate-limit.js"));
+  ({ User } = await import("./models/user.js"));
 
   await connectDb(process.env.MONGODB_URI);
   disconnect = disconnectDb;
@@ -101,6 +103,42 @@ function tokenFrom(email: string): string {
 }
 
 const lastMailTo = (email: string) => [...outbox].reverse().find((m) => m.to === email);
+
+/**
+ * Puts an account on a live subscription for `websites` sites.
+ *
+ * Websites are the thing money buys, so any test that needs one has to say so
+ * explicitly — which is exactly the behaviour worth pinning down.
+ */
+const grantWebsites = (email: string, websites: number) =>
+  User.updateOne(
+    { email },
+    { $set: { plan: "starter", subscription: { status: "active", websites, period: "monthly" } } }
+  );
+
+/**
+ * A brand-new account cannot build anything until it pays. This is the whole
+ * shape of the business, so it is asserted here rather than only in the quota
+ * suite: signing up is free, building is not.
+ */
+describe("what a new account may do before paying", () => {
+  it("refuses to create a website until there is a subscription", async () => {
+    const email = "browsing@example.com";
+    await signUp(email);
+    const session = await api("/api/auth/verify-email", {
+      method: "POST",
+      body: { token: tokenFrom(email) },
+    });
+
+    const res = await api("/api/projects", {
+      method: "POST",
+      token: session.json.data.accessToken,
+      body: { name: "Not Yet" },
+    });
+    assert.equal(res.status, 402);
+    assert.equal(res.json.code, "subscription_required");
+  });
+});
 
 /* ------------------------------------------------------------- signing up */
 
@@ -365,7 +403,11 @@ describe("closing an account", () => {
     });
     const token = session.json.data.accessToken;
 
-    await api("/api/projects", { method: "POST", token, body: { name: "Still Live" } });
+    // A fresh signup is entitled to zero websites — there is no free trial —
+    // so this one has to be paid for before it can exist at all.
+    await grantWebsites(email, 1);
+    const made = await api("/api/projects", { method: "POST", token, body: { name: "Still Live" } });
+    assert.equal(made.status, 201);
 
     const res = await api("/api/auth/me", { method: "DELETE", token });
     assert.equal(res.status, 400);

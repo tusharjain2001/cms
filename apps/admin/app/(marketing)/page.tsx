@@ -229,9 +229,9 @@ export default function LandingPage() {
                 </Print>
                 <Print delay={260}>
                   <div className="mt-7 flex flex-wrap items-center gap-4">
-                    <ButtonLink href={links.signUp}>Create a free account</ButtonLink>
+                    <ButtonLink href={links.signUp}>Get started · ₹999 a month</ButtonLink>
                     <span className="text-[13.5px] text-quiet">
-                      14 days free, no card. Your developer connects the site once.
+                      ₹999 a month for one website. Your developer connects the site once.
                     </span>
                   </div>
                 </Print>
@@ -424,8 +424,8 @@ export default function LandingPage() {
               <Print delay={140}>
                 <p className="max-w-[300px] text-[14.5px] leading-[1.55] text-quiet">
                   Anything else, mail{" "}
-                  <a href={links.contact} className="font-medium text-accent hover:underline">
-                    hello@pagecraft.dev
+                  <a href={links.contactEmail} className="font-medium text-accent hover:underline">
+                    hello@mypagecraft.com
                   </a>{" "}
                   and a human answers, usually the same day.
                 </p>
@@ -511,7 +511,7 @@ export default function LandingPage() {
                 </p>
                 <div className="mt-8 flex flex-wrap justify-center gap-3">
                   <ButtonLink href={links.signUp} className="px-6! hover:animate-celebrate">
-                    Create a free account
+                    Get started · ₹999 a month
                   </ButtonLink>
                   <ButtonLink href={links.docs} tone="outline" className="px-6!">
                     Read the developer docs

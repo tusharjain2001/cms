@@ -7,6 +7,8 @@
  * server-side validation the dashboard does not need).
  */
 export type {
+  BillingPeriod,
+  CheckoutDTO,
   FieldDef,
   FieldKind,
   FileValue,
@@ -22,6 +24,8 @@ export type {
   SectionContent,
   SectionDTO,
   SectionTypeDef,
+  SubscriptionDTO,
+  SubscriptionStatus,
   UserDTO,
   WireKind,
 } from "@pagecraft/shared";

@@ -27,7 +27,13 @@ export interface ApiIssue {
 }
 
 /** Matches `ApiErrorCode` in @pagecraft/shared. */
-export type ApiCode = "email_not_verified" | "email_not_configured" | "quota_exceeded";
+export type ApiCode =
+  | "email_not_verified"
+  | "email_not_configured"
+  | "quota_exceeded"
+  /** No live subscription — the dashboard sends these to /billing. */
+  | "subscription_required"
+  | "billing_not_configured";
 
 export class ApiError extends Error {
   constructor(

@@ -54,7 +54,11 @@ before(async () => {
 
   await User.create({
     email: "dev@example.com",
-    plan: "business", // this fixture owns several sites; quotas are tested elsewhere
+    // This fixture owns several websites, so it needs a subscription that
+    // covers them — under per-website pricing an account with none is allowed
+    // zero. The website cap itself is tested in signup.test.ts.
+    plan: "starter",
+    subscription: { status: "active", websites: 20, period: "monthly" },
     name: "Dev",
     emailVerifiedAt: new Date(),
     passwordHash: await hashPassword("correct-horse"),

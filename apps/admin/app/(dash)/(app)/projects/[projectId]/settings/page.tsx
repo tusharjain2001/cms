@@ -1,13 +1,14 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { API_URL } from "@/lib/api";
 import { useStore } from "@/lib/store";
-import { Button, Card, CardTitle, Input, cx } from "@/components/ui";
+import { Button, Card, CardTitle, Input, Modal, ModalActions, cx } from "@/components/ui";
 
 export default function SettingsScreen() {
   const s = useStore();
+  const router = useRouter();
   const params = useParams<{ projectId: string }>();
   const project = s.project;
 
@@ -16,6 +17,15 @@ export default function SettingsScreen() {
   const [revalidateUrl, setRevalidateUrl] = useState("");
   const [secret, setSecret] = useState("");
   const [revealed, setRevealed] = useState(false);
+
+  /**
+   * Deleting a website is irreversible and takes its pages, media and tokens
+   * with it, so the owner types the website's name to confirm. A yes/no dialog
+   * is the wrong guard for something a mis-click cannot undo.
+   */
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [typedName, setTypedName] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (params.projectId && params.projectId !== s.projectId) s.setProjectId(params.projectId);
@@ -27,6 +37,18 @@ export default function SettingsScreen() {
     setDomain(project.domain);
     setRevalidateUrl(project.revalidateUrl ?? "");
   }, [project?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function reallyDelete() {
+    if (!project) return;
+    setDeleting(true);
+    const gone = await s.deleteProject(project.id);
+    setDeleting(false);
+    if (gone) {
+      setConfirmingDelete(false);
+      // Back to the list: this screen belongs to a website that no longer exists.
+      router.push("/projects");
+    }
+  }
 
   if (!project) {
     return <div className="px-6 py-10 text-label text-muted lg:px-11">Loading settings…</div>;
@@ -200,7 +222,61 @@ PAGECRAFT_API_KEY=${revealed ? project.apiKey : masked}
 #   header: x-api-key: <your key>`}
           </pre>
         </Card>
+
+        {/* ------------------------------------------------------ danger zone */}
+        <Card className="border-destructive-line bg-destructive-bg">
+          <CardTitle sub="Deleting a website removes its pages, sections, photos and access tokens for good. There is no undo.">
+            Delete this website
+          </CardTitle>
+          <p className="text-label leading-[1.55] text-quiet">
+            Your live site keeps serving the pages it last built, but its API key stops working —
+            so the next time it is deployed, that build will fail. Point it at another website
+            first, or take it down.
+          </p>
+          <p className="mt-2 text-label leading-[1.55] text-quiet">
+            This frees the slot on your plan, so you can add a different website in its place.
+          </p>
+          <div className="mt-4">
+            <Button variant="danger" onClick={() => { setTypedName(""); setConfirmingDelete(true); }}>
+              Delete website
+            </Button>
+          </div>
+        </Card>
       </div>
+
+      {/* The guard is typing the name, not pressing Yes: this cannot be undone,
+          and it is reachable one click from ordinary settings. */}
+      <Modal open={confirmingDelete} onClose={() => setConfirmingDelete(false)}>
+        <div className="p-6">
+          <h2 className="text-modal font-bold">Delete “{project.name}”?</h2>
+          <p className="mt-2 text-label leading-[1.55] text-quiet">
+            This deletes {s.pages.length === 1 ? "its 1 page" : `its ${s.pages.length} pages`}, every
+            section in them, all of its photos and files, and any access tokens you have minted. It
+            cannot be undone.
+          </p>
+          <label className="mt-5 flex flex-col gap-2">
+            <span className="text-label font-semibold">
+              Type <span className="font-mono text-ink">{project.name}</span> to confirm
+            </span>
+            <Input
+              autoFocus
+              value={typedName}
+              placeholder={project.name}
+              onChange={(e) => setTypedName(e.target.value)}
+            />
+          </label>
+          <ModalActions>
+            <Button onClick={() => setConfirmingDelete(false)}>Cancel</Button>
+            <Button
+              variant="danger"
+              disabled={typedName.trim() !== project.name || deleting}
+              onClick={() => void reallyDelete()}
+            >
+              {deleting ? "Deleting…" : "Delete this website"}
+            </Button>
+          </ModalActions>
+        </div>
+      </Modal>
     </div>
   );
 }

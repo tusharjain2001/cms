@@ -13,10 +13,13 @@ import { links } from "@/lib/links";
  * sequence. Bands reveal with print-wipes; the only interactivity is the
  * monthly/yearly toggle inside <PricingPlans>.
  *
- * One account is one website, and the website's owner pays for it. Two plans,
- * separated by how big the site is. See the header comment in
- * `components/landing/pricing-plans.tsx` for why the axes are what they are,
- * and the pricing note in CLAUDE.md for what is not yet enforced.
+ * THE MODEL: you pay per website. One is ₹999 a month, two is ₹1,998, three
+ * is ₹2,997 — a ladder, not a set of feature tiers, because website count is the one
+ * number a customer knows before they buy. **There is no free trial**, and the
+ * API genuinely enforces that: a fresh account may own zero websites. See the
+ * header comment in `components/landing/pricing-plans.tsx` for why the old
+ * two-tier table was replaced, and do not put a trial back on this page
+ * without changing `websiteAllowance()` first.
  *
  * Copy is aimed at the person paying — a shop or practice owner, not a
  * developer. That is a deliberate shift from the landing page, which speaks to
@@ -24,7 +27,7 @@ import { links } from "@/lib/links";
  */
 
 const description =
-  "One website, one simple price. Edit your own words and photos, and your site updates itself. From $9 a month, with 14 days free.";
+  "₹999 a month per website. Edit your own words and photos, and your site updates itself. Add a second website for another ₹999 — no tiers, no trial, no surprises.";
 
 export const metadata: Metadata = {
   title: "Pricing",
@@ -32,57 +35,73 @@ export const metadata: Metadata = {
   openGraph: { type: "website", siteName: "Pagecraft", title: "Pricing · Pagecraft", description },
 };
 
-const COMPARISON: { label: string; starter: string; business: string }[] = [
-  { label: "Pages on your website", starter: "Up to 10", business: "Unlimited" },
-  { label: "Photos and files", starter: "5 GB", business: "50 GB" },
-  { label: "Sections per page", starter: "Unlimited", business: "Unlimited" },
-  { label: "Edits and publishing", starter: "Unlimited", business: "Unlimited" },
-  { label: "Section types", starter: "All nine", business: "All nine" },
-  { label: "Preview before publishing", starter: "Yes", business: "Yes" },
-  { label: "Your site updates itself on publish", starter: "Yes", business: "Yes" },
-  { label: "Download everything as a file", starter: "Yes", business: "Yes" },
-  { label: "Support", starter: "Email", business: "Email, one working day" },
+/**
+ * The ladder written out. Not a feature comparison — there is nothing to
+ * compare, because every website gets everything. The only thing that changes
+ * down this table is the number of sites and the number on the bill.
+ */
+const LADDER = [1, 2, 3, 5, 10].map((websites) => ({
+  websites,
+  monthly: `₹${(websites * 999).toLocaleString("en-IN")}`,
+  yearly: `₹${(websites * 9990).toLocaleString("en-IN")}`,
+}));
+
+/** What a website includes, at every rung. */
+const INCLUDED: { label: string; value: string }[] = [
+  { label: "Pages on your website", value: "Unlimited" },
+  { label: "Photos and files", value: "10 GB per website" },
+  { label: "Sections per page", value: "Unlimited" },
+  { label: "Edits and publishing", value: "Unlimited" },
+  { label: "Section types", value: "All nine" },
+  { label: "Preview before publishing", value: "Yes" },
+  { label: "Your site updates itself on publish", value: "Yes" },
+  { label: "Download everything as a file", value: "Yes" },
+  { label: "Support", value: "Email, one working day" },
 ];
 
 const ADD_ONS = [
   {
     title: "More space for photos",
-    body: "Photos are resized automatically before they are stored, so most websites never come close. You get an email long before it matters.",
-    price: "$2",
+    body: "10 GB per website is included, and photos are resized automatically before they are stored — most websites never come close. You get an email long before it matters.",
+    price: "₹199",
     unit: "per 10 GB / month",
   },
   {
     title: "A new kind of section",
     body: "For your developer. We build the section type to their design and it appears in your dashboard like any other.",
-    price: "$180",
+    price: "₹14,999",
     unit: "one-off",
   },
 ];
 
 const FAQS = [
   {
-    q: "Do I pay, or does my developer?",
-    a: "Whoever holds the account pays. Most owners pay for it themselves and keep the sign-in, so the website stays theirs even if they change developer later. Some developers prefer to carry it inside a care plan — either works.",
-  },
-  {
-    q: "Can my developer edit it too?",
-    a: "Yes. Share your sign-in with them and you both work in the same dashboard. There is nothing extra to buy for a second person.",
+    q: "Is there a free trial?",
+    a: "No. Signing up, looking around the dashboard and reading the developer docs cost nothing, but creating a website is a purchase — ₹999 for the first month. We would rather charge honestly on day one than run a clock you have to remember to cancel.",
   },
   {
     q: "What counts as one website?",
-    a: "Everything at one address — every page, every section, every photo. If you run a second website, that is a second account and a second subscription.",
+    a: "Everything at one address — every page, every section, every photo. A second website is a second ₹999 a month, on the same account and the same bill.",
   },
   {
-    q: "What happens after the 14 days?",
-    a: "We ask for a card, not before. Nothing is charged during the trial and there is nothing to cancel if you walk away.",
+    q: "Can I add a website later?",
+    a: "Any time, from Plan & billing. It takes effect immediately, the difference is prorated, and you are not asked for your card again. Removing one works the same way — delete the website first, then reduce the plan.",
+  },
+  {
+    q: "Do I pay, or does my developer?",
+    a: "Whoever holds the account pays. Most owners pay for it themselves and keep the sign-in, so the website stays theirs even if they change developer later. A developer who looks after several client sites can also hold one account covering all of them — that is what the ladder is for.",
+  },
+  {
+    q: "Can my developer edit it too?",
+    a: "Yes. Share your sign-in with them and you both work in the same dashboard. There is nothing extra to buy for a second person — we charge for websites, not seats.",
   },
   {
     q: "What if I stop paying?",
-    a: "Your content stays readable for 30 days and you can download all of it as a file at any time. The pages already published on your website keep working regardless — your site does not go dark over a billing problem.",
+    a: "Your content stays readable and editable, and the pages already published on your website keep working — your site does not go dark over a billing problem. What stops is adding another website. You can download everything as a file at any time.",
   },
   {
-    q: "Will I outgrow Starter?",
-    a: "Only if your website passes ten pages. Nothing breaks when you do — we tell you, and moving up is one click. Most small sites never need to.",
+    q: "Which currency, and how is it charged?",
+    a: "Indian rupees, through Razorpay — cards, UPI AutoPay, net banking. We never see your card. Monthly renews every month; yearly is ₹9,990 a website, twelve months for the price of ten.",
   },
 ];
 
@@ -111,12 +130,13 @@ export default function PricingPage() {
               as="h1"
               className="mx-auto max-w-[820px] font-display text-[clamp(2.75rem,6.5vw,4rem)] font-extrabold leading-[0.94] tracking-[-0.025em]"
             >
-              One website. One simple price.
+              ₹999 a month. Per website.
             </Print>
-            <Print delay={90} className="mx-auto mt-5 max-w-[600px]">
+            <Print delay={90} className="mx-auto mt-5 max-w-[620px]">
               <p className="text-[16px] leading-[1.6] text-quiet sm:text-[17px]">
                 Less than a site builder, and your website stays exactly as your designer made it.
-                Try it for fourteen days without giving us a card.
+                Two websites is ₹1,998, three is ₹2,997 — no tiers to decode, and nothing held back on a
+                cheaper one.
               </p>
             </Print>
           </Band>
@@ -130,61 +150,61 @@ export default function PricingPage() {
             <Print delay={90}>
               <div className="mx-auto mt-4 flex max-w-[760px] flex-wrap items-center gap-3.5 rounded-xl border border-line bg-surface px-5 py-4">
                 <p className="text-sub text-quiet">
-                  Both plans include every section type, unlimited edits, preview links and automatic
-                  publishing to your live website. Nothing about the product is held back on the
-                  cheaper plan — you are only paying for a bigger site.
+                  There is no free trial: signing up and looking around costs nothing, but creating
+                  a website is a purchase. We would rather charge honestly on day one than run a
+                  clock you have to remember to cancel.
                 </p>
                 <Link
                   href={links.signUp}
                   className="ml-auto text-sub font-semibold text-accent hover:underline"
                 >
-                  Start your 14 days →
+                  Get started →
                 </Link>
               </div>
             </Print>
           </Band>
 
-          {/* --------------------------------------------------- comparison */}
+          {/* ------------------------------------------------------- the ladder */}
           <Band stage="paper" className="pt-19">
             <Print as="header">
-              <SectionHead>The details, side by side</SectionHead>
+              <SectionHead>The whole price list</SectionHead>
             </Print>
             <Print delay={70}>
               <div className="mt-5.5 overflow-x-auto rounded-2xl border border-line bg-surface">
-                <table className="w-full min-w-[560px] border-collapse text-left">
+                <table className="w-full min-w-[480px] border-collapse text-left">
                   <thead>
                     <tr className="border-b border-line bg-sunken">
-                      <th scope="col" className="w-[46%] px-5.5 py-4">
-                        <span className="sr-only">Feature</span>
+                      <th scope="col" className="w-[46%] px-5.5 py-4 text-label font-semibold">
+                        Websites
                       </th>
                       <th
                         scope="col"
                         className="border-l border-line-mid px-4 py-4 text-label font-semibold"
                       >
-                        Starter
+                        Monthly
                       </th>
                       <th
                         scope="col"
-                        className="border-l border-line-mid px-4 py-4 text-label font-bold text-accent"
+                        className="border-l border-line-mid px-4 py-4 text-label font-semibold"
                       >
-                        Business
+                        Yearly
                       </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {COMPARISON.map((row) => (
-                      <tr key={row.label} className="border-b border-line-soft last:border-b-0">
+                    {LADDER.map((row) => (
+                      <tr key={row.websites} className="border-b border-line-soft last:border-b-0">
                         <th
                           scope="row"
-                          className="px-5.5 py-3.5 text-left text-sub font-medium text-ink"
+                          className="px-5.5 py-3.5 text-left text-sub font-medium text-ink tabular-nums"
                         >
-                          {row.label}
+                          {row.websites} website{row.websites === 1 ? "" : "s"}
                         </th>
-                        <td className="border-l border-line-mid px-4 py-3.5 text-label text-quiet tabular-nums">
-                          {row.starter}
-                        </td>
                         <td className="border-l border-line-mid px-4 py-3.5 text-label font-medium text-ink tabular-nums">
-                          {row.business}
+                          {row.monthly} / mo
+                        </td>
+                        <td className="border-l border-line-mid px-4 py-3.5 text-label text-quiet tabular-nums">
+                          {row.yearly} / yr
                         </td>
                       </tr>
                     ))}
@@ -194,12 +214,40 @@ export default function PricingPage() {
             </Print>
 
             <p className="mt-4 text-sub leading-[1.6] text-quiet">
-              Look after several websites and want them under one sign-in?{" "}
+              It carries on at ₹999 each up to twenty websites. Past that,{" "}
               <a href={links.contact} className="font-semibold text-accent hover:underline">
-                Tell us what you need
+                tell us what you need
               </a>{" "}
-              — that is a conversation, not a column on a table.
+              — that is a conversation, not another row on a table.
             </p>
+          </Band>
+
+          {/* -------------------------------------- what a website includes */}
+          <Band stage="paper" className="pt-19">
+            <Print as="header">
+              <SectionHead>What every website includes</SectionHead>
+            </Print>
+            <p className="mt-3 max-w-[620px] text-[15px] leading-[1.6] text-quiet">
+              All of it, on every website you pay for. There is no cheaper rung that holds features
+              back — the only thing the price tracks is how many sites you run.
+            </p>
+            <Print delay={70}>
+              <div className="mt-5.5 overflow-hidden rounded-2xl border border-line bg-surface">
+                <dl>
+                  {INCLUDED.map((row) => (
+                    <div
+                      key={row.label}
+                      className="flex flex-wrap items-baseline justify-between gap-4 border-b border-line-soft px-5.5 py-3.5 last:border-b-0"
+                    >
+                      <dt className="text-sub font-medium text-ink">{row.label}</dt>
+                      <dd className="text-label font-medium text-quiet tabular-nums">
+                        {row.value}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            </Print>
           </Band>
 
           {/* ------------------------------------------------------ add-ons */}
@@ -231,8 +279,8 @@ export default function PricingPage() {
                 </Print>
                 <p className="mt-3 text-[15px] leading-[1.6] text-quiet">
                   Anything unclear, mail{" "}
-                  <a href={links.contact} className="font-medium text-accent hover:underline">
-                    hello@pagecraft.dev
+                  <a href={links.contactEmail} className="font-medium text-accent hover:underline">
+                    hello@mypagecraft.com
                   </a>{" "}
                   before you pay, not after.
                 </p>
@@ -259,11 +307,11 @@ export default function PricingPage() {
                   Change your own website today.
                 </h2>
                 <p className="mx-auto mt-3.5 max-w-[540px] text-[15.5px] leading-[1.6] text-slate sm:text-[16px]">
-                  Fourteen days free, no card. Change a headline, swap a photo, press Publish, and
-                  watch your live website update itself.
+                  ₹999 a month, cancel whenever. Change a headline, swap a photo, press Publish,
+                  and watch your live website update itself.
                 </p>
                 <div className="mt-6.5 flex flex-wrap justify-center gap-2.5">
-                  <ButtonLink href={links.signUp}>Start 14 days free</ButtonLink>
+                  <ButtonLink href={links.signUp}>Get started · ₹999 a month</ButtonLink>
                   <ButtonLink href="/" tone="outline">
                     Back to the overview
                   </ButtonLink>

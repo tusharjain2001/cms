@@ -14,13 +14,24 @@ import { PagecraftMark } from "@/components/logo";
  * edge-to-edge at full height.
  */
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { status } = useAuth();
+  const { status, signedOutTo } = useAuth();
   const router = useRouter();
   const [drawer, setDrawer] = useState(false);
 
+  /**
+   * Sends away anyone without a session — but not always to the same place.
+   *
+   * `signedOutTo` is `/login` for someone who arrived at a dashboard URL with
+   * no session, or whose session expired underneath them: they want back in.
+   * It is `/` when they pressed Sign out, because that is someone leaving.
+   *
+   * Hard-coding `/login` here is what made an earlier attempt at this fail:
+   * this shell is still mounted when `status` flips, so its redirect fires
+   * *after* the sign-out has already navigated, and quietly overrules it.
+   */
   useEffect(() => {
-    if (status === "signedOut") router.replace("/login");
-  }, [status, router]);
+    if (status === "signedOut") router.replace(signedOutTo);
+  }, [status, signedOutTo, router]);
 
   if (status !== "signedIn") {
     return (

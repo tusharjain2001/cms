@@ -16,7 +16,8 @@
     "mcp": "npm run shared && npm run build --workspace @mypagecraft/mcp && npm run start --workspace @mypagecraft/mcp",
     "test": "npm run shared && npm run test --workspaces --if-present",
     "typecheck": "npm run shared && npm run typecheck --workspaces --if-present",
-    "seed": "npm run shared && npm run seed --workspace @pagecraft/api"
+    "seed": "npm run shared && npm run seed --workspace @pagecraft/api",
+    "setup:razorpay": "npm run shared && npm run setup:razorpay --workspace @pagecraft/api"
   },
   "devDependencies": {
     "concurrently": "^10.0.5"

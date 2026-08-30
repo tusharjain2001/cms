@@ -30,14 +30,28 @@ export const links = {
   owners: "/#owners",
   developers: "/#code",
 
-  contact: "mailto:hello@pagecraft.dev",
-
   docs: "/docs",
+
+  /**
+   * The policy pages. Razorpay will not verify a website for payments without
+   * all four, so these are load-bearing rather than decorative — see
+   * `lib/legal.ts` for the one file that fills in the business details.
+   *
+   * `contact` is a page rather than a `mailto:` on purpose: a payment
+   * provider's reviewer needs to see a postal address and a phone number, and
+   * a mail client opening is not evidence of either.
+   */
+  contact: "/contact",
+  terms: "/terms",
+  privacy: "/privacy",
+  refunds: "/refunds",
+
+  /** The mailbox itself, for the places that genuinely want to open a mail client. */
+  contactEmail: "mailto:hello@mypagecraft.com",
 
   // Not written yet.
   sdkReference: TODO,
   selfHosting: TODO,
   github: TODO,
   status: TODO,
-  privacy: TODO,
 } satisfies Record<string, string>;

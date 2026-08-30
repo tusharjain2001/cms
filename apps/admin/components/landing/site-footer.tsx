@@ -25,9 +25,22 @@ const COLUMNS = [
   {
     heading: "Company",
     items: [
-      { label: "Contact", href: links.contact },
+      { label: "Contact us", href: links.contact },
       { label: "Status", href: links.status },
+    ],
+  },
+  /**
+   * The policy pages get their own column rather than being tucked into the
+   * meta line. A payment provider's reviewer has to find all four from the
+   * footer of any page, and so does a customer looking for the refund terms
+   * at the moment they want their money back.
+   */
+  {
+    heading: "Legal",
+    items: [
+      { label: "Terms", href: links.terms },
       { label: "Privacy", href: links.privacy },
+      { label: "Refunds", href: links.refunds },
     ],
   },
 ];
@@ -52,7 +65,7 @@ export function SiteFooter() {
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-x-12 gap-y-9 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-x-12 gap-y-9 sm:grid-cols-4">
             {COLUMNS.map((col) => (
               <div key={col.heading} className="flex flex-col gap-2.5">
                 <h2 className="text-helper font-semibold tracking-[0.08em] uppercase text-muted">

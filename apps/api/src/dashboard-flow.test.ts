@@ -43,7 +43,11 @@ before(async () => {
   disconnect = disconnectDb;
   await User.create({
     email: "maya@studio.test",
-    plan: "business", // this fixture owns several sites; quotas are tested elsewhere
+    // This fixture owns several websites, so it needs a subscription that
+    // covers them — under per-website pricing an account with none is allowed
+    // zero. The website cap itself is tested in signup.test.ts.
+    plan: "starter",
+    subscription: { status: "active", websites: 20, period: "monthly" },
     name: "Maya Kessler",
     emailVerifiedAt: new Date(),
     passwordHash: await hashPassword("open-sesame"),

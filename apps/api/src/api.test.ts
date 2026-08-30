@@ -38,7 +38,18 @@ before(async () => {
 
   // Two ordinary, unrelated accounts — the everyday case now that signup is
   // open — plus the one platform administrator, who is created by seeding.
+  //
+  // They carry a live subscription because websites are what money buys: an
+  // account with none is allowed zero of them, so a fixture that builds
+  // websites has to be paying for them. The ceiling itself is tested in
+  // project-tokens.test.ts, not here.
+  const subscribed = {
+    plan: "starter",
+    subscription: { status: "active", websites: 10, period: "monthly" },
+  };
+
   await User.create({
+    ...subscribed,
     email: "dev@example.com",
     name: "Dev",
     emailVerifiedAt: new Date(),
@@ -46,6 +57,7 @@ before(async () => {
     projectIds: [],
   });
   await User.create({
+    ...subscribed,
     email: "client@example.com",
     name: "Client",
     emailVerifiedAt: new Date(),
@@ -53,6 +65,7 @@ before(async () => {
     projectIds: [],
   });
   await User.create({
+    ...subscribed,
     email: "boss@example.com",
     name: "Boss",
     emailVerifiedAt: new Date(),

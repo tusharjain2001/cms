@@ -19,6 +19,7 @@ let disconnect: () => Promise<void>;
 let Page: typeof import("./models/page.js").Page;
 let Media: typeof import("./models/media.js").Media;
 let ProjectToken: typeof import("./models/project-token.js").ProjectToken;
+let User: typeof import("./models/user.js").User;
 
 before(async () => {
   mongo = await MongoMemoryServer.create();
@@ -31,7 +32,8 @@ before(async () => {
 
   const { connectDb, disconnectDb } = await import("./db.js");
   const { createApp } = await import("./app.js");
-  const { User, hashPassword } = await import("./models/user.js");
+  const { User: UserModel, hashPassword } = await import("./models/user.js");
+  User = UserModel;
   ({ Page } = await import("./models/page.js"));
   ({ Media } = await import("./models/media.js"));
   ({ ProjectToken } = await import("./models/project-token.js"));
@@ -45,6 +47,10 @@ before(async () => {
     emailVerifiedAt: new Date(),
     passwordHash: await hashPassword("owner-pass"),
     projectIds: [],
+    // Websites are what money buys, so a fixture that owns any must pay for
+    // them — an account with no live subscription is allowed zero.
+    plan: "starter",
+    subscription: { status: "active", websites: 5, period: "monthly" },
   });
   await User.create({
     email: "other@example.com",
@@ -52,6 +58,10 @@ before(async () => {
     emailVerifiedAt: new Date(),
     passwordHash: await hashPassword("other-pass"),
     projectIds: [],
+    // Subscribed to start with, because the isolation tests need it to own a
+    // website. The ceiling suite below strips this back down deliberately.
+    plan: "starter",
+    subscription: { status: "active", websites: 5, period: "monthly" },
   });
 
   server = createApp().listen(0);
@@ -233,21 +243,95 @@ describe("deleting a website cascades", () => {
   });
 });
 
-describe("plan quotas", () => {
-  it("refuses a second website on the Free plan with a 402", async () => {
-    const token = await login("other@example.com", "other-pass");
-    // Clear any projects this account has so it starts at zero.
+/**
+ * The website ceiling — the one quota that carries money.
+ *
+ * Under per-website pricing there is no free trial, so these two cases are the
+ * whole rule: nothing without a subscription, and never more websites than the
+ * subscription's quantity.
+ */
+describe("the website ceiling", () => {
+  /** Puts an account on a live subscription for `websites` sites. */
+  const grant = (email: string, websites: number) =>
+    User.updateOne(
+      { email },
+      { $set: { plan: "starter", subscription: { status: "active", websites, period: "monthly" } } }
+    );
+
+  /** Puts an account back to never-subscribed, owning nothing. */
+  async function reset(email: string, token: string) {
     const existing = await api("/api/projects", { token });
     for (const p of existing.json.data as Json[]) {
       await api(`/api/projects/${p.id}`, { method: "DELETE", token });
     }
+    await User.updateOne(
+      { email },
+      { $set: { plan: "free", subscription: { status: "none", websites: 0, period: "monthly" } } }
+    );
+  }
+
+  it("refuses the very first website when nobody has paid — there is no free trial", async () => {
+    const email = "other@example.com";
+    const token = await login(email, "other-pass");
+    await reset(email, token);
+
+    const res = await api("/api/projects", { method: "POST", token, body: { name: "Site One" } });
+    assert.equal(res.status, 402);
+    assert.equal(res.json.code, "subscription_required");
+    // The refusal has to name the price, or the person reading it has no idea
+    // what to do next.
+    assert.match(res.json.error, /₹999 a month/);
+    assert.match(res.json.error, /no free trial/i);
+  });
+
+  it("allows exactly the number of websites the subscription covers", async () => {
+    const email = "other@example.com";
+    const token = await login(email, "other-pass");
+    await reset(email, token);
+    await grant(email, 1);
 
     const first = await api("/api/projects", { method: "POST", token, body: { name: "Site One" } });
     assert.equal(first.status, 201);
 
     const second = await api("/api/projects", { method: "POST", token, body: { name: "Site Two" } });
     assert.equal(second.status, 402);
-    assert.equal(second.json.code, "quota_exceeded");
-    assert.match(second.json.error, /Free plan/);
+    assert.equal(second.json.code, "subscription_required");
+    // And it quotes the price of the next rung, not a generic "upgrade".
+    assert.match(second.json.error, /covers 1 website/);
+    assert.match(second.json.error, /₹1,998 a month/);
+  });
+
+  it("lets a bigger subscription hold more websites", async () => {
+    const email = "other@example.com";
+    const token = await login(email, "other-pass");
+    await reset(email, token);
+    await grant(email, 3);
+
+    for (const name of ["One", "Two", "Three"]) {
+      const res = await api("/api/projects", { method: "POST", token, body: { name } });
+      assert.equal(res.status, 201, `expected ${name} to be allowed`);
+    }
+    const fourth = await api("/api/projects", { method: "POST", token, body: { name: "Four" } });
+    assert.equal(fourth.status, 402);
+    assert.match(fourth.json.error, /₹3,996 a month/);
+  });
+
+  it("stops counting once the subscription lapses", async () => {
+    const email = "other@example.com";
+    const token = await login(email, "other-pass");
+    await reset(email, token);
+    await grant(email, 2);
+    assert.equal(
+      (await api("/api/projects", { method: "POST", token, body: { name: "Kept" } })).status,
+      201
+    );
+
+    // Retries exhausted. The website already built stays — nobody's live site
+    // goes dark over a card — but no new one may be added.
+    await User.updateOne({ email }, { $set: { "subscription.status": "halted" } });
+
+    const res = await api("/api/projects", { method: "POST", token, body: { name: "Blocked" } });
+    assert.equal(res.status, 402);
+    assert.equal((await api("/api/projects", { token })).json.data.length, 1);
   });
 });

@@ -9,6 +9,7 @@ import sectionTypeRoutes from "./routes/section-types.js";
 import pageRoutes from "./routes/pages.js";
 import mediaRoutes from "./routes/media.js";
 import contentRoutes from "./routes/content.js";
+import billingRoutes, { razorpayWebhookRouter } from "./routes/billing.js";
 
 /**
  * The Express app, separate from the server bootstrap so tests can mount it
@@ -29,6 +30,12 @@ export function createApp() {
       credentials: true, // the refresh cookie has to travel
     })
   );
+  // Razorpay signs its webhook over the EXACT bytes it sent, so that one route
+  // has to see the raw body — which means mounting it above the JSON parser.
+  // Once express.json has read the stream there is no way back to the bytes,
+  // and the digest silently stops matching, presenting as "payments never
+  // activate". Everything else in billing is ordinary JSON and mounts below.
+  app.use("/api/billing/webhook", razorpayWebhookRouter);
   app.use(express.json({ limit: "2mb" }));
   app.use(cookieParser());
 
@@ -37,6 +44,7 @@ export function createApp() {
   });
 
   app.use("/api/auth", authRoutes);
+  app.use("/api/billing", billingRoutes);
   app.use("/api/projects", projectRoutes);
   app.use("/api/section-types", sectionTypeRoutes);
   // Read-only, API-key authenticated. This is what client websites call.

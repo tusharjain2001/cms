@@ -65,6 +65,11 @@ interface Store {
   createProject: (name: string, domain: string) => Promise<ProjectDTO | null>;
   updateProject: (patch: Partial<ProjectDTO> & { revalidateSecret?: string }) => Promise<void>;
   rotateApiKey: () => Promise<void>;
+  /**
+   * Deletes a website and everything in it. Returns true only if the API
+   * confirmed it, so the caller knows whether it is safe to navigate away.
+   */
+  deleteProject: (id: string) => Promise<boolean>;
 
   // pages
   pages: PageSummaryDTO[];
@@ -196,6 +201,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   );
 
   /* ------------------------------------------------------- initial loading */
+
+  /**
+   * Empties the dashboard the moment a session ends.
+   *
+   * Signing out deliberately leaves for `/`, which unmounts this whole
+   * provider and takes the state with it — but a session that *expires* lands
+   * on `/login`, which sits inside the same `(dash)` tree, so this provider
+   * stays mounted and would keep the previous account's websites in memory.
+   * On a shared computer the next person would see them flash up before the
+   * refetch below replaced them.
+   */
+  useEffect(() => {
+    if (status !== "signedOut") return;
+    setSectionTypes([]);
+    setProjects([]);
+    setProjectIdState("");
+    setPages([]);
+    setPage(null);
+    setSelected("");
+  }, [status]);
 
   useEffect(() => {
     if (status !== "signedIn") return;
@@ -744,6 +769,34 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [pushToast, reportError]
   );
 
+  /**
+   * Deletes a website outright — its pages, sections, media and tokens go with
+   * it, and the API removes the stored files from R2 too. There is no undo and
+   * no soft delete, which is why the settings screen makes the owner type the
+   * website's name before this is ever called.
+   *
+   * The selected website is cleared when it was the one deleted, so nothing is
+   * left pointing at an id the API no longer knows.
+   */
+  const deleteProject = useCallback(
+    async (id: string) => {
+      try {
+        await api(`/api/projects/${id}`, { method: "DELETE" });
+        setProjects((list) => list.filter((p) => p.id !== id));
+        // Clearing the selection also drops the open page and section, which
+        // would otherwise still be pointing into a website that no longer
+        // exists. `setProjectId` is the wrapper that does all three.
+        if (id === projectId) setProjectId("");
+        pushToast("Website deleted");
+        return true;
+      } catch (err) {
+        reportError(err);
+        return false;
+      }
+    },
+    [projectId, setProjectId, pushToast, reportError]
+  );
+
   const updateProject = useCallback(
     async (patch: Partial<ProjectDTO> & { revalidateSecret?: string }) => {
       if (!projectId) return;
@@ -803,6 +856,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     projectId,
     setProjectId,
     createProject,
+    deleteProject,
     updateProject,
     rotateApiKey,
     pages,

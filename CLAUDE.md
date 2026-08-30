@@ -60,14 +60,14 @@ cms/
 | **`npm run dev`** | **The usual one.** Rebuilds shared, then runs the API (:4000) and the dashboard (:3000) together, output prefixed `[api]` / `[admin]` |
 | `npm run dev:api` | Just the API on :4000, with watch |
 | `npm run dev:admin` | Just the dashboard on :3000 |
-| `npm test` | 248 tests: registry/validation (15), API integration against a real in-memory MongoDB (113 — including self-service accounts and a contract test that walks the dashboard's exact request sequence), SDK (43) and MCP server (77, against a stub API — no live keys) |
+| `npm test` | 286 tests: registry/validation (15), API integration against a real in-memory MongoDB (150 — including self-service accounts, the per-website billing ladder against a stubbed Razorpay, and a contract test that walks the dashboard's exact request sequence), SDK (43) and MCP server (77, against a stub API — no live keys) |
 | `npm run build` | Builds shared → sdk → mcp → api → admin |
 | `npm run typecheck` | Type-checks every workspace |
 | `npm run seed` | Creates the first developer account and a demo website |
 
 ## Data model (MongoDB)
 
-- **users**: `{ email, passwordHash, name, emailVerifiedAt, isPlatformAdmin, projectIds, sessionVersion }`. `emailVerifiedAt` is null until the emailed link is clicked, and sign-in is refused until it is set. `projectIds` lists websites this user was *invited* to; ones they **own** are not in it. `sessionVersion` is bumped on every password change and is carried in both token kinds, so a reset logs every other device out at once.
+- **users**: `{ email, passwordHash, name, emailVerifiedAt, isPlatformAdmin, projectIds, plan, subscription, sessionVersion }`. `subscription` mirrors the live Razorpay subscription — `{ status, websites, period, razorpaySubscriptionId, currentPeriodEnd, cancelAtPeriodEnd, lastEventAt }` — and `subscription.websites` is the quantity paid for, which `websiteAllowance()` turns into the ceiling on how many websites this account may own. It is mirrored rather than fetched because every page and website creation consults it, and a plan check that depended on a third party's uptime would take the CMS down with them. `emailVerifiedAt` is null until the emailed link is clicked, and sign-in is refused until it is set. `projectIds` lists websites this user was *invited* to; ones they **own** are not in it. `sessionVersion` is bumped on every password change and is carried in both token kinds, so a reset logs every other device out at once.
 - **auth_tokens**: `{ userId, kind: 'verify' | 'reset' | 'invite', tokenHash, projectId?, expiresAt, usedAt }` — the one-shot links sent by email. Deliberately **not** JWTs: a reset link that still works after it has been used is how accounts get stolen, and a database row can be burned the moment it is spent. Only a SHA-256 of the token is stored. A TTL index sweeps expired rows.
 
 **Roles are per website, not per person** (`ProjectRole = 'owner' | 'editor'`). This is the rule the whole authorization model rests on:
@@ -187,7 +187,14 @@ Where things live:
 | `components/media-picker.tsx` | The modal `pick()` opens. |
 | `app/(app)/foundation` | Live style guide — palette, type, parts, skeletons, phone layouts. Keep it current. |
 
-Routes — public: `/` (the landing page) · `/pricing` · **`/docs`** · `/login` · `/signup` · `/verify-email?token=` · `/forgot-password` · `/reset-password?token=`. Signed in: `/projects` → `/projects/[projectId]/pages` → `/projects/[projectId]/pages/[pageId]` (editor) → `/projects/[projectId]/media` → **`/projects/[projectId]/integration`** → `/projects/[projectId]/settings` → `/foundation`.
+Routes — public: `/` (the landing page) · `/pricing` · **`/docs`** · the four policy pages `/terms` `/privacy` `/refunds` `/contact` · `/login` · `/signup` · `/verify-email?token=` · `/forgot-password` · `/reset-password?token=`. Signed in: `/projects` → **`/billing`** → `/projects/[projectId]/pages` → `/projects/[projectId]/pages/[pageId]` (editor) → `/projects/[projectId]/media` → **`/projects/[projectId]/integration`** → `/projects/[projectId]/settings` → `/foundation`.
+
+**The four policy pages are a payment requirement, not decoration.** Razorpay will not verify a website for payments without Terms, a Privacy Policy, a Refund/Cancellation Policy, a Contact page carrying a **real postal address and phone number**, and public pricing. A missing one is the usual reason a verification request bounces — an email-only contact page being the most common single cause.
+
+- **`lib/legal.ts` is the only file you edit to complete them.** Business name, address, phone, GSTIN and jurisdiction live there once; all four pages read from it. Anything left as the `FILL_ME` sentinel renders through `<Fill>` as a loud inline **"TO BE FILLED IN"** marker, so an unfinished policy cannot quietly ship the word `undefined` to the reviewer who decides whether you may take money. Grep the built HTML for that string before submitting.
+- **They are server components with no `motion.tsx` import**, so they ship ~180 B of JS and prerender to static HTML. That is deliberate beyond weight: a reviewer or regulator must be able to read the text with scripts blocked.
+- **The privacy policy describes what the code actually does**, which is the part a template always gets wrong — bcrypt password hashes, SHA-256-only one-shot links, the single httpOnly refresh cookie, IPs held in memory for rate limiting and never written to Mongo, media served from **public** CDN URLs, and card details never reaching our servers. Its header comment lists the file behind each claim. Change one of those, change the page in the same commit.
+- The commercial terms in `refunds` (a 7-day full refund on a first payment) and the liability cap in `terms` are **business decisions**, flagged as such in `lib/legal.ts`. These documents are a careful draft, not legal advice.
 
 **The two integration surfaces, and why there are two.** A developer reads docs *before* signing up and needs their own key *after*, so the same material exists at two altitudes and neither replaces the other:
 
@@ -219,7 +226,7 @@ Two terminals, from the repo root:
 
 CORS and the refresh cookie are already configured for this pair; `ADMIN_ORIGIN` in the API's `.env` must match the dashboard's origin. Without SMTP set, signing up is refused — but the seeded account signs in normally, and any verification link the CMS would have emailed is printed to the API's log.
 
-Screens: Sign up → confirm email → Sign in → Projects (someone invited to exactly one website lands straight in it; owners stay on the list) → **Pages** (drag-reorder, add with auto-slug, delete w/ confirm, draft/published chips) → **Page editor** (left: section cards titled by the client-entered section `name` — falling back to the type label — drag-reorder, show/hide, delete, "+ Add section" limited to `allowedSectionTypes`; right: form auto-generated from the registry, with a "Section name (for your reference)" field at the top of every section form — repeatable rows for list fields, image picker backed by media library + R2 upload; top: Preview / **Publish** / Discard draft) → **Media library** → **Settings** (owner-only: API key, revalidate URL/secret, enabled section types, who else has access).
+Screens: Sign up → confirm email → Sign in → Projects (someone invited to exactly one website lands straight in it; owners stay on the list) → **Pages** (drag-reorder, add with auto-slug, delete w/ confirm, draft/published chips) → **Page editor** (left: section cards titled by the client-entered section `name` — falling back to the type label — drag-reorder, show/hide, delete, "+ Add section" limited to `allowedSectionTypes`; right: form auto-generated from the registry, with a "Section name (for your reference)" field at the top of every section form — repeatable rows for list fields, image picker backed by media library + R2 upload; top: Preview / **Publish** / Discard draft) → **Media library** → **Settings** (owner-only: API key, revalidate URL/secret, enabled section types, who else has access, and a danger zone that **deletes the website** — guarded by typing its name, since the API cascades pages, media, tokens and the stored R2 objects with no undo. Deleting frees the slot on the plan, which is how someone swaps one website for another.).
 
 Drafts autosave (debounced). Publish is the single action that pushes content live.
 
@@ -263,37 +270,59 @@ app/
 | `components/logo.tsx` | The p+c mark, drawn from the artboard's construction spec as ratios of its own height. Shared by marketing, the auth screens and the dashboard sidebar, so there is one mark, not four. |
 | `lib/links.ts` | Every destination the landing page points at. Plain relative paths, since it is all one origin. |
 
-**`/` is the landing page, so signing in is at `/login`.** Anything that sends a signed-out user back to sign in — `signOut`, the lost-session handler in `lib/auth.tsx`, the `(app)` layout's guard — points at `/login`, not `/`. Sending them to `/` would drop them on a marketing page.
+**`/` is the landing page, so signing in is at `/login` — but "signed out" has two meanings and they go to different places.** (Revised 31 Aug 2026; it used to send all of them to `/login`.)
+
+- **Pressing Sign out** is someone leaving, so they land on **`/`**. `signOut` in `lib/auth.tsx` owns that.
+- **Losing a session** — an expired token, a password changed on another device, or arriving at a dashboard URL with no session at all — is someone who wants back in, so they land on **`/login`**. That is the lost-session handler and the `(app)` layout's guard.
+
+`Auth.signedOutTo` is what keeps the two honest, and it is **not incidental**: the `(app)` shell is still mounted when `status` flips to `signedOut`, so its guard fires *after* the sign-out has navigated. A hard-coded `/login` there silently overrules the landing page — which is exactly how a first attempt at this failed. Set the destination on the context before flipping `status`, and let the guard read it.
+
+Both use `router.replace`, not `push`: Back must not walk into a dashboard shell the visitor has just left.
+
+**Signing out also empties the dashboard.** `/` lives in the `(marketing)` route group, so leaving for it unmounts the whole `(dash)` provider tree and the previous account's websites go with it. `/login` does **not** — it is inside `(dash)`, so `StoreProvider` survives — which is why the store clears itself on `signedOut` as well. Without that, the next person to sign in on a shared computer sees the previous account's website names flash up before the refetch replaces them.
 
 **A link with no destination renders as text, not as a dead link.** `lib/links.ts` marks unwritten pages with the `TODO` sentinel and `MaybeLink` renders those as muted text. Docs, SDK reference, self-hosting guide, GitHub, status and privacy are all still sentinels. Fill a value in and it becomes a real link everywhere it appears, with no other edit. Note that `MaybeLink` owns its own colour: pass it shape classes only, or two competing `text-*` utilities end up on the placeholder and stylesheet order decides which one shows.
 
-## Pricing (`apps/admin/app/pricing/page.tsx`) — PAGE BUILT, PRODUCT BEHIND IT IS NOT
+## Pricing & billing — BUILT (Razorpay, live-capable)
 
-**The business model — decided, do not re-derive.** *One account is one website, and the website's **owner** pays for it.* The developer who built the site does not hold the account; the owner shares their sign-in, which is the same decision recorded under "One account per website, shared by hand" in the roadmap. Two plans, separated only by how big the site is:
+**The business model — decided 30 Aug 2026, do not re-derive.** *You pay per website: ₹999 a month each.* One website is ₹999, two is ₹1,998, three is ₹2,997, up to twenty. Yearly is ₹9,990 per website — twelve months for the price of ten. Billed in **INR** through **Razorpay**, plus ₹199 per extra 10 GB and ₹14,999 for a bespoke section type.
 
-| | Starter | Business |
-|---|---|---|
-| Price | $9 / mo ($90 yr) | $19 / mo ($190 yr) |
-| Pages | up to 10 | unlimited |
-| Media | 5 GB | 50 GB |
-| Support | email | email, 1 working day |
+**The price is strictly linear, and it has to be.** Razorpay bills a subscription as `plan amount × quantity`, so a ladder that bent — ₹1,999 for two rather than ₹1,998 — could not be one plan bought twice. It would need a plan per rung, and since Razorpay cannot swap the plan on a live subscription, every change to a customer's website count would force them to re-authorise their mandate. Nobody re-enters a card over ₹1. **INR, not USD**, because Razorpay's auto-debit machinery (UPI AutoPay, e-NACH, card mandates under the RBI e-mandate framework) is built for Indian rails; USD recurring is not something a standard account can rely on.
 
-Plus a 14-day trial with no card, $2 per extra 10 GB, and $180 for a bespoke section type.
+**There is no free trial, and this is enforced, not just written.** A brand-new account's website allowance is **zero**: signing up, confirming an email and looking around are free, but creating the first website is a purchase. `websiteAllowance()` in `packages/shared/src/plans.ts` is the single function that decides, and `assertCanCreateProject` is the wall. Do not put "14 days free" back on any page without changing that function first, or the button promises what the product refuses.
 
-**Why the plans differ on page count and media, and nothing else.** The alternative model — the developer holds one account with many client websites, priced by how many — is the stronger business (fewer, stickier, higher-value customers) and is what the data model was originally shaped for. It was **considered and rejected**, because it requires invites so each client gets a login scoped to their own site; without those, one developer's clients could all edit each other's websites. Given the shared-login decision, two levers are simply unavailable:
+**Why a ladder rather than feature tiers.** The old Starter/Business table is gone. Tiers had to differ on *something*, and with one shared sign-in there were no seats to count — which left page counts and storage, proxies for size that a customer cannot predict before buying. Website count is the one number they already know, and the one that tracks what the product actually costs to run. So **every paid website gets everything**: all nine section types, unlimited pages and edits, 10 GB of media, preview links, automatic publishing. There is no cheaper rung holding features back, and therefore no feature matrix to keep in step.
 
-- **Not number of editors** — one shared sign-in means there is nobody to count.
-- **Not number of websites** — an account only ever has one.
+This also **reverses** the old "one account is one website" constraint. An account may now own as many websites as it pays for, which is what makes the developer-with-several-clients case work — it was previously ruled out for want of invites. Invites are still not built, so those clients still share one sign-in; what changed is that the *account* is no longer capped at one site.
 
-If invites are ever built, revisit this: per-developer pricing becomes possible and is worth more.
+**The ladder is a Razorpay `quantity`, not twenty plans.** There are exactly **two** Razorpay Plans — "one website, monthly" (₹999) and "one website, yearly" (₹9,990) — and three websites is quantity 3 of one of them. `npm run setup:razorpay` creates both at the right amounts and prints the ids for `.env`; it is idempotent and refuses loudly if a plan already exists at the wrong price, because **Razorpay plan amounts cannot be edited after creation**. That is why adding a fourth website amends the existing mandate (`schedule_change_at: "now"`, prorated) instead of asking for the card again, and why the ladder can extend without touching Razorpay.
 
-`components/landing/pricing-plans.tsx` is the **only** `"use client"` component on any public page — the monthly/yearly toggle needs state, and isolating it keeps the table, add-ons and FAQ server-rendered. The landing page speaks to **both** people — the developer who builds the site and the owner who runs it and pays for it (decided 30 Aug 2026; it used to address developers only, with the owner in third person). The hero names both, the "For site owners" band mirrors the "For developers" band, and the FAQ carries questions from each. Keep new copy two-voiced.
+Where it lives:
 
-**⚠ Nothing on that page is enforced.** There is no billing, no Stripe, no trial clock, no page cap and no media metering. A new signup today gets unlimited websites, unlimited pages, unlimited media, forever. Before this goes in front of anyone who can pay, at minimum: a page cap per project, media metering, a trial expiry, and Stripe. Until then the page is a design artefact, not an offer.
+| Path | What it is |
+|---|---|
+| `packages/shared/src/plans.ts` | **The source of truth.** Prices in cents, the ladder bounds, `SubscriptionStatus`, and `websiteAllowance()` — the only function that decides how many websites an account may own. |
+| `apps/api/src/lib/razorpay.ts` | The whole provider integration: raw `fetch` against Razorpay's REST API (no SDK), plus the two HMAC verifiers. Nothing else in the API knows payments exist. |
+| `apps/api/src/setup-razorpay.ts` | `npm run setup:razorpay` — creates the two Plans and prints their ids. |
+| `apps/api/src/routes/billing.ts` | `GET /api/billing`, `POST /subscription`, `POST /verify`, `POST /cancel`, `GET /plans`, and the webhook. `applySubscription` is the one place entitlement can change. |
+| `apps/admin/lib/billing.ts` | Browser side, including injecting Razorpay's Checkout script on demand. |
+| `apps/admin/app/(dash)/(app)/billing/page.tsx` | Plan & billing — a stepper, because the whole screen is one number. |
+| `apps/admin/components/landing/pricing-plans.tsx` | Still the **only** `"use client"` component on any public page. Its numbers **mirror** `plans.ts` rather than importing it — importing `@pagecraft/shared` would pull Zod into the public bundle. Change one, change the other. |
 
-Three claims elsewhere were corrected to match this model — the landing page's comparison row, its hero fine print, and a FAQ answer all used to promise free self-hosting, which is not on offer (the repo has no licence and is unpublished).
+Four rules worth knowing before touching this code:
 
+- **The webhook is mounted above `express.json`** (its own router, `razorpayWebhookRouter`), because Razorpay signs the exact bytes it sent. Re-serialising parsed JSON reorders keys and the digest silently stops matching — which presents as "payments mysteriously never activate".
+- **Only a valid signature grants anything.** `POST /subscription` creates a Razorpay object and grants nothing; `POST /verify` grants on the Checkout signature (HMAC'd with the API secret, which the browser never sees) purely so the dashboard lights up without waiting; the **webhook is the source of truth** thereafter. With no webhook secret configured, every webhook is rejected rather than trusted — an unverified webhook is a public endpoint that hands out paid access.
+- **Webhook order is not guaranteed.** Razorpay retries for days, so `subscription.lastEventAt` drops any event older than the one already applied. Without it a redelivered `cancelled` from last week lands after this morning's `active` and locks a paying customer out of sites they still pay for.
+- **Losing a subscription never deletes anything.** The account drops to Free and keeps its websites readable and editable — nobody's live site goes dark over a bounced card. What stops is *adding another*. For the same reason, `pending` (Razorpay retrying a failed charge) still counts as entitled; `halted` is where access stops. And a downgrade below the number of websites that exist is **refused** — there is no honest way for us to pick which one to switch off.
 
+**Razorpay is optional the way R2 and SMTP are.** Without `RAZORPAY_*` in `.env` the CMS boots, `billingEnabled` is false, and the billing screen explains what is missing instead of showing a checkout button that dead-ends. The honest consequence is that nobody can create a website on such an instance — which is correct, because the first one has to be paid for. The seed script's platform admin is comped (a subscription written directly, not a trial) so a fresh install is usable.
+
+**Razorpay error descriptions are surfaced verbatim** rather than flattened into "payment failed" — messages like "Subscriptions is not enabled for this account" are the whole diagnosis, and hiding them turns a five-minute fix into an afternoon.
+
+The landing page speaks to **both** people — the developer who builds the site and the owner who runs it and pays for it. The hero names both, the "For site owners" band mirrors the "For developers" band, and the FAQ carries questions from each. Keep new copy two-voiced.
+
+**Still not enforced:** the page cap and media metering are defined in `PLANS` and checked by `assertCanAddPage` / `assertStorageAllows`, but the numbers are generous starting points rather than tuned limits. Storage add-ons ($2 per 10 GB) are advertised and have no purchase path.
 
 ## SDK (`packages/sdk`) & site integration — BUILT
 
@@ -360,10 +389,11 @@ Tests run every handler against `src/stub-api.ts` — a stand-in that enforces t
    - ⬜ **Two Cloudflare-admin jobs remain, and media does not display until the second is done**:
      the bucket CORS rule, and connecting `media.mypagecraft.com` as an R2 custom domain (its
      DNS currently points at the VPS, so every stored media URL is unreachable).
-   - ⬜ Per-account limits — a public signup form with no cap on websites is an open-ended bill on the Atlas and Render tiers below.
+   - ✅ **Per-account limits and payment.** Websites are capped at the number a Razorpay subscription covers (₹999 each per month), with no free trial — a public signup form can no longer run up an open-ended bill. Pages, storage and content-API calls are metered per website too. See "Pricing & billing" above.
+   - ⬜ Two Razorpay-admin jobs remain: create the two Plans ("one website" monthly and yearly) and point a webhook at `/api/billing/webhook`, then fill the five `RAZORPAY_*` vars. Until then `billingEnabled` is false and nobody but the seeded admin can create a website.
    - ⬜ SEO fields surfaced in the dashboard, and the deployment run-through.
 
-**One account per website, shared by hand — decided, do not rebuild.** There is deliberately no invite flow. Whoever owns a website shares those sign-in details with the other party directly. `ProjectRole` and `user.projectIds` still model an `editor` who was added to someone else's website, and `requireProjectAccess` honours it, so the model does not need changing if invites are ever wanted — but nothing currently creates that relationship, and `AuthToken.kind: "invite"` plus `sendProjectInviteEmail` are unused scaffolding.
+**No invite flow, shared sign-ins — decided, do not rebuild.** Whoever owns a website shares those sign-in details with the other party directly. (The *other* half of this rule — "one account is one website" — was **reversed** on 30 Aug 2026: per-website pricing means an account owns as many websites as it pays for. Sharing a login is still how a second person gets in.) `ProjectRole` and `user.projectIds` still model an `editor` who was added to someone else's website, and `requireProjectAccess` honours it, so the model does not need changing if invites are ever wanted — but nothing currently creates that relationship, and `AuthToken.kind: "invite"` plus `sendProjectInviteEmail` are unused scaffolding.
 
 Two consequences of sharing one account that follow from the auth design above, and should be explained rather than engineered around:
 

@@ -45,6 +45,15 @@ async function main() {
       emailVerifiedAt: new Date(),
       passwordHash: await hashPassword(password),
       projectIds: [],
+      // Whoever runs the instance is not a customer, so they are not sent
+      // through Razorpay to get a website. This is a comped subscription, not
+      // a trial — ordinary signups still start at zero websites and pay.
+      plan: "starter",
+      subscription: {
+        status: "active",
+        websites: 20,
+        period: "monthly",
+      },
     });
     console.log(`Created platform administrator: ${email}`);
   }

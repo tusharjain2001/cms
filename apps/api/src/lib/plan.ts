@@ -1,24 +1,34 @@
-import { type Plan, type PlanId, type QuotaUsageDTO, planFor } from "@pagecraft/shared";
-import { User, type UserDoc, planIdOf } from "../models/user.js";
+import {
+  PRICE_PER_WEBSITE_MONTHLY_PAISE,
+  type Plan,
+  type QuotaUsageDTO,
+  formatInr,
+  planFor,
+  pricePaise,
+  websiteAllowance,
+} from "@pagecraft/shared";
+import { User, type UserDoc, entitlementOf } from "../models/user.js";
 import { Project, type ProjectDoc } from "../models/project.js";
 import { Page } from "../models/page.js";
 import { Media } from "../models/media.js";
 import { bumpApiCall, apiCallsThisMonth } from "../models/usage.js";
-import { paymentRequired } from "./respond.js";
+import { paymentRequired, subscriptionRequired } from "./respond.js";
 
 /**
  * Plan limits, enforced. This is the "non-payment half" of monetisation: an
  * account has a plan, a plan has quotas, and every place that would grow a
  * tenant checks the relevant quota and returns a friendly 402 when it is hit.
  *
- * THE PAYMENT BOUNDARY: `setPlan` is the single function a real payment
- * provider (Stripe, Razorpay…) calls from its webhook to move an account
- * between plans. Nothing else in the app needs to know payments exist — wire
- * the webhook to this and the quotas start reflecting what the customer bought.
+ * **The website ceiling is the one that carries money.** It is not a constant
+ * on the plan — it is `websiteAllowance()`, computed from the quantity the
+ * customer's Razorpay subscription was bought with. An account with no live
+ * subscription is allowed **zero** websites: there is no free trial, so even
+ * the first website has to be paid for.
+ *
+ * THE PAYMENT BOUNDARY: `lib/razorpay.ts` and `routes/billing.ts` are the only
+ * files that know a payment provider exists. They write the account's
+ * subscription; everything here only ever reads it.
  */
-export async function setPlan(userId: unknown, plan: PlanId): Promise<void> {
-  await User.updateOne({ _id: userId }, { $set: { plan } });
-}
 
 /** The plan that governs a website — always its OWNER's plan (the owner pays). */
 export async function ownerPlanFor(project: ProjectDoc): Promise<Plan> {
@@ -35,13 +45,37 @@ async function storageBytesUsed(projectId: unknown): Promise<number> {
   return row?.total ?? 0;
 }
 
-/** Refuses if this account is already at its website ceiling. */
+/** How many websites this account may own, and how many it already has. */
+export async function websiteCapacity(
+  owner: UserDoc
+): Promise<{ allowed: number; used: number }> {
+  const used = await Project.countDocuments({ ownerId: owner._id });
+  return { allowed: websiteAllowance(entitlementOf(owner)), used };
+}
+
+/**
+ * Refuses if this account is already at the number of websites it pays for.
+ *
+ * The two refusals are deliberately different. Somebody who has never
+ * subscribed needs to be told the product costs money at all; somebody on one
+ * website who wants a second needs the exact price of the next step. A single
+ * generic "please upgrade" would fail both of them.
+ */
 export async function assertCanCreateProject(owner: UserDoc): Promise<void> {
-  const plan = planFor(planIdOf(owner));
-  const count = await Project.countDocuments({ ownerId: owner._id });
-  if (count >= plan.maxProjects) {
-    throw paymentRequired(
-      `Your ${plan.name} plan includes ${plan.maxProjects} website${plan.maxProjects === 1 ? "" : "s"}. Upgrade to add more.`
+  const { allowed, used } = await websiteCapacity(owner);
+
+  if (allowed === 0) {
+    throw subscriptionRequired(
+      `Pagecraft is ₹${formatInr(PRICE_PER_WEBSITE_MONTHLY_PAISE)} a month for one website. ` +
+        `Choose a plan to add your first one — there is no free trial.`
+    );
+  }
+
+  if (used >= allowed) {
+    const next = used + 1;
+    throw subscriptionRequired(
+      `Your plan covers ${allowed} website${allowed === 1 ? "" : "s"} and you already have ${used}. ` +
+        `Increase it to ${next} for ₹${formatInr(pricePaise(next, "monthly"))} a month.`
     );
   }
 }
@@ -90,7 +124,8 @@ export async function enforceApiCallQuota(project: ProjectDoc): Promise<void> {
 /** Everything the dashboard needs to draw usage bars for one website. */
 export async function computeQuotaUsage(project: ProjectDoc): Promise<QuotaUsageDTO> {
   const plan = await ownerPlanFor(project);
-  const [projects, pages, storageBytes, apiCalls] = await Promise.all([
+  const [owner, projects, pages, storageBytes, apiCalls] = await Promise.all([
+    User.findById(project.ownerId),
     Project.countDocuments({ ownerId: project.ownerId }),
     Page.countDocuments({ projectId: project._id }),
     storageBytesUsed(project._id),
@@ -99,7 +134,8 @@ export async function computeQuotaUsage(project: ProjectDoc): Promise<QuotaUsage
   return {
     plan: plan.id,
     planName: plan.name,
-    projects: { used: projects, limit: plan.maxProjects },
+    // The website ceiling is what was paid for, never a number on the plan.
+    projects: { used: projects, limit: owner ? websiteAllowance(entitlementOf(owner)) : 0 },
     pages: { used: pages, limit: plan.maxPagesPerProject },
     storageBytes: { used: storageBytes, limit: plan.maxStorageBytesPerProject },
     apiCallsThisMonth: { used: apiCalls, limit: plan.maxApiCallsPerMonth },

@@ -1,13 +1,16 @@
 import { Router, type Response } from "express";
 import { z } from "zod";
+import { isEntitled } from "@pagecraft/shared";
 import {
   User,
   hashPassword,
   isVerified,
+  subscriptionStatusOf,
   toUserDTO,
   verifyPassword,
   type UserDoc,
 } from "../models/user.js";
+import { cancelSubscription } from "../lib/razorpay.js";
 import { AuthToken, consumeToken, issueToken } from "../models/auth-token.js";
 import { Project } from "../models/project.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -383,6 +386,30 @@ router.delete("/me", requireAuth, async (req, res, next) => {
       throw badRequest(
         `Delete your ${owned === 1 ? "website" : `${owned} websites`} first, or hand them to someone else.`
       );
+    }
+
+    /**
+     * Stop the money before deleting the record that points at it. A closed
+     * account with a live mandate keeps being charged every month, and once
+     * the user row is gone there is nothing left linking that Razorpay
+     * subscription to anyone — nobody would notice until a chargeback.
+     *
+     * A failure here does NOT block the deletion: refusing to close someone's
+     * account because a third party is unreachable is the wrong trade. It is
+     * logged loudly instead, because it is a real bill somebody has to cancel
+     * by hand.
+     */
+    const subscriptionId = user.subscription?.razorpaySubscriptionId;
+    if (subscriptionId && isEntitled(subscriptionStatusOf(user))) {
+      try {
+        await cancelSubscription(subscriptionId);
+      } catch (err) {
+        console.error(
+          `[billing] could not cancel ${subscriptionId} while closing ${user.email}. ` +
+            `Cancel it by hand in the Razorpay dashboard.`,
+          err
+        );
+      }
     }
 
     await AuthToken.deleteMany({ userId: user._id });

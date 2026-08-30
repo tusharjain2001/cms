@@ -66,6 +66,29 @@ const schema = z.object({
    * S3-compatible store.
    */
   R2_ENDPOINT: z.string().optional(),
+
+  // Razorpay, optional in exactly the same way as R2 and SMTP: without these
+  // the CMS runs, the billing screen explains what is missing instead of
+  // showing a checkout button that cannot work, and nobody can create a
+  // website (which is the honest outcome — the first one has to be paid for).
+  RAZORPAY_KEY_ID: z.string().optional(),
+  RAZORPAY_KEY_SECRET: z.string().optional(),
+  /**
+   * The webhook signing secret from the Razorpay dashboard. Without it the
+   * webhook route refuses every request rather than trusting unsigned callers:
+   * an unverified webhook is a public endpoint that grants paid access.
+   */
+  RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
+  /**
+   * The two Razorpay Plan ids for "one website", monthly and yearly. The
+   * ladder is the subscription's `quantity` — 3 websites is quantity 3 of the
+   * same plan, never a third plan — so there are exactly two of these no
+   * matter how far the ladder goes.
+   */
+  RAZORPAY_PLAN_ID_MONTHLY: z.string().optional(),
+  RAZORPAY_PLAN_ID_YEARLY: z.string().optional(),
+  /** Overridable so tests can point the client at a local stub. */
+  RAZORPAY_API_BASE: z.string().default("https://api.razorpay.com/v1"),
 });
 
 const parsed = schema.safeParse(process.env);
@@ -118,3 +141,14 @@ export const isProd = env.NODE_ENV === "production";
 
 /** Without a host and credentials there is nowhere to send a verification link. */
 export const emailEnabled = Boolean(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASSWORD);
+
+/**
+ * Checkout needs the API keys *and* at least one plan id — a key with no plan
+ * behind it produces a subscription call that fails at Razorpay rather than
+ * here, which is a much worse place to find out.
+ */
+export const billingEnabled = Boolean(
+  env.RAZORPAY_KEY_ID &&
+    env.RAZORPAY_KEY_SECRET &&
+    (env.RAZORPAY_PLAN_ID_MONTHLY || env.RAZORPAY_PLAN_ID_YEARLY)
+);

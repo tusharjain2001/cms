@@ -46,5 +46,13 @@ export const conflict = (msg: string) => new HttpError(409, msg);
 /** A plan limit was hit — 402 tells the dashboard to offer an upgrade. */
 export const paymentRequired = (msg: string) =>
   new HttpError(402, msg, undefined, "quota_exceeded");
+/**
+ * Also a 402, but specifically "you need to buy more websites". Separate from
+ * `paymentRequired` because the dashboard sends this one straight to the
+ * billing screen with the right quantity preselected, where a storage or page
+ * limit wants a different answer entirely.
+ */
+export const subscriptionRequired = (msg: string) =>
+  new HttpError(402, msg, undefined, "subscription_required");
 export const serviceUnavailable = (msg: string, code?: ApiErrorCode) =>
   new HttpError(503, msg, undefined, code);
