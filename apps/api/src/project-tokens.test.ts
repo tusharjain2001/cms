@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { after, before, beforeEach, describe, it } from "node:test";
 import type { Server } from "node:http";
 import { MongoMemoryServer } from "mongodb-memory-server";
+import { formatInr, PRICE_PER_WEBSITE_MONTHLY_PAISE } from "@pagecraft/shared";
 
 /**
  * The write-scoped project token and the plan quotas.
@@ -280,7 +281,10 @@ describe("the website ceiling", () => {
     assert.equal(res.json.code, "subscription_required");
     // The refusal has to name the price, or the person reading it has no idea
     // what to do next.
-    assert.match(res.json.error, /₹1 a month/);
+    assert.match(
+      res.json.error,
+      new RegExp(`₹${formatInr(PRICE_PER_WEBSITE_MONTHLY_PAISE)} a month`)
+    );
     assert.match(res.json.error, /no free trial/i);
   });
 
@@ -298,7 +302,10 @@ describe("the website ceiling", () => {
     assert.equal(second.json.code, "subscription_required");
     // And it quotes the price of the next rung, not a generic "upgrade".
     assert.match(second.json.error, /covers 1 website/);
-    assert.match(second.json.error, /₹2 a month/);
+    assert.match(
+      second.json.error,
+      new RegExp(`₹${formatInr(2 * PRICE_PER_WEBSITE_MONTHLY_PAISE)} a month`)
+    );
   });
 
   it("lets a bigger subscription hold more websites", async () => {
@@ -313,7 +320,10 @@ describe("the website ceiling", () => {
     }
     const fourth = await api("/api/projects", { method: "POST", token, body: { name: "Four" } });
     assert.equal(fourth.status, 402);
-    assert.match(fourth.json.error, /₹4 a month/);
+    assert.match(
+      fourth.json.error,
+      new RegExp(`₹${formatInr(4 * PRICE_PER_WEBSITE_MONTHLY_PAISE)} a month`)
+    );
   });
 
   it("stops counting once the subscription lapses", async () => {

@@ -3,6 +3,7 @@ import { createHmac } from "node:crypto";
 import { after, before, describe, it } from "node:test";
 import { createServer, type Server } from "node:http";
 import { MongoMemoryServer } from "mongodb-memory-server";
+import { formatInr, PRICE_PER_WEBSITE_MONTHLY_PAISE as MONTHLY } from "@pagecraft/shared";
 
 /**
  * Billing: the ladder, and the wall it puts in front of an unpaid account.
@@ -197,10 +198,12 @@ describe("the price ladder", () => {
     const res = await api("/api/billing/plans");
     assert.equal(res.status, 200);
     assert.equal(res.json.data.currency, "INR");
-    assert.equal(res.json.data.pricePerWebsitePaise.monthly, 100);
+    // Derived from the shared constant rather than written out, so repricing
+    // stays the four-number change `plans.ts` promises it is.
+    assert.equal(res.json.data.pricePerWebsitePaise.monthly, MONTHLY);
     assert.deepEqual(
       res.json.data.examples.map((e: Json) => e.monthly),
-      ["₹1", "₹2", "₹3"]
+      [1, 2, 3].map((n) => `₹${formatInr(n * MONTHLY)}`)
     );
   });
 
@@ -224,7 +227,7 @@ describe("buying websites", () => {
     });
 
     assert.equal(res.status, 201);
-    assert.equal(res.json.data.checkout.amountPaise, 300, "3 websites is 3x the unit price");
+    assert.equal(res.json.data.checkout.amountPaise, 3 * MONTHLY, "3 websites is 3x the unit price");
     assert.equal(res.json.data.checkout.websites, 3);
 
     // The ladder is one plan bought three times, never a third plan.
@@ -300,7 +303,7 @@ describe("buying websites", () => {
     const fourth = await api("/api/projects", { method: "POST", token, body: { name: "Four" } });
     assert.equal(fourth.status, 402);
     assert.equal(fourth.json.code, "subscription_required");
-    assert.match(fourth.json.error, /₹4 a month/);
+    assert.match(fourth.json.error, new RegExp(`₹${formatInr(4 * MONTHLY)} a month`));
   });
 
   it("adds a website by amending the mandate, not by asking for the card again", async () => {

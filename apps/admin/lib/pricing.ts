@@ -1,19 +1,19 @@
 /**
  * The price, for everything the dashboard and the marketing pages say out loud.
  *
- * ⚠️ **THE PRICE IS CURRENTLY A TEMPORARY ₹1 TEST AMOUNT**, set so a real
- * payment can be put through end to end and confirmed as landing in the bank
- * account. The intended price is ₹999 a month and ₹9,990 a year.
+ * ₹999 per website per month, or ₹9,990 a year — twelve months for the price
+ * of ten. Strictly linear: two websites cost exactly twice one.
  *
- * **To put the real price back, change the two numbers below and the matching
- * two in `packages/shared/src/plans.ts`** (`99_900` and `999_000` paise), then
- * re-run `npm run setup:razorpay` — Razorpay plan amounts are immutable, so a
- * new price means new plans; the old ones cannot be repriced.
+ * **To change the price, change the two numbers below and the matching two in
+ * `packages/shared/src/plans.ts`** (`99_900` and `999_000` paise), then re-run
+ * `npm run setup:razorpay` and put the new plan ids in `.env` — Razorpay plan
+ * amounts are immutable, so a new price means new plans; the old ones cannot be
+ * repriced.
  *
  * Everything that quotes a figure derives from here, so those four numbers are
  * the entire change. That is the point of this file: the price used to be
  * written out in about thirty places across marketing copy, dashboard buttons
- * and legal pages, and putting it back would have meant finding all of them.
+ * and legal pages, and changing it meant finding all of them.
  *
  * This mirrors `packages/shared/src/plans.ts` rather than importing it, for the
  * same reason `lib/dto.ts` re-exports types only: importing that package pulls
@@ -25,8 +25,8 @@ export type BillingPeriod = "monthly" | "yearly";
 
 /** Rupees per website, per billing period. */
 export const PRICE_PER_WEBSITE: Record<BillingPeriod, number> = {
-  monthly: 1, // ⚠️ temporary test price. Real price: 999
-  yearly: 10, // ⚠️ temporary test price. Real price: 9990
+  monthly: 999,
+  yearly: 9990,
 };
 
 /**
@@ -45,7 +45,7 @@ export const inr = (rupees: number): string =>
 export const priceOf = (websites: number, period: BillingPeriod = "monthly"): number =>
   websites * PRICE_PER_WEBSITE[period];
 
-/** What `websites` sites cost per cycle, formatted: "₹1", "₹1,998". */
+/** What `websites` sites cost per cycle, formatted: "₹999", "₹1,998". */
 export const price = (websites: number, period: BillingPeriod = "monthly"): string =>
   inr(priceOf(websites, period));
 

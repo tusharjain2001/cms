@@ -44,8 +44,8 @@ import { PRICE_PER_WEBSITE, inr, price } from "@/lib/pricing";
 type Billing = "monthly" | "yearly";
 
 /**
- * The figures come from `lib/pricing.ts`, which is also where the temporary
- * ₹1 test price is set. Strictly linear, because Razorpay bills a subscription
+ * The figures come from `lib/pricing.ts`, the one place the price is set.
+ * Strictly linear, because Razorpay bills a subscription
  * as plan amount × quantity: a ladder that bent could not be one plan bought
  * twice, and would force a re-authorised mandate on every change. See
  * `packages/shared/src/plans.ts`.

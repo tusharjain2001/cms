@@ -7,9 +7,8 @@
  * is on every paid account; the only thing money buys is how many websites you
  * may own.
  *
- * ⚠️ The price is currently set to a **temporary ₹1 test amount** so a real
- * payment can be put through end to end. The intended price is ₹999/month. See
- * the constants below.
+ * The price is ₹999 per website per month, or ₹9,990 a year — twelve months
+ * for the price of ten. See the constants below.
  *
  * **The price is strictly linear, and it has to be.** Razorpay bills a
  * subscription as `plan amount × quantity`, so a ladder that bent — charging
@@ -115,21 +114,18 @@ export const PAID_PLAN: PlanId = "starter";
 export const CURRENCY = "INR" as const;
 
 /**
- * ⚠️ **TEMPORARY TEST PRICE — ₹1, not ₹999.**
+ * The price of one website, per month, in paise: ₹999.
  *
- * Set deliberately low so a real payment can be made end to end to confirm the
- * money actually reaches the bank account. The intended price is ₹999 a month
- * and ₹9,990 a year; restore `99_900` and `999_000` here, mirror them in
- * `apps/admin/lib/pricing.ts`, and re-run `npm run setup:razorpay` to create
- * Razorpay plans at the real amounts.
- *
- * Razorpay plan amounts are immutable, so changing these means creating new
- * plans — the old ones cannot be repriced.
+ * Razorpay plan amounts are **immutable**, so changing this number means
+ * creating new plans — the old ones cannot be repriced. Change it here, mirror
+ * it in `apps/admin/lib/pricing.ts` (which quotes in whole rupees), then re-run
+ * `npm run setup:razorpay` and put the new plan ids in `.env`. Those are the
+ * only four numbers; everything the product quotes derives from them.
  */
-export const PRICE_PER_WEBSITE_MONTHLY_PAISE = 100;
+export const PRICE_PER_WEBSITE_MONTHLY_PAISE = 99_900;
 
-/** ⚠️ Temporary test price — ₹10, not ₹9,990. See above. */
-export const PRICE_PER_WEBSITE_YEARLY_PAISE = 1_000;
+/** One website for a year: ₹9,990 — twelve months for the price of ten. */
+export const PRICE_PER_WEBSITE_YEARLY_PAISE = 999_000;
 
 export const MIN_WEBSITES = 1;
 
