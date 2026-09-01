@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { after, before, beforeEach, describe, it } from "node:test";
 import type { Server } from "node:http";
 import { MongoMemoryServer } from "mongodb-memory-server";
-import { formatInr, PRICE_PER_WEBSITE_MONTHLY_PAISE } from "@pagecraft/shared";
+import { formatMoney, PRICE_PER_WEBSITE_MONTHLY_CENTS as UNIT } from "@pagecraft/shared";
 
 /**
  * The write-scoped project token and the plan quotas.
@@ -105,6 +105,14 @@ async function makeProject(token: string, name: string): Promise<string> {
   assert.equal(res.status, 201, JSON.stringify(res.json));
   return res.json.data.id as string;
 }
+
+/**
+ * A refusal message must quote a price. Escaped before it becomes a RegExp,
+ * because `formatMoney` returns "$7.99" and a bare `$` in a pattern means
+ * end-of-string — the obvious version would silently never match.
+ */
+const priceRe = (minor: number) =>
+  new RegExp(`${formatMoney(minor).replace(/[.*+?^${}()|[\\\]]/g, "\\$&")} a month`);
 
 describe("write-scoped project tokens", () => {
   let ownerToken: string;
@@ -247,9 +255,9 @@ describe("deleting a website cascades", () => {
 /**
  * The website ceiling — the one quota that carries money.
  *
- * Under per-website pricing there is no free trial, so these two cases are the
- * whole rule: nothing without a subscription, and never more websites than the
- * subscription's quantity.
+ * The free tier is one website, so the rule has three cases: the free one is
+ * allowed, a second is not, and a subscription never buys more than its own
+ * quantity. The page cap that makes the free website free is tested below.
  */
 describe("the website ceiling", () => {
   /** Puts an account on a live subscription for `websites` sites. */
@@ -271,21 +279,26 @@ describe("the website ceiling", () => {
     );
   }
 
-  it("refuses the very first website when nobody has paid — there is no free trial", async () => {
+  it("gives an unpaid account exactly one website, and refuses the second", async () => {
     const email = "other@example.com";
     const token = await login(email, "other-pass");
     await reset(email, token);
 
-    const res = await api("/api/projects", { method: "POST", token, body: { name: "Site One" } });
-    assert.equal(res.status, 402);
-    assert.equal(res.json.code, "subscription_required");
+    // The free website. No subscription, no card, no clock.
+    const first = await api("/api/projects", { method: "POST", token, body: { name: "Site One" } });
+    assert.equal(first.status, 201);
+
+    const second = await api("/api/projects", { method: "POST", token, body: { name: "Site Two" } });
+    assert.equal(second.status, 402);
+    assert.equal(second.json.code, "subscription_required");
     // The refusal has to name the price, or the person reading it has no idea
-    // what to do next.
+    // what to do next — and must not talk about a "plan" they never chose.
     assert.match(
-      res.json.error,
-      new RegExp(`₹${formatInr(PRICE_PER_WEBSITE_MONTHLY_PAISE)} a month`)
+      second.json.error,
+      priceRe(2 * UNIT)
     );
-    assert.match(res.json.error, /no free trial/i);
+    assert.match(second.json.error, /free website/i);
+    assert.doesNotMatch(second.json.error, /Your plan covers/);
   });
 
   it("allows exactly the number of websites the subscription covers", async () => {
@@ -304,7 +317,7 @@ describe("the website ceiling", () => {
     assert.match(second.json.error, /covers 1 website/);
     assert.match(
       second.json.error,
-      new RegExp(`₹${formatInr(2 * PRICE_PER_WEBSITE_MONTHLY_PAISE)} a month`)
+      priceRe(2 * UNIT)
     );
   });
 
@@ -322,7 +335,7 @@ describe("the website ceiling", () => {
     assert.equal(fourth.status, 402);
     assert.match(
       fourth.json.error,
-      new RegExp(`₹${formatInr(4 * PRICE_PER_WEBSITE_MONTHLY_PAISE)} a month`)
+      priceRe(4 * UNIT)
     );
   });
 
@@ -343,5 +356,114 @@ describe("the website ceiling", () => {
     const res = await api("/api/projects", { method: "POST", token, body: { name: "Blocked" } });
     assert.equal(res.status, 402);
     assert.equal((await api("/api/projects", { token })).json.data.length, 1);
+  });
+});
+
+/**
+ * The page cap — the limit that actually defines the free tier.
+ *
+ * The free website is real and permanent, so `assertCanCreateProject` waves
+ * everyone through and this is the wall they meet instead. It is therefore the
+ * refusal most customers will ever see, which is why the wording is asserted
+ * here and not just the status code.
+ */
+describe("the free website's one page", () => {
+  const grant = (email: string, websites: number) =>
+    User.updateOne(
+      { email },
+      { $set: { plan: "starter", subscription: { status: "active", websites, period: "monthly" } } }
+    );
+
+  async function freshSite(email: string, token: string): Promise<string> {
+    const existing = await api("/api/projects", { token });
+    for (const p of existing.json.data as Json[]) {
+      await api(`/api/projects/${p.id}`, { method: "DELETE", token });
+    }
+    await User.updateOne(
+      { email },
+      { $set: { plan: "free", subscription: { status: "none", websites: 0, period: "monthly" } } }
+    );
+    const made = await api("/api/projects", { method: "POST", token, body: { name: "Free Site" } });
+    assert.equal(made.status, 201);
+    return made.json.data.id as string;
+  }
+
+  it("takes one page and refuses the second, quoting the price", async () => {
+    const email = "other@example.com";
+    const token = await login(email, "other-pass");
+    const projectId = await freshSite(email, token);
+
+    const home = await api(`/api/projects/${projectId}/pages`, {
+      method: "POST",
+      token,
+      body: { title: "Home" },
+    });
+    assert.equal(home.status, 201);
+
+    const about = await api(`/api/projects/${projectId}/pages`, {
+      method: "POST",
+      token,
+      body: { title: "About" },
+    });
+    assert.equal(about.status, 402);
+    assert.equal(about.json.code, "quota_exceeded");
+    assert.match(
+      about.json.error,
+      priceRe(UNIT)
+    );
+    // "Your Free plan includes 1 pages" is both ungrammatical and reads like a
+    // quota nobody chose, so the free case has wording of its own.
+    assert.doesNotMatch(about.json.error, /1 pages/);
+  });
+
+  it("keeps the one page editable and publishable — free is not read-only", async () => {
+    const email = "other@example.com";
+    const token = await login(email, "other-pass");
+    const projectId = await freshSite(email, token);
+
+    const page = await api(`/api/projects/${projectId}/pages`, {
+      method: "POST",
+      token,
+      body: { title: "Home" },
+    });
+    const pageId = page.json.data.id as string;
+
+    const section = await api(`/api/pages/${pageId}/sections`, {
+      method: "POST",
+      token,
+      body: { type: "hero" },
+    });
+    assert.equal(section.status, 201, "a free page must still take sections");
+
+    // Filled in because publish-mode validation enforces required fields — an
+    // empty hero is refused on every plan, which is not what this is testing.
+    const sectionId = section.json.data.section.id as string;
+    const filled = await api(`/api/pages/${pageId}/sections/${sectionId}`, {
+      method: "PATCH",
+      token,
+      body: { content: { heading: "Hello" } },
+    });
+    assert.equal(filled.status, 200);
+
+    const published = await api(`/api/pages/${pageId}/publish`, { method: "POST", token });
+    assert.equal(published.status, 200, "a free page must still go live");
+  });
+
+  it("lifts the cap the moment a subscription is live", async () => {
+    const email = "other@example.com";
+    const token = await login(email, "other-pass");
+    const projectId = await freshSite(email, token);
+
+    await api(`/api/projects/${projectId}/pages`, { method: "POST", token, body: { title: "Home" } });
+    await grant(email, 1);
+
+    // Same website, same account — paying lifts a limit rather than starting
+    // anything over, which is what the upgrade copy promises.
+    const about = await api(`/api/projects/${projectId}/pages`, {
+      method: "POST",
+      token,
+      body: { title: "About" },
+    });
+    assert.equal(about.status, 201);
   });
 });

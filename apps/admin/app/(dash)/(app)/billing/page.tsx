@@ -9,9 +9,9 @@ import {
   cancelSubscription,
   getPayments,
   getSubscription,
-  openCheckout,
+  goToCheckout,
   startSubscription,
-  inrFromPaise,
+  money,
 } from "@/lib/billing";
 import type { BillingPeriod, PaymentDTO, SubscriptionDTO } from "@/lib/dto";
 import { Button, Card, CardTitle, PageHeader } from "@/components/ui";
@@ -22,16 +22,19 @@ import { Button, Card, CardTitle, PageHeader } from "@/components/ui";
  * THE WHOLE SCREEN IS ONE NUMBER: how many websites this account pays for.
  * One website per unit — so the control is a stepper, not a
  * grid of tiers, and the price is arithmetic the customer can check in their
- * head. There is no free trial and nothing here pretends otherwise.
+ * head. The free tier is one website of one page — so what a plan sells is
+ * not access, it is room, and the copy here says that rather than implying the
+ * product is locked.
  *
  * Three states it has to handle honestly:
  *
- *   - **Payments not configured on the server** (no Razorpay keys). Say so,
+ *   - **Payments not configured on the server** (no Dodo keys). Say so,
  *     the way the media screen says R2 is missing, rather than showing a
  *     checkout button that dead-ends.
- *   - **Never subscribed.** The account owns zero websites and cannot create
- *     one; this screen is the way out of that, so `/projects` links straight
- *     here when someone presses "New website".
+ *   - **Never subscribed.** The account has its one free single-page website.
+ *     This screen is the way past that, so `/projects` links straight here
+ *     when someone presses "New website" with no room left, and so does the
+ *     pages screen when the free website is full.
  *   - **Reducing below what they own.** Refused by the API, because there is no
  *     honest way for us to choose which website to switch off. The stepper
  *     stops at the number they actually have and says why.
@@ -81,6 +84,66 @@ export default function BillingPage() {
     void load();
   }, [load]);
 
+  /**
+   * Coming back from Dodo's hosted checkout.
+   *
+   * **Returning here proves nothing** — `?checkout=done` is a plain redirect
+   * anyone can type. Access is granted only when Dodo's webhook reaches the
+   * API, which is usually a second or two behind the customer's browser. So
+   * this polls for the entitlement to appear rather than trusting the URL, and
+   * says something honest while it waits.
+   *
+   * It gives up after ~20s and tells the customer their payment is still
+   * settling instead of claiming it failed — because it almost certainly has
+   * not. Webhooks are retried for days, so the account will be right shortly
+   * whether or not anyone is looking at this page.
+   */
+  useEffect(() => {
+    if (params.get("checkout") !== "done") return;
+
+    let cancelled = false;
+    let attempts = 0;
+    setNotice("Payment received — setting up your plan…");
+
+    const tick = async () => {
+      if (cancelled) return;
+      attempts += 1;
+      try {
+        const data = await getSubscription();
+        if (cancelled) return;
+        if (data.websites > 0) {
+          setSub(data);
+          setWant(Math.max(data.websites, data.websitesUsed, 1));
+          setPeriod(data.period);
+          setNotice(
+            `Thank you — your plan covers ${data.websites} website${data.websites === 1 ? "" : "s"}.`
+          );
+          await refreshUser();
+          // Drop the query string so a refresh does not replay all this.
+          router.replace("/billing");
+          return;
+        }
+      } catch {
+        /* transient — keep waiting, the webhook is the thing that matters */
+      }
+      if (attempts >= 10) {
+        setNotice(
+          "Your payment went through and is still being confirmed. This page will be " +
+            "correct within a minute — you do not need to pay again."
+        );
+        router.replace("/billing");
+        return;
+      }
+      setTimeout(() => void tick(), 2000);
+    };
+
+    void tick();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params]);
+
   if (loading) {
     return (
       <div className="max-w-[860px] px-6 py-10 lg:px-11">
@@ -101,8 +164,13 @@ export default function BillingPage() {
     );
   }
 
-  const perWebsite = sub.pricePerWebsitePaise[period];
+  const perWebsite = sub.pricePerWebsiteMinor[period];
   const total = perWebsite * want;
+  /**
+   * `websites` is what they PAY for, not what they may own — a free account is
+   * allowed one website but pays for none, so this is false for them and the
+   * button reads "Subscribe" rather than "This is your plan".
+   */
   const live = sub.websites > 0;
   const isChange = live && (want !== sub.websites || period !== sub.period);
   /** Never offer to buy fewer websites than already exist — the API refuses it. */
@@ -124,29 +192,14 @@ export default function BillingPage() {
         return;
       }
 
-      if (!result.checkout) throw new Error("The payment window could not be opened.");
+      if (!result.checkout) throw new Error("The payment page could not be opened.");
 
-      const outcome = await openCheckout(result.checkout);
-      if (outcome.kind === "paid") {
-        setSub(outcome.subscription);
-        setNotice(
-          `Thank you — your plan covers ${outcome.subscription.websites} website${
-            outcome.subscription.websites === 1 ? "" : "s"
-          }.`
-        );
-        await refreshUser();
-      } else if (outcome.kind === "blocked") {
-        setError(
-          outcome.url
-            ? "The payment window was blocked, most likely by an ad blocker. Use the secure link below instead."
-            : "The payment window was blocked, most likely by an ad blocker."
-        );
-        if (outcome.url) window.open(outcome.url, "_blank", "noopener");
-      } else {
-        // Dismissed. Re-read rather than assume — they may have paid on
-        // Razorpay's hosted page in another tab.
-        await load();
-      }
+      // Dodo hosts the payment page, so this navigates away and nothing below
+      // runs. The customer comes back to `?checkout=done`, which is handled by
+      // the effect above. `busy` is deliberately left true — the page is on its
+      // way out and re-enabling the button would only invite a second click.
+      goToCheckout(result.checkout);
+      return;
     } catch (err) {
       setError(
         err instanceof ApiError ? err.message : "Something went wrong starting that payment."
@@ -204,10 +257,16 @@ export default function BillingPage() {
 
       {/* ------------------------------------------------------- what you have */}
       <Card className="mb-4">
-        <CardTitle sub={live ? undefined : "There is no free trial — the first website is a purchase."}>
+        <CardTitle
+          sub={
+            live
+              ? undefined
+              : `Your free website can hold one page. A plan lifts that, and adds room for more websites — ${ONE_MONTH} a month each.`
+          }
+        >
           {live
             ? `Your plan covers ${sub.websites} website${sub.websites === 1 ? "" : "s"}`
-            : "You have no plan yet"}
+            : "You are on the free plan"}
         </CardTitle>
 
         <dl className="grid gap-4 sm:grid-cols-3">
@@ -215,13 +274,13 @@ export default function BillingPage() {
             <dt className="text-mid text-muted">Websites used</dt>
             <dd className="mt-1 text-[22px] font-bold tabular-nums">
               {sub.websitesUsed}
-              <span className="text-label font-normal text-muted"> of {sub.websites}</span>
+              <span className="text-label font-normal text-muted"> of {sub.websitesAllowed}</span>
             </dd>
           </div>
           <div>
             <dt className="text-mid text-muted">Billing</dt>
             <dd className="mt-1 text-[22px] font-bold tabular-nums">
-              {live ? inrFromPaise(sub.pricePerWebsitePaise[sub.period] * sub.websites) : "—"}
+              {live ? money(sub.pricePerWebsiteMinor[sub.period] * sub.websites, sub.currency) : "—"}
               {live && (
                 <span className="text-label font-normal text-muted">
                   {sub.period === "yearly" ? " / year" : " / month"}
@@ -308,13 +367,13 @@ export default function BillingPage() {
 
           <div>
             <p className="text-[30px] font-bold leading-none tabular-nums">
-              {inrFromPaise(total)}
+              {money(total, sub.currency)}
               <span className="text-label font-normal text-muted">
                 {period === "yearly" ? " / year" : " / month"}
               </span>
             </p>
             <p className="mt-1.5 text-mid text-muted tabular-nums">
-              {want} × {inrFromPaise(perWebsite)} per website
+              {want} × {money(perWebsite, sub.currency)} per website
             </p>
           </div>
 
@@ -327,14 +386,16 @@ export default function BillingPage() {
             {busy
               ? "Working…"
               : !live
-                ? `Subscribe · ${inrFromPaise(total)}`
+                ? `Subscribe · ${money(total, sub.currency)}`
                 : isChange
                   ? "Update my plan"
                   : "This is your plan"}
           </Button>
         </div>
 
-        {want <= sub.websitesUsed && sub.websitesUsed > 0 && (
+        {/* Only meaningful once there is a plan to reduce. Shown to a free
+            account about to buy its first website, it reads as a refusal. */}
+        {live && want <= sub.websitesUsed && sub.websitesUsed > 0 && (
           <p className="mt-5 text-label text-quiet">
             You have {sub.websitesUsed} website{sub.websitesUsed === 1 ? "" : "s"}, so your plan
             cannot cover fewer. Delete one first if you want to pay for less.
@@ -360,7 +421,7 @@ export default function BillingPage() {
       {/* ------------------------------------------------------------ history */}
       {payments.length > 0 && (
         <Card className="mt-4">
-          <CardTitle sub="Every charge Razorpay has taken. Quote the payment id if you ever need to ask us about one.">
+          <CardTitle sub="Every charge taken so far. Quote the payment id if you ever need to ask us about one.">
             Payments
           </CardTitle>
           <div className="overflow-x-auto">
@@ -398,7 +459,8 @@ export default function BillingPage() {
                       {p.period ? ` · ${p.period}` : ""}
                     </td>
                     <td className="py-3 text-label font-medium text-ink tabular-nums">
-                      {inrFromPaise(p.amountPaise)}
+                      {/* Each row in its own currency, never today's. */}
+                      {money(p.amountMinor, p.currency)}
                       {/* Anything but a clean capture has to say so, or a failed
                           charge reads as a successful one. */}
                       {p.status !== "captured" && (
@@ -407,7 +469,7 @@ export default function BillingPage() {
                         </span>
                       )}
                     </td>
-                    <td className="py-3 font-mono text-mid text-muted">{p.razorpayPaymentId}</td>
+                    <td className="py-3 font-mono text-mid text-muted">{p.providerPaymentId}</td>
                   </tr>
                 ))}
               </tbody>
@@ -417,7 +479,7 @@ export default function BillingPage() {
       )}
 
       <p className="mt-5 text-label text-quiet">
-        Payments are handled by Razorpay — we never see your card. Billed in rupees to{" "}
+        Payments are handled by Dodo Payments, our merchant of record — we never see your card. Billed in US dollars to{" "}
         <span className="font-medium text-ink">{user?.email}</span>.{" "}
         <button
           type="button"

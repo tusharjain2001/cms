@@ -31,9 +31,10 @@ export default function ProjectsPage() {
 
   /**
    * Websites are what money buys: an account may own exactly as many as its
-   * subscription covers, and a brand-new account covers **none** — there is no
-   * free trial. `websiteAllowance` comes from the account itself, so this is
-   * the same number the API enforces rather than a second guess at it.
+   * subscription covers, and a brand-new account covers **one** — the free
+   * website, which is capped at a single page rather than at a date.
+   * `websiteAllowance` comes from the account itself, so this is the same
+   * number the API enforces rather than a second guess at it.
    *
    * Only owned websites count. Being invited to edit somebody else's costs
    * nothing and must not eat into what you paid for.
@@ -103,7 +104,7 @@ export default function ProjectsPage() {
           body={
             canAdd
               ? "Create your first website and you will get a public key to drop into your React or Next.js project. If someone has invited you to edit theirs, it will appear here instead."
-              : `Pagecraft is ${ONE_MONTH} a month for one website, and another ${ONE_MONTH} for each one after that. There is no free trial — pick a plan and your first website is ready in a moment. If someone has invited you to edit theirs, it will appear here instead.`
+              : `Pagecraft is ${ONE_MONTH} a month for one website, and another ${ONE_MONTH} for each one after that. If someone has invited you to edit theirs, it will appear here instead.`
           }
           action={
             <Button variant="primary" onClick={startCreating}>

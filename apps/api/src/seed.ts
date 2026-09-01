@@ -47,7 +47,8 @@ async function main() {
       projectIds: [],
       // Whoever runs the instance is not a customer, so they are not sent
       // through Razorpay to get a website. This is a comped subscription, not
-      // a trial — ordinary signups still start at zero websites and pay.
+      // a trial — ordinary signups get the one free single-page website and pay
+      // for anything beyond it.
       plan: "starter",
       subscription: {
         status: "active",

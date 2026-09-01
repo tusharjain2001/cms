@@ -16,18 +16,19 @@ import { ONE_MONTH, ONE_YEAR, price } from "@/lib/pricing";
  *
  * THE MODEL: you pay per website. Two cost twice one, three cost three times
  * — a ladder, not a set of feature tiers, because website count is the one
- * number a customer knows before they buy. **There is no free trial**, and the
- * API genuinely enforces that: a fresh account may own zero websites. See the
+ * number a customer knows before they buy. **The free tier is one website of
+ * one page** — not a trial, nothing expires — and the API genuinely enforces
+ * both halves (`FREE_WEBSITES` and `PLANS.free.maxPagesPerProject`). See the
  * header comment in `components/landing/pricing-plans.tsx` for why the old
- * two-tier table was replaced, and do not put a trial back on this page
- * without changing `websiteAllowance()` first.
+ * two-tier table was replaced, and do not widen what free includes on this
+ * page without changing those two constants first.
  *
  * Copy is aimed at the person paying — a shop or practice owner, not a
  * developer. That is a deliberate shift from the landing page, which speaks to
  * whoever builds the site.
  */
 
-const description = `${ONE_MONTH} a month per website. Edit your own words and photos, and your site updates itself. Add a second website for another ${ONE_MONTH} — no tiers, no trial, no surprises.`;
+const description = `Start free with a one-page website. ${ONE_MONTH} a month per website after that — edit your own words and photos, and your site updates itself. No tiers, no surprises.`;
 
 export const metadata: Metadata = {
   title: "Pricing",
@@ -63,21 +64,24 @@ const ADD_ONS = [
   {
     title: "More space for photos",
     body: "10 GB per website is included, and photos are resized automatically before they are stored — most websites never come close. You get an email long before it matters.",
-    price: "₹199",
+    // ⚠️ Converted from ₹199 when the product moved to USD — a business
+    // decision that has not been signed off, unlike the $7.99 per website.
+    price: "$1.99",
     unit: "per 10 GB / month",
   },
   {
     title: "A new kind of section",
     body: "For your developer. We build the section type to their design and it appears in your dashboard like any other.",
-    price: "₹14,999",
+    // ⚠️ Converted from ₹14,999. Same caveat as above.
+    price: "$179",
     unit: "one-off",
   },
 ];
 
 const FAQS = [
   {
-    q: "Is there a free trial?",
-    a: `No. Signing up, looking around the dashboard and reading the developer docs cost nothing, but creating a website is a purchase — ${ONE_MONTH} for the first month. We would rather charge honestly on day one than run a clock you have to remember to cancel.`,
+    q: "Is there a free plan?",
+    a: `Yes — one website with one page, free for as long as you want it. Nothing expires and no card is needed. It is a real published page on a real address, not a preview. When your site needs a second page, that is ${ONE_MONTH} a month. We would rather cap pages than run a clock you have to remember to cancel.`,
   },
   {
     q: "What counts as one website?",
@@ -101,7 +105,7 @@ const FAQS = [
   },
   {
     q: "Which currency, and how is it charged?",
-    a: `Indian rupees, through Razorpay — cards, UPI AutoPay, net banking. We never see your card. Monthly renews every month; yearly is ${ONE_YEAR} a website, twelve months for the price of ten.`,
+    a: `US dollars, through Dodo Payments, who are the merchant of record — they appear as the seller on your receipt and handle any local sales tax or VAT, which is added at checkout. We never see your card. Monthly renews every month; yearly is ${ONE_YEAR} a website, twelve months for the price of ten.`,
   },
 ];
 
@@ -150,9 +154,8 @@ export default function PricingPage() {
             <Print delay={90}>
               <div className="mx-auto mt-4 flex max-w-[760px] flex-wrap items-center gap-3.5 rounded-xl border border-line bg-surface px-5 py-4">
                 <p className="text-sub text-quiet">
-                  There is no free trial: signing up and looking around costs nothing, but creating
-                  a website is a purchase. We would rather charge honestly on day one than run a
-                  clock you have to remember to cancel.
+                  Start free: one website, one page, no card and no clock. Everything you build on
+                  it stays yours when you pick a plan — you are lifting a limit, not starting over.
                 </p>
                 <Link
                   href={links.signUp}

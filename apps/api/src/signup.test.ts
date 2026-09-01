@@ -117,26 +117,44 @@ const grantWebsites = (email: string, websites: number) =>
   );
 
 /**
- * A brand-new account cannot build anything until it pays. This is the whole
- * shape of the business, so it is asserted here rather than only in the quota
- * suite: signing up is free, building is not.
+ * A brand-new account gets one free website holding one page. This is the
+ * whole shape of the business, so it is asserted here on the signup path
+ * itself rather than only in the quota suite: confirming an email is all it
+ * takes to have something real published.
  */
 describe("what a new account may do before paying", () => {
-  it("refuses to create a website until there is a subscription", async () => {
+  it("may create the free website the moment its email is confirmed", async () => {
     const email = "browsing@example.com";
     await signUp(email);
     const session = await api("/api/auth/verify-email", {
       method: "POST",
       body: { token: tokenFrom(email) },
     });
+    const token = session.json.data.accessToken;
 
-    const res = await api("/api/projects", {
+    const site = await api("/api/projects", {
       method: "POST",
-      token: session.json.data.accessToken,
-      body: { name: "Not Yet" },
+      token,
+      body: { name: "First Thing" },
     });
-    assert.equal(res.status, 402);
-    assert.equal(res.json.code, "subscription_required");
+    assert.equal(site.status, 201, "signing up should be enough for the free website");
+
+    // ...and it is one page, not an empty shell: the free tier has to be able
+    // to publish something or it advertises nothing.
+    const page = await api(`/api/projects/${site.json.data.id}/pages`, {
+      method: "POST",
+      token,
+      body: { title: "Home" },
+    });
+    assert.equal(page.status, 201);
+
+    const second = await api(`/api/projects/${site.json.data.id}/pages`, {
+      method: "POST",
+      token,
+      body: { title: "About" },
+    });
+    assert.equal(second.status, 402, "the second page is what a plan buys");
+    assert.equal(second.json.code, "quota_exceeded");
   });
 });
 
@@ -403,8 +421,8 @@ describe("closing an account", () => {
     });
     const token = session.json.data.accessToken;
 
-    // A fresh signup is entitled to zero websites — there is no free trial —
-    // so this one has to be paid for before it can exist at all.
+    // The free website would do here, but granting a subscription keeps this
+    // test about account deletion rather than about the free tier's page cap.
     await grantWebsites(email, 1);
     const made = await api("/api/projects", { method: "POST", token, body: { name: "Still Live" } });
     assert.equal(made.status, 201);

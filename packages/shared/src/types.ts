@@ -1,5 +1,5 @@
 import type { SectionContent } from "./fields.js";
-import type { BillingPeriod, PlanId, SubscriptionStatus } from "./plans.js";
+import type { BillingPeriod, Currency, PlanId, SubscriptionStatus } from "./plans.js";
 
 /**
  * Wire shapes shared by the API, the dashboard and the site SDK.
@@ -136,7 +136,7 @@ export interface UserDTO {
   plan: PlanId;
   /**
    * How many websites this account may own right now — zero until a
-   * subscription is live, because there is no free trial. The dashboard gates
+   * subscription is live; without one it is the free allowance. The dashboard gates
    * "Add website" on this rather than on the plan name, so the ladder (₹999 per
    * website) needs no client-side arithmetic.
    */
@@ -160,7 +160,7 @@ export type ApiErrorCode =
   | "quota_exceeded"
   /** No live subscription, so this account may not own a website yet. */
   | "subscription_required"
-  /** The server has no Razorpay credentials, so nobody can check out. */
+  /** The server has no payment-provider credentials, so nobody can check out. */
   | "billing_not_configured";
 
 /** Every API response uses this envelope. */
@@ -187,45 +187,62 @@ export interface SubscriptionDTO {
   planName: string;
   status: SubscriptionStatus;
   /** Websites this account may own right now. Zero until a subscription is live. */
+  /**
+   * Websites this account **pays for** — 0 on the free plan. This is the field
+   * that says whether there is a subscription at all; do not put the allowance
+   * here (see `paidWebsites` vs `websiteAllowance`).
+   */
   websites: number;
+  /**
+   * Websites this account **may own**, free one included. What the "x of y"
+   * counter shows, and always at least `FREE_WEBSITES`.
+   */
+  websitesAllowed: number;
   websitesUsed: number;
   period: BillingPeriod;
   /** ISO date the current cycle ends, or null when there is no subscription. */
   currentPeriodEnd: string | null;
   /** True once cancellation is scheduled — access lasts until the period ends. */
   cancelAtPeriodEnd: boolean;
-  /** Price in paise per website, so the dashboard never hard-codes the ladder. */
-  pricePerWebsitePaise: { monthly: number; yearly: number };
-  currency: "INR";
+  /**
+   * Price per website in the currency's minor unit, so the dashboard never
+   * hard-codes the ladder. Pair it with `currency` to render it — see
+   * `formatMoney`.
+   */
+  pricePerWebsiteMinor: { monthly: number; yearly: number };
+  currency: Currency;
   minWebsites: number;
   maxWebsites: number;
   /**
-   * False when the server has no Razorpay credentials. The dashboard shows a
+   * False when the server has no payment-provider credentials. The dashboard shows a
    * plain explanation instead of a checkout button that cannot work — the same
    * courtesy R2 and SMTP already get.
    */
   billingEnabled: boolean;
-  /** Razorpay's public key id. Present only when `billingEnabled`. */
-  keyId?: string;
-  /** Razorpay's hosted management page for this subscription, when it has one. */
+  /** The provider's hosted management page for this subscription, when it has one. */
   manageUrl?: string | null;
 }
 
 /**
- * One charge Razorpay actually took — the account's billing history.
+ * One charge the provider actually took — the account's billing history.
  *
  * The amount is stored per row rather than derived from today's price list,
  * because prices change and a charge must always explain itself.
  */
 export interface PaymentDTO {
   id: string;
-  /** Razorpay's payment id — what support asks for to find or refund a charge. */
-  razorpayPaymentId: string;
-  amountPaise: number;
+  /** The provider's payment id — what support asks for to find or refund a charge. */
+  providerPaymentId: string;
+  /**
+   * The charge, in the minor unit of **this row's** `currency` — not today's.
+   * A history that spans a currency change (this one spans INR → USD) is only
+   * honest if each row is formatted with the currency it was taken in.
+   */
+  amountMinor: number;
   currency: string;
-  /** Razorpay's own state: captured, failed, authorized, refunded. */
+  /** The provider's own state: succeeded, failed, refunded. */
   status: string;
-  /** "card", "upi", "netbanking" — never the card itself. */
+  /** "card", "upi" — the method label, never the card itself. */
   method: string | null;
   /** Websites this charge covered, so an old row explains its own amount. */
   websites: number | null;
@@ -233,16 +250,22 @@ export interface PaymentDTO {
   paidAt: string;
 }
 
-/** What the dashboard needs to open Razorpay Checkout. */
+/**
+ * Where to send the customer to pay.
+ *
+ * Dodo hosts the payment page, so unlike the Razorpay modal this replaced there
+ * are no keys or ids for the browser to assemble a widget from — just a URL to
+ * navigate to. The consequence is that **nothing is granted in the browser**:
+ * the webhook is the only thing that grants access, so the page the customer
+ * returns to has to tolerate "paid, but not confirmed yet".
+ */
 export interface CheckoutDTO {
-  subscriptionId: string;
-  keyId: string;
+  /** Dodo's checkout session id, useful only for support and logs. */
+  sessionId: string;
+  /** Navigate here. Do not render it in an iframe — card pages refuse to load. */
+  checkoutUrl: string;
   websites: number;
   period: BillingPeriod;
-  amountPaise: number;
-  currency: "INR";
-  /** Razorpay's own hosted page, used as the fallback if the modal cannot open. */
-  shortUrl: string | null;
-  customerEmail: string;
-  customerName: string;
+  amountMinor: number;
+  currency: Currency;
 }

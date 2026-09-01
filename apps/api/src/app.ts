@@ -9,7 +9,7 @@ import sectionTypeRoutes from "./routes/section-types.js";
 import pageRoutes from "./routes/pages.js";
 import mediaRoutes from "./routes/media.js";
 import contentRoutes from "./routes/content.js";
-import billingRoutes, { razorpayWebhookRouter } from "./routes/billing.js";
+import billingRoutes, { dodoWebhookRouter } from "./routes/billing.js";
 
 /**
  * The Express app, separate from the server bootstrap so tests can mount it
@@ -35,7 +35,7 @@ export function createApp() {
   // Once express.json has read the stream there is no way back to the bytes,
   // and the digest silently stops matching, presenting as "payments never
   // activate". Everything else in billing is ordinary JSON and mounts below.
-  app.use("/api/billing/webhook", razorpayWebhookRouter);
+  app.use("/api/billing/webhook", dodoWebhookRouter);
   app.use(express.json({ limit: "2mb" }));
   app.use(cookieParser());
 

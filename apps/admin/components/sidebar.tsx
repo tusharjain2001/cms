@@ -231,14 +231,6 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             Getting started
           </button>
         )}
-        <NavLink
-          href="/foundation"
-          icon="◐"
-          active={pathname === "/foundation"}
-          onNavigate={onNavigate}
-        >
-          Style &amp; states
-        </NavLink>
         <div className="h-px bg-line-mid" />
 
         <div className="flex items-center gap-2.5 px-1 py-0.5">

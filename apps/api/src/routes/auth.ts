@@ -10,7 +10,7 @@ import {
   verifyPassword,
   type UserDoc,
 } from "../models/user.js";
-import { cancelSubscription } from "../lib/razorpay.js";
+import { cancelSubscription } from "../lib/dodo.js";
 import { AuthToken, consumeToken, issueToken } from "../models/auth-token.js";
 import { Project } from "../models/project.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -399,14 +399,14 @@ router.delete("/me", requireAuth, async (req, res, next) => {
      * logged loudly instead, because it is a real bill somebody has to cancel
      * by hand.
      */
-    const subscriptionId = user.subscription?.razorpaySubscriptionId;
+    const subscriptionId = user.subscription?.providerSubscriptionId;
     if (subscriptionId && isEntitled(subscriptionStatusOf(user))) {
       try {
         await cancelSubscription(subscriptionId);
       } catch (err) {
         console.error(
           `[billing] could not cancel ${subscriptionId} while closing ${user.email}. ` +
-            `Cancel it by hand in the Razorpay dashboard.`,
+            `Cancel it by hand in the Dodo Payments dashboard.`,
           err
         );
       }

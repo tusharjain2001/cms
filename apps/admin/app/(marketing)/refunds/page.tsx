@@ -5,7 +5,7 @@ import { business, commercials, refunds } from "@/lib/legal";
 /**
  * Refunds and cancellation.
  *
- * Required by Razorpay before a website is verified for payments, and the one
+ * Required by the payment provider before a website is verified for payments, and the one
  * policy customers actually read. Every figure comes from `lib/legal.ts` and
  * `commercials`, so the page cannot drift from what the product charges.
  *
@@ -52,9 +52,10 @@ export default function RefundsPage() {
           to {commercials.maxWebsites}.
         </p>
         <p>
-          There is no free trial. Signing up, confirming your email address and looking around the
-          dashboard cost nothing, but creating a website is a purchase — which is exactly why the
-          refund window below exists.
+          A free plan is available and does not expire: one website holding one page, at no charge
+          and with no card. Nothing in this policy applies to it, because nothing has been paid.
+          Paid plans begin only when you choose one, which is exactly why the refund window below
+          exists.
         </p>
       </Clause>
 
@@ -114,11 +115,11 @@ export default function RefundsPage() {
           >
             {business.supportEmail}
           </a>{" "}
-          from the address on your account, with the Razorpay payment id from your receipt.
+          from the address on your account, with the payment id from your receipt.
         </p>
         <p>
           We reply within {refunds.responseTime}. An approved refund goes back to the card or
-          account you paid from — we cannot send it anywhere else — and Razorpay usually settles it
+          account you paid from — we cannot send it anywhere else — and Dodo Payments usually settles it
           within {refunds.settlementDays}.
         </p>
       </Clause>
@@ -128,7 +129,7 @@ export default function RefundsPage() {
           items={[
             <>
               <strong className="font-semibold text-ink">Adding one</strong> takes effect
-              immediately. Razorpay charges the difference for the rest of the current period, and
+              immediately. Dodo Payments charges the difference for the rest of the current period, and
               you are not asked for your card again.
             </>,
             <>
@@ -144,7 +145,7 @@ export default function RefundsPage() {
 
       <Clause n={6} title="If a payment fails">
         <p>
-          Razorpay retries automatically. Nothing happens to your websites while it does — a bounced
+          Dodo Payments retries automatically. Nothing happens to your websites while it does — a bounced
           card should not take a live site down. If the retries are exhausted, the subscription
           stops and you can no longer add websites, but everything you have built stays readable and
           editable, and your published pages keep serving.

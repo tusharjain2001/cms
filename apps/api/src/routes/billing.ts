@@ -6,17 +6,19 @@ import {
   MAX_WEBSITES,
   MIN_WEBSITES,
   PAID_PLAN,
-  PRICE_PER_WEBSITE_MONTHLY_PAISE,
-  PRICE_PER_WEBSITE_YEARLY_PAISE,
+  PRICE_PER_WEBSITE_MONTHLY_CENTS,
+  PRICE_PER_WEBSITE_YEARLY_CENTS,
   type SubscriptionDTO,
-  type SubscriptionStatus,
+  CURRENCY,
   clampWebsites,
-  formatInr,
+  formatMoney,
   isEntitled,
+  paidWebsites,
   planFor,
-  pricePaise,
+  priceMinor,
   websiteAllowance,
 } from "@pagecraft/shared";
+import { env } from "../config/env.js";
 import { Project } from "../models/project.js";
 import { Payment, recordPayment, toPaymentDTO } from "../models/payment.js";
 import {
@@ -30,57 +32,47 @@ import {
 import { requireAuth, requireVerified } from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
 import { rateLimit } from "../middleware/rate-limit.js";
-import { badRequest, conflict, ok, unauthorized } from "../lib/respond.js";
+import { badRequest, conflict, ok, serviceUnavailable, unauthorized } from "../lib/respond.js";
 import {
-  type RazorpaySubscription,
+  type DodoPaymentEntity,
+  type DodoSubscription,
   cancelSubscription,
-  createSubscription,
-  cycleAmountPaise,
+  changeSubscriptionQuantity,
+  checkProductPrice,
+  createCheckoutSession,
+  cycleAmountMinor,
+  dodoEnabled,
   fetchSubscription,
-  periodOfPlanId,
-  razorpayEnabled,
-  razorpayKeyId,
-  updateSubscriptionQuantity,
-  verifyCheckoutSignature,
+  mapStatus,
+  periodOfProductId,
   verifyWebhookSignature,
-} from "../lib/razorpay.js";
+} from "../lib/dodo.js";
 
 /**
  * Billing — the only router that knows a payment provider exists.
  *
- * THE MODEL: ₹999 per website per month, ₹9,990 per website per year. Buying
- * three websites is quantity 3 of one Razorpay plan, not a third price tier.
- * There is **no free trial**: a fresh account's allowance is zero, so the very
- * first website is a purchase.
+ * THE MODEL: $7.99 per website per month, $79.90 per website per year. Buying
+ * three websites is quantity 3 of one Dodo product, not a third price tier.
+ * A fresh account's allowance is `FREE_WEBSITES` — one website, capped at a
+ * single page. What a plan sells is room: more pages, and more websites.
  *
  * WHAT GRANTS ACCESS, AND WHAT DOES NOT:
  *
- *   - `POST /subscription` creates a Razorpay subscription and grants nothing.
- *     It exists only so Checkout has something to authorise.
- *   - `POST /verify` grants access after checking the signature Checkout hands
- *     the browser. This is a *latency* optimisation — the customer should not
- *     stare at a spinner waiting for a webhook — and it is safe because the
- *     signature is HMAC'd with the API secret, which the browser never sees.
- *   - `POST /webhook` is the source of truth from then on: renewals, failed
- *     charges, cancellations and anything that happens while nobody is looking.
+ *   - `POST /subscription` opens a hosted checkout and grants **nothing**.
+ *   - `POST /webhook` is the **only** thing that grants access — renewals,
+ *     failed charges, cancellations, and the first purchase alike.
  *
- * Both writers funnel into `applySubscription`, so there is exactly one place
- * where an account's entitlement can change.
+ * That is a real change from the Razorpay arrangement this replaced, which also
+ * had a `POST /verify` route granting access from a signature handed to the
+ * browser. Dodo hosts the payment page, so no such signature exists: the
+ * customer leaves the site entirely and comes back to a return URL that proves
+ * nothing. One source of truth is simpler and safer, but it has a consequence
+ * the dashboard must handle — for a second or two after paying, the customer is
+ * back on the billing screen and still not entitled. Do not "fix" that by
+ * trusting the return URL; it is a plain redirect anyone can visit.
+ *
+ * `applySubscription` remains the one place an entitlement can change.
  */
-/**
- * The slice of Razorpay's payment entity we store. Deliberately partial — we
- * keep what a customer or an accountant would ask for, and nothing that looks
- * like card data (which never reaches this server anyway).
- */
-interface RazorpayPaymentEntity {
-  id: string;
-  amount?: number;
-  currency?: string;
-  status?: string;
-  method?: string;
-  invoice_id?: string | null;
-  created_at?: number;
-}
 
 const router = Router();
 
@@ -97,26 +89,27 @@ async function toSubscriptionDTO(user: UserDoc): Promise<SubscriptionDTO> {
   const status = subscriptionStatusOf(user);
   const plan = planFor(planIdOf(user));
   const websitesUsed = await Project.countDocuments({ ownerId: user._id });
-  const keyId = razorpayKeyId();
 
   return {
     plan: plan.id,
     planName: plan.name,
     status,
-    websites: websiteAllowance(entitlementOf(user)),
+    // Two different numbers on purpose: what they pay for, and what they may
+    // own. They only coincide on a paid account.
+    websites: paidWebsites(entitlementOf(user)),
+    websitesAllowed: websiteAllowance(entitlementOf(user)),
     websitesUsed,
     period: billingPeriodOf(user),
     currentPeriodEnd: user.subscription?.currentPeriodEnd?.toISOString() ?? null,
     cancelAtPeriodEnd: Boolean(user.subscription?.cancelAtPeriodEnd),
-    pricePerWebsitePaise: {
-      monthly: PRICE_PER_WEBSITE_MONTHLY_PAISE,
-      yearly: PRICE_PER_WEBSITE_YEARLY_PAISE,
+    pricePerWebsiteMinor: {
+      monthly: PRICE_PER_WEBSITE_MONTHLY_CENTS,
+      yearly: PRICE_PER_WEBSITE_YEARLY_CENTS,
     },
-    currency: "INR",
+    currency: CURRENCY,
     minWebsites: MIN_WEBSITES,
     maxWebsites: MAX_WEBSITES,
-    billingEnabled: razorpayEnabled(),
-    ...(razorpayEnabled() && keyId ? { keyId } : {}),
+    billingEnabled: dodoEnabled(),
   };
 }
 
@@ -135,15 +128,15 @@ router.get("/", requireAuth, async (req, res, next) => {
 /**
  * The **only** function that changes what an account is entitled to.
  *
- * `eventAt` is Razorpay's timestamp for the change, not ours. Webhooks are
+ * `eventAt` is the provider's timestamp for the change, not ours. Webhooks are
  * retried for days and arrive out of order, so an update older than the one
  * already applied is dropped — otherwise a re-delivered `cancelled` from last
- * week can land after this morning's `active` and lock a paying customer out
- * of websites they are still paying for.
+ * week can land after this morning's `active` and lock a paying customer out of
+ * websites they are still paying for.
  */
 async function applySubscription(
   userId: unknown,
-  sub: RazorpaySubscription,
+  sub: DodoSubscription,
   eventAt: Date
 ): Promise<void> {
   const user = await User.findById(userId);
@@ -152,9 +145,9 @@ async function applySubscription(
   const applied = user.subscription?.lastEventAt;
   if (applied && applied.getTime() > eventAt.getTime()) return;
 
-  const status = sub.status as SubscriptionStatus;
+  const status = mapStatus(sub.status);
   const entitled = isEntitled(status);
-  const period = periodOfPlanId(sub.plan_id);
+  const period = periodOfProductId(sub.product_id);
 
   await User.updateOne(
     { _id: user._id },
@@ -167,24 +160,32 @@ async function applySubscription(
         "subscription.status": status,
         "subscription.websites": clampWebsites(sub.quantity ?? 1),
         "subscription.period": period,
-        "subscription.razorpaySubscriptionId": sub.id,
-        "subscription.razorpayPlanId": sub.plan_id ?? null,
-        "subscription.razorpayCustomerId": sub.customer_id ?? null,
-        "subscription.currentPeriodEnd": sub.current_end ? new Date(sub.current_end * 1000) : null,
-        "subscription.cancelAtPeriodEnd": status === "cancelled" || status === "completed",
+        "subscription.providerSubscriptionId": sub.subscription_id,
+        "subscription.providerProductId": sub.product_id ?? null,
+        "subscription.providerCustomerId": sub.customer?.customer_id ?? null,
+        "subscription.currentPeriodEnd": sub.next_billing_date
+          ? new Date(sub.next_billing_date)
+          : null,
+        // Dodo reports a scheduled cancellation as a flag on a still-active
+        // subscription, so the flag is read directly rather than inferred from
+        // the status — inferring it would either revoke access early or lose it.
+        "subscription.cancelAtPeriodEnd": Boolean(sub.cancel_at_next_billing_date),
         "subscription.lastEventAt": eventAt,
       },
     }
   );
 }
 
+/** Where Dodo sends the customer back to after a hosted checkout. */
+const returnUrl = () => `${env.APP_URL.replace(/\/+$/, "")}/billing?checkout=done`;
+
 // ---------------------------------------------------------------- checkout
 
 /**
  * Starts a purchase, or changes how many websites an existing one covers.
  *
- * Rate limited because each call creates a real object at Razorpay; a loop
- * here would litter the account with hundreds of abandoned subscriptions.
+ * Rate limited because each call creates a real object at Dodo; a loop here
+ * would litter the account with hundreds of abandoned checkout sessions.
  */
 router.post(
   "/subscription",
@@ -202,12 +203,26 @@ router.post(
       if (!user) throw unauthorized();
 
       const { websites, period } = req.body as { websites: number; period: BillingPeriod };
-      const existingId = user.subscription?.razorpaySubscriptionId ?? null;
+      const existingId = user.subscription?.providerSubscriptionId ?? null;
       const live = isEntitled(subscriptionStatusOf(user));
 
-      // Going DOWN is refused while the websites still exist. Razorpay would
-      // happily take the smaller quantity and we would be left holding more
-      // websites than the customer pays for — with no honest way to choose
+      // **Never sell at a price we did not quote.** The customer is charged the
+      // Dodo product's price, not ours, so a product that no longer matches
+      // `plans.ts` means the dashboard is advertising one price and Dodo is
+      // about to take another. Refuse rather than take the money: an
+      // over-charge is far more expensive to undo than a failed checkout.
+      const priced = await checkProductPrice(period);
+      if (!priced.ok) {
+        throw serviceUnavailable(
+          "Checkout is unavailable while our payment plans are being updated. " +
+            "Nothing has been charged — please try again shortly.",
+          "billing_not_configured"
+        );
+      }
+
+      // Going DOWN is refused while the websites still exist. The provider
+      // would happily take the smaller quantity and we would be left holding
+      // more websites than the customer pays for — with no honest way to choose
       // which one to switch off. Delete first, then reduce.
       const owned = await Project.countDocuments({ ownerId: user._id });
       if (websites < owned) {
@@ -217,10 +232,13 @@ router.post(
         );
       }
 
-      // An existing, authorised mandate is amended rather than replaced, so
-      // adding a website does not ask the customer for their card again.
+      // An existing, authorised subscription is amended rather than replaced,
+      // so adding a website does not send the customer back through checkout.
       if (existingId && live && period === billingPeriodOf(user)) {
-        const updated = await updateSubscriptionQuantity(existingId, websites);
+        await changeSubscriptionQuantity(existingId, period, websites);
+        // Dodo answers a plan change with an empty body, so the truth is
+        // re-read rather than guessed at from what we asked for.
+        const updated = await fetchSubscription(existingId);
         await applySubscription(user._id, updated, new Date());
         const fresh = await User.findById(user._id);
         return ok(res, {
@@ -229,82 +247,24 @@ router.post(
         });
       }
 
-      const sub = await createSubscription({
+      const session = await createCheckoutSession({
         websites,
         period,
         userId: user._id.toString(),
         email: user.email,
         name: user.name,
+        returnUrl: returnUrl(),
       });
 
-      // Recorded now, unauthorised, so the webhook can find this account even
-      // if the customer closes the tab mid-payment.
-      await applySubscription(user._id, sub, new Date());
-
       const checkout: CheckoutDTO = {
-        subscriptionId: sub.id,
-        keyId: razorpayKeyId() ?? "",
+        sessionId: session.session_id,
+        checkoutUrl: session.checkout_url,
         websites: clampWebsites(websites),
         period,
-        amountPaise: cycleAmountPaise(websites, period),
-        currency: "INR",
-        shortUrl: sub.short_url ?? null,
-        customerEmail: user.email,
-        customerName: user.name,
+        amountMinor: cycleAmountMinor(websites, period),
+        currency: CURRENCY,
       };
       ok(res, { updated: false, checkout }, 201);
-    } catch (err) {
-      next(err);
-    }
-  }
-);
-
-const verifySchema = z.object({
-  razorpay_payment_id: z.string().min(1),
-  razorpay_subscription_id: z.string().min(1),
-  razorpay_signature: z.string().min(1),
-});
-
-/**
- * What the browser posts back the instant Checkout succeeds.
- *
- * The signature is HMAC'd with the API key secret, which never leaves the
- * server, so a forged call cannot buy anything. The subscription is then
- * re-fetched from Razorpay rather than trusted from the request body — the
- * signature proves *who paid*, not *what they bought*.
- */
-router.post(
-  "/verify",
-  requireAuth,
-  requireVerified,
-  validateBody(verifySchema),
-  async (req, res, next) => {
-    try {
-      const user = req.user;
-      if (!user) throw unauthorized();
-
-      const body = req.body as z.infer<typeof verifySchema>;
-      if (!verifyCheckoutSignature(body)) {
-        throw badRequest("That payment could not be verified. Nothing has been charged twice.");
-      }
-
-      // Only the account this subscription was created for may claim it.
-      if (
-        user.subscription?.razorpaySubscriptionId &&
-        user.subscription.razorpaySubscriptionId !== body.razorpay_subscription_id
-      ) {
-        throw badRequest("That payment belongs to a different subscription.");
-      }
-
-      const sub = await fetchSubscription(body.razorpay_subscription_id);
-      const owner = sub.notes?.userId;
-      if (owner && owner !== user._id.toString()) {
-        throw badRequest("That payment belongs to a different account.");
-      }
-
-      await applySubscription(user._id, sub, new Date());
-      const fresh = await User.findById(user._id);
-      ok(res, fresh ? await toSubscriptionDTO(fresh) : null);
     } catch (err) {
       next(err);
     }
@@ -317,22 +277,22 @@ router.post("/cancel", requireAuth, requireVerified, async (req, res, next) => {
     const user = req.user;
     if (!user) throw unauthorized();
 
-    const id = user.subscription?.razorpaySubscriptionId;
+    const id = user.subscription?.providerSubscriptionId;
     if (!id || !isEntitled(subscriptionStatusOf(user))) {
       throw badRequest("There is no active subscription to cancel.");
     }
 
     const sub = await cancelSubscription(id);
-    // Deliberately NOT applySubscription: Razorpay reports a cycle-end cancel
-    // as still `active` with a pending cancellation, and treating it as a
+    // Deliberately NOT applySubscription: a cycle-end cancel leaves the
+    // subscription `active` with a pending cancellation, and treating that as a
     // status change would either revoke access early or lose the flag.
     await User.updateOne(
       { _id: user._id },
       {
         $set: {
           "subscription.cancelAtPeriodEnd": true,
-          "subscription.currentPeriodEnd": sub.current_end
-            ? new Date(sub.current_end * 1000)
+          "subscription.currentPeriodEnd": sub.next_billing_date
+            ? new Date(sub.next_billing_date)
             : (user.subscription?.currentPeriodEnd ?? null),
         },
       }
@@ -348,96 +308,149 @@ router.post("/cancel", requireAuth, requireVerified, async (req, res, next) => {
 // ----------------------------------------------------------------- webhook
 
 /**
- * Razorpay's callback — the source of truth for everything that happens when
- * the customer is not sitting in front of the dashboard: renewals, failed
- * charges, cancellations, mandates authorised on Razorpay's own hosted page.
+ * Dodo's callback — and, with a hosted checkout, the **only** thing that grants
+ * access. Renewals, failed charges, cancellations and first purchases all
+ * arrive here.
  *
  * It lives on its own router, mounted in `app.ts` **above** `express.json`,
- * because the signature is computed over the exact bytes Razorpay sent. Once
- * the JSON parser has read the stream those bytes are gone, and re-serialising
- * the parsed object reorders keys so the digest silently stops matching — a
- * failure that presents as "payments mysteriously never activate".
+ * because the signature is computed over the exact bytes Dodo sent. Once the
+ * JSON parser has read the stream those bytes are gone, and re-serialising the
+ * parsed object reorders keys so the digest silently stops matching — a failure
+ * that presents as "payments mysteriously never activate".
  *
  * The route is public by necessity, so the signature is the entire door: with
  * no webhook secret configured every request is rejected, never waved through.
  */
-export const razorpayWebhookRouter = Router();
+export const dodoWebhookRouter = Router();
 
-razorpayWebhookRouter.post(
-  "/",
-  express.raw({ type: "*/*", limit: "1mb" }),
-  async (req, res, next) => {
-    try {
-      const signature = req.header("x-razorpay-signature") ?? "";
-      const raw: Buffer = Buffer.isBuffer(req.body) ? req.body : Buffer.from("");
+/** The shape Dodo wraps every event in. `data` is the entity that changed. */
+interface DodoWebhookEvent {
+  type?: string;
+  timestamp?: string;
+  data?: Partial<DodoSubscription> &
+    Partial<DodoPaymentEntity> & {
+      payload_type?: string;
+      metadata?: Record<string, string> | null;
+    };
+}
 
-      if (!verifyWebhookSignature(raw, signature)) {
-        // 400, not 5xx: Razorpay retries on 5xx, and redelivering a request
-        // whose signature can never match just makes noise for days.
-        return res.status(400).json({ success: false, error: "Invalid signature." });
-      }
+/**
+ * Which account an event belongs to, in order of trustworthiness.
+ *
+ * **This matters more here than it did under Razorpay.** There, the
+ * subscription was created by our own API call, so its id could be written to
+ * the account *before* any webhook arrived and every event had something to
+ * match on. Dodo's hosted checkout returns only a session id — the
+ * subscription does not exist until the customer pays — so for a first
+ * purchase there is nothing on the account yet, and the event has to identify
+ * itself.
+ *
+ *   1. `metadata.userId`, stamped on the checkout session and carried through
+ *      to the subscription. Exact, and immune to a customer holding two
+ *      accounts.
+ *   2. The subscription id, once we have seen it once. This is what renewals
+ *      and cancellations months later match on.
+ *   3. The customer's email address — a **last resort**, and only reached when
+ *      a first purchase arrives with no metadata. Safe because emails are
+ *      unique in this schema and the address is the one we handed Dodo at
+ *      checkout, but it is last for a reason: it trusts a field we did not
+ *      stamp ourselves.
+ */
+async function accountFor(
+  metadataUserId: string | undefined,
+  subscriptionId: string | undefined,
+  email: string | undefined
+): Promise<unknown | null> {
+  if (metadataUserId) return metadataUserId;
 
-      const event = JSON.parse(raw.toString("utf8")) as {
-        event?: string;
-        created_at?: number;
-        payload?: {
-          subscription?: { entity?: RazorpaySubscription };
-          /** `subscription.charged` carries the charge alongside the subscription. */
-          payment?: { entity?: RazorpayPaymentEntity };
-        };
-      };
-
-      const sub = event.payload?.subscription?.entity;
-      const payment = event.payload?.payment?.entity;
-
-      if (sub?.id) {
-        const eventAt = new Date((event.created_at ?? Math.floor(Date.now() / 1000)) * 1000);
-        // `notes.userId` was stamped at creation, so the account comes from the
-        // event itself — no email lookup, and no way to credit the wrong
-        // account if one person holds two.
-        const userId =
-          sub.notes?.userId ??
-          (await User.findOne({ "subscription.razorpaySubscriptionId": sub.id }).select("_id"))
-            ?._id;
-
-        if (userId) {
-          await applySubscription(userId, sub, eventAt);
-
-          /**
-           * Record the money, not just the state.
-           *
-           * `subscription.charged` carries both entities, which is why the
-           * webhook needs no `payment.*` subscription to build a full billing
-           * history. The amount comes from Razorpay rather than from our own
-           * price list on purpose: what was charged is a fact, and recomputing
-           * it from today's prices is how a repricing quietly rewrites history.
-           */
-          if (payment?.id) {
-            await recordPayment({
-              userId,
-              razorpayPaymentId: payment.id,
-              razorpaySubscriptionId: sub.id,
-              razorpayInvoiceId: payment.invoice_id ?? null,
-              amountPaise: payment.amount ?? 0,
-              currency: payment.currency ?? "INR",
-              status: payment.status ?? "captured",
-              method: payment.method ?? null,
-              websites: clampWebsites(sub.quantity ?? 1),
-              period: periodOfPlanId(sub.plan_id),
-              paidAt: new Date((payment.created_at ?? event.created_at ?? 0) * 1000),
-            });
-          }
-        }
-      }
-
-      // Always 200 once the signature checks out. A handler slip must not make
-      // Razorpay redeliver forever — the next event carries the same state.
-      res.json({ success: true, data: { received: true } });
-    } catch (err) {
-      next(err);
-    }
+  if (subscriptionId) {
+    const bySub = await User.findOne({
+      "subscription.providerSubscriptionId": subscriptionId,
+    }).select("_id");
+    if (bySub) return bySub._id;
   }
-);
+
+  if (email) {
+    const byEmail = await User.findOne({ email: email.toLowerCase() }).select("_id");
+    if (byEmail) return byEmail._id;
+  }
+
+  return null;
+}
+
+dodoWebhookRouter.post("/", express.raw({ type: "*/*", limit: "1mb" }), async (req, res, next) => {
+  try {
+    const raw: Buffer = Buffer.isBuffer(req.body) ? req.body : Buffer.from("");
+
+    if (
+      !verifyWebhookSignature(raw, {
+        id: req.header("webhook-id"),
+        timestamp: req.header("webhook-timestamp"),
+        signature: req.header("webhook-signature"),
+      })
+    ) {
+      // 400, not 5xx: Dodo retries on 5xx, and redelivering a request whose
+      // signature can never match just makes noise for days.
+      return res.status(400).json({ success: false, error: "Invalid signature." });
+    }
+
+    const event = JSON.parse(raw.toString("utf8")) as DodoWebhookEvent;
+    const data = event.data ?? {};
+    const eventAt = event.timestamp ? new Date(event.timestamp) : new Date();
+    const type = event.type ?? "";
+
+    if (type.startsWith("subscription.") && data.subscription_id) {
+      const userId = await accountFor(
+        data.metadata?.userId,
+        data.subscription_id,
+        data.customer?.email
+      );
+      if (userId) {
+        await applySubscription(userId, data as DodoSubscription, eventAt);
+      }
+    } else if (type.startsWith("payment.") && data.payment_id) {
+      /**
+       * Record the money, not just the state.
+       *
+       * The amount comes from Dodo rather than from our own price list on
+       * purpose: what was charged is a fact, and recomputing it from today's
+       * prices is how a repricing quietly rewrites history. `settlement_amount`
+       * is deliberately ignored — a customer's bill is what they were charged,
+       * not what reached us after the provider's fee.
+       */
+      const subscriptionId = data.subscription_id ?? undefined;
+      const userId = await accountFor(
+        data.metadata?.userId,
+        subscriptionId,
+        data.customer?.email
+      );
+      if (userId) {
+        const owner = await User.findById(userId).select("subscription");
+        await recordPayment({
+          userId,
+          providerPaymentId: data.payment_id,
+          providerSubscriptionId: subscriptionId ?? null,
+          amountMinor: data.total_amount ?? 0,
+          // Dodo's own currency for this charge, never ours: a history that
+          // spans a currency change must keep each row in the one it was taken.
+          currency: data.currency ?? CURRENCY,
+          status: data.status ?? "succeeded",
+          method: data.payment_method ?? null,
+          websites: owner?.subscription?.websites ?? null,
+          period: owner?.subscription?.period ?? null,
+          paidAt: data.created_at ? new Date(data.created_at) : eventAt,
+        });
+      }
+    }
+
+    // Always 200 once the signature checks out — including for the dozens of
+    // event types this handler ignores. A handler slip, or an event nobody
+    // deliberately subscribed to, must not make Dodo redeliver for days.
+    res.json({ success: true, data: { received: true } });
+  } catch (err) {
+    next(err);
+  }
+});
 
 /**
  * This account's billing history — what the customer sees instead of emailing
@@ -463,19 +476,19 @@ router.get("/payments", requireAuth, async (req, res, next) => {
  */
 router.get("/plans", (_req, res) => {
   ok(res, {
-    currency: "INR",
+    currency: CURRENCY,
     minWebsites: MIN_WEBSITES,
     maxWebsites: MAX_WEBSITES,
-    pricePerWebsitePaise: {
-      monthly: PRICE_PER_WEBSITE_MONTHLY_PAISE,
-      yearly: PRICE_PER_WEBSITE_YEARLY_PAISE,
+    pricePerWebsiteMinor: {
+      monthly: PRICE_PER_WEBSITE_MONTHLY_CENTS,
+      yearly: PRICE_PER_WEBSITE_YEARLY_CENTS,
     },
     examples: [1, 2, 3].map((n) => ({
       websites: n,
-      monthly: `₹${formatInr(pricePaise(n, "monthly"))}`,
-      yearly: `₹${formatInr(pricePaise(n, "yearly"))}`,
+      monthly: formatMoney(priceMinor(n, "monthly")),
+      yearly: formatMoney(priceMinor(n, "yearly")),
     })),
-    billingEnabled: razorpayEnabled(),
+    billingEnabled: dodoEnabled(),
   });
 });
 

@@ -1,13 +1,17 @@
 "use client";
 
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
+import { FREE_PAGES_PER_WEBSITE, ONE_MONTH } from "@/lib/pricing";
 import { useDragList } from "@/lib/use-drag-list";
 import { Button, Chip, DropLine, EmptyState, Grip, PageHeader } from "@/components/ui";
 
 export default function PagesScreen() {
   const s = useStore();
+  const { user } = useAuth();
   const router = useRouter();
   const params = useParams<{ projectId: string }>();
   const drag = useDragList((from, to) => void s.movePage(from, to));
@@ -22,15 +26,38 @@ export default function PagesScreen() {
 
   const openPage = (id: string) => router.push(`${base}/${id}`);
 
+  /**
+   * The free website holds one page, so the button that would add a second is
+   * an upgrade prompt instead of a request the API is about to refuse.
+   *
+   * Gated on being the **owner** as well as on the plan, for two reasons: the
+   * cap belongs to whoever owns the website (they pay, not the viewer), and an
+   * editor invited to someone else's site cannot buy anything, so offering
+   * them a plan would be a dead end. An editor keeps the plain button and, if
+   * the site really is full, the API's own explanation.
+   */
+  const owns = s.project?.role === "owner";
+  const atFreePageLimit =
+    owns && user?.plan === "free" && s.pages.length >= FREE_PAGES_PER_WEBSITE;
+  const upgradeHref = `/billing?want=${Math.max(1, s.projects.filter((p) => p.role === "owner").length)}`;
+
   return (
     <div className="max-w-[960px] px-6 py-10 lg:px-11">
       <PageHeader
         title={s.project?.name ?? "Pages"}
         sub="Drag the pages to change the order of your website menu."
         action={
-          <Button variant="primary" data-tour="add-page" onClick={() => s.openModal("addpage")}>
-            + Add page
-          </Button>
+          atFreePageLimit ? (
+            <Link href={upgradeHref}>
+              <Button variant="primary" data-tour="add-page">
+                Choose a plan to add pages
+              </Button>
+            </Link>
+          ) : (
+            <Button variant="primary" data-tour="add-page" onClick={() => s.openModal("addpage")}>
+              + Add page
+            </Button>
+          )
         }
       />
 
@@ -128,7 +155,17 @@ export default function PagesScreen() {
             ))}
           </div>
           <p className="mt-3 text-mid text-muted">
-            Changes to a page are only visible to you until you press Publish.
+            {atFreePageLimit ? (
+              <>
+                Your free website holds one page. {ONE_MONTH} a month lifts that — add as many
+                pages as your website needs, and keep everything you have already built.{" "}
+                <Link href={upgradeHref} className="font-semibold text-accent hover:underline">
+                  See plans
+                </Link>
+              </>
+            ) : (
+              "Changes to a page are only visible to you until you press Publish."
+            )}
           </p>
         </>
       )}

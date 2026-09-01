@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { links } from "@/lib/links";
-import { PRICE_PER_WEBSITE, inr, price } from "@/lib/pricing";
+import { PRICE_PER_WEBSITE, price, usd } from "@/lib/pricing";
 
 /**
  * The price ladder and the monthly/yearly toggle.
@@ -28,11 +28,11 @@ import { PRICE_PER_WEBSITE, inr, price } from "@/lib/pricing";
  * So there are no feature tiers here to keep in step: every paid account gets
  * every section type, unlimited edits, preview links and automatic publishing.
  *
- * **THERE IS NO FREE TRIAL.** Signing up and looking around is free; creating a
- * website is a purchase. The API enforces exactly that — a fresh account's
- * website allowance is zero (`websiteAllowance()` in
- * `packages/shared/src/plans.ts`). Do not add "14 days free" back to this page
- * without changing that first, or the button will promise something the
+ * **THE FREE TIER IS ONE WEBSITE OF ONE PAGE, and it does not expire.** The
+ * API enforces both halves — `FREE_WEBSITES` and `PLANS.free.maxPagesPerProject`
+ * in `packages/shared/src/plans.ts`. It is a page cap, not a clock: do not put
+ * "14 days free" on this page, and do not widen what free includes without
+ * changing those two constants first, or a button here promises something the
  * product refuses.
  *
  * These numbers MIRROR `packages/shared/src/plans.ts`, which is the source of
@@ -45,7 +45,7 @@ type Billing = "monthly" | "yearly";
 
 /**
  * The figures come from `lib/pricing.ts`, the one place the price is set.
- * Strictly linear, because Razorpay bills a subscription
+ * Strictly linear, because the provider bills a subscription
  * as plan amount × quantity: a ladder that bent could not be one plan bought
  * twice, and would force a re-authorised mandate on every change. See
  * `packages/shared/src/plans.ts`.
@@ -157,7 +157,7 @@ function RungCard({
       <div>
         <p className="flex items-baseline gap-1.5">
           <span className="font-display text-[38px] font-bold leading-none tracking-[-0.02em] tabular-nums">
-            {inr(billing === "yearly" ? total / 12 : total)}
+            {usd(billing === "yearly" ? total / 12 : total)}
           </span>
           <span className="text-label text-muted">
             {billing === "yearly" ? "/ month, billed yearly" : "/ month"}
@@ -165,7 +165,7 @@ function RungCard({
         </p>
         <p className="mt-1.5 text-helper text-muted tabular-nums">
           {billing === "yearly"
-            ? `${inr(total)} billed once a year`
+            ? `${usd(total)} billed once a year`
             : `or ${price(websites, "yearly")} a year`}
         </p>
       </div>
@@ -208,7 +208,7 @@ export function PricingPlans() {
           <div className="min-w-[200px]">
             <h3 className="text-[15px] font-semibold">Look after more than three?</h3>
             <p className="mt-1 text-mid leading-normal text-muted">
-              It keeps going at {inr(PER_WEBSITE[billing])} each. Add and remove websites
+              It keeps going at {usd(PER_WEBSITE[billing])} each. Add and remove websites
               whenever you like.
             </p>
           </div>
@@ -246,7 +246,7 @@ export function PricingPlans() {
           </div>
 
           <p className="font-display text-[32px] font-bold leading-none tracking-[-0.02em] tabular-nums">
-            {inr(custom)}
+            {usd(custom)}
             <span className="ml-1.5 font-sans text-label font-normal text-muted">
               {billing === "yearly" ? "/ year" : "/ month"}
             </span>

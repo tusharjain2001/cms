@@ -1,5 +1,5 @@
 import { Schema, model, type HydratedDocument, type InferSchemaType } from "mongoose";
-import type { PaymentDTO } from "@pagecraft/shared";
+import { CURRENCY, type PaymentDTO } from "@pagecraft/shared";
 
 /**
  * One row per charge Razorpay actually took. The account's billing history.
@@ -12,10 +12,16 @@ import type { PaymentDTO } from "@pagecraft/shared";
  * charged and how much?" from your own database, reconcile revenue, or defend
  * a chargeback; every one of those would mean opening the Razorpay dashboard.
  *
- * **The amount is stored, not derived.** Prices change, and a subscriber
- * charged ₹1 during a settlement test must stay distinguishable from one
- * charged ₹999 a year later. Recomputing history from today's price list is
- * how billing disputes are lost.
+ * **The amount is stored, not derived, and so is its currency.** Prices change
+ * — this product went ₹999 → ₹1 → ₹999 → $7.99 inside two days — so a row must
+ * carry both its figure and the unit that figure is in. Recomputing history
+ * from today's price list is how billing disputes are lost, and formatting an
+ * old row with today's currency is how a ₹999 charge reads as "$9.99".
+ *
+ * `currency` is whatever Razorpay reported, never what we are charging now.
+ * There is nothing to migrate today (the only INR rows were a ₹1 live-key test
+ * and were deleted by hand), but the next price change should not be the thing
+ * that discovers this.
  *
  * **Nothing here is card data.** Card numbers never reach this server —
  * Razorpay's checkout handles them — so the most sensitive field is a payment
@@ -25,24 +31,35 @@ const paymentSchema = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     /**
-     * Razorpay's payment id, and the reason redeliveries are harmless: the
-     * unique index makes recording a payment idempotent, so a webhook retried
-     * for three days still produces exactly one row.
+     * The payment provider's id for this charge, and the reason redeliveries
+     * are harmless: the unique index makes recording a payment idempotent, so a
+     * webhook retried for three days still produces exactly one row.
+     *
+     * Named for the role, not the vendor — it held Razorpay ids before the move
+     * to Dodo Payments and will hold whoever's comes next.
      */
-    razorpayPaymentId: { type: String, required: true, unique: true },
-    razorpaySubscriptionId: { type: String, default: null, index: true },
-    razorpayInvoiceId: { type: String, default: null },
-    /** In paise, exactly as Razorpay reports it. Never a float. */
-    amountPaise: { type: Number, required: true },
-    currency: { type: String, default: "INR" },
-    /** Razorpay's own payment state: captured, failed, authorized, refunded. */
+    providerPaymentId: { type: String, required: true, unique: true },
+    providerSubscriptionId: { type: String, default: null, index: true },
+    /**
+     * In the minor unit of `currency` (cents for USD, paise for INR), exactly
+     * as Razorpay reports it. Never a float.
+     */
+    amountMinor: { type: Number, required: true },
+    /**
+     * Whatever Razorpay charged in. The default is only a safety net —
+     * `recordPayment` always passes the currency Razorpay reported — but it
+     * tracks `CURRENCY` rather than being written out, so a future currency
+     * change cannot leave a row silently labelled with the old one.
+     */
+    currency: { type: String, default: CURRENCY },
+    /** The provider's own payment state: succeeded, failed, refunded. */
     status: { type: String, required: true },
     /** How they paid — "card", "upi", "netbanking". Not the card itself. */
     method: { type: String, default: null },
     /** Websites covered by this charge, so an old row explains its own amount. */
     websites: { type: Number, default: null },
     period: { type: String, default: null },
-    /** Razorpay's timestamp for the charge, not ours. */
+    /** The provider's timestamp for the charge, not ours. */
     paidAt: { type: Date, required: true },
   },
   { timestamps: true }
@@ -57,10 +74,9 @@ export const Payment = model("Payment", paymentSchema);
 
 export interface RecordPaymentInput {
   userId: unknown;
-  razorpayPaymentId: string;
-  razorpaySubscriptionId?: string | null;
-  razorpayInvoiceId?: string | null;
-  amountPaise: number;
+  providerPaymentId: string;
+  providerSubscriptionId?: string | null;
+  amountMinor: number;
   currency?: string;
   status: string;
   method?: string | null;
@@ -79,11 +95,11 @@ export interface RecordPaymentInput {
  * forever.
  */
 export async function recordPayment(input: RecordPaymentInput): Promise<void> {
-  const { razorpayPaymentId, ...rest } = input;
+  const { providerPaymentId, ...rest } = input;
   try {
     await Payment.updateOne(
-      { razorpayPaymentId },
-      { $set: { razorpayPaymentId, ...rest } },
+      { providerPaymentId },
+      { $set: { providerPaymentId, ...rest } },
       { upsert: true }
     );
   } catch (err) {
@@ -94,9 +110,9 @@ export async function recordPayment(input: RecordPaymentInput): Promise<void> {
 export function toPaymentDTO(p: PaymentDoc): PaymentDTO {
   return {
     id: p._id.toString(),
-    razorpayPaymentId: p.razorpayPaymentId,
-    amountPaise: p.amountPaise,
-    currency: p.currency ?? "INR",
+    providerPaymentId: p.providerPaymentId,
+    amountMinor: p.amountMinor,
+    currency: p.currency ?? CURRENCY,
     status: p.status,
     method: p.method ?? null,
     websites: p.websites ?? null,

@@ -230,9 +230,10 @@ export default function LandingPage() {
                 </Print>
                 <Print delay={260}>
                   <div className="mt-7 flex flex-wrap items-center gap-4">
-                    <ButtonLink href={links.signUp}>Get started · {ONE_MONTH} a month</ButtonLink>
+                    <ButtonLink href={links.signUp}>Start free · no card</ButtonLink>
                     <span className="text-[13.5px] text-quiet">
-                      {ONE_MONTH} a month for one website. Your developer connects the site once.
+                      One page free, for as long as you like. {ONE_MONTH} a month when your site
+                      needs more. Your developer connects it once.
                     </span>
                   </div>
                 </Print>
@@ -512,7 +513,7 @@ export default function LandingPage() {
                 </p>
                 <div className="mt-8 flex flex-wrap justify-center gap-3">
                   <ButtonLink href={links.signUp} className="px-6! hover:animate-celebrate">
-                    Get started · {ONE_MONTH} a month
+                    Start free · no card
                   </ButtonLink>
                   <ButtonLink href={links.docs} tone="outline" className="px-6!">
                     Read the developer docs

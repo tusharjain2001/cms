@@ -5,7 +5,7 @@ import { business, isFilled } from "@/lib/legal";
 /**
  * Contact us.
  *
- * Razorpay's website review checks this page specifically, and looks for a
+ * A payment provider's website review checks this page specifically, and looks for a
  * **postal address and a working phone number** — an email-only contact page
  * is the most common single reason a verification request is sent back. The
  * details come from `lib/legal.ts`; fill them in there.
@@ -83,7 +83,7 @@ export default function ContactPage() {
             </>,
             <>
               <strong className="font-semibold text-ink">Billing or a refund:</strong> the email
-              address on the account and the Razorpay payment id from your receipt. See our{" "}
+              address on the account and the payment id from your receipt. See our{" "}
               <a href="/refunds" className="font-semibold text-accent hover:underline">
                 refunds and cancellation policy
               </a>
@@ -111,7 +111,7 @@ export default function ContactPage() {
           not on the phone. Nobody at Pagecraft needs any of them, and anyone who asks is not us.
         </p>
         <p>
-          Card details are handled entirely by Razorpay and never reach our servers.
+          Card details are handled entirely by Dodo Payments and never reach our servers.
         </p>
       </Clause>
     </LegalPage>

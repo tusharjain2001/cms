@@ -1,7 +1,7 @@
 import { createApp } from "./app.js";
 import { connectDb } from "./db.js";
 import { env, isProd } from "./config/env.js";
-import { warnAboutBillingConfig } from "./lib/razorpay.js";
+import { warnAboutBillingConfig, verifyProductPricesAtBoot } from "./lib/dodo.js";
 
 async function main() {
   await connectDb(env.MONGODB_URI);
@@ -10,6 +10,7 @@ async function main() {
   // Payments can be misconfigured in ways that look healthy until money is
   // involved, so the server says so at boot rather than at the first renewal.
   warnAboutBillingConfig();
+  verifyProductPricesAtBoot();
 
   // In production the API sits behind nginx on the same box, so it only needs
   // the loopback interface — binding 0.0.0.0 there would expose it to the

@@ -5,7 +5,7 @@ import { business, commercials } from "@/lib/legal";
 /**
  * Terms and conditions.
  *
- * Required by Razorpay before a website is verified for payments. Written to
+ * Required by the payment provider before a website is verified for payments. Written to
  * describe what this product actually does — the shared sign-in, the
  * per-website ladder, the absence of a trial, what happens when a subscription
  * lapses — rather than the generic SaaS terms that would contradict all four.
@@ -100,11 +100,11 @@ export default function TermsPage() {
               Two websites cost twice as much, three three times, up to {commercials.maxWebsites}.
             </>,
             <>
-              <strong className="font-semibold text-ink">There is no free trial.</strong> Signing up
-              and looking around costs nothing; creating a website is a purchase. Our refund policy
-              is what protects you if you change your mind.
+              <strong className="font-semibold text-ink">The free plan does not expire.</strong> One
+              website of one page costs nothing and needs no card. A paid plan starts only when you
+              choose one, and our refund policy is what protects you if you change your mind.
             </>,
-            "Payment is taken by Razorpay on a recurring mandate you authorise. It renews automatically until you stop it.",
+            "Payment is taken by Dodo Payments, which acts as the merchant of record — they are the seller on your receipt and they collect any sales tax or VAT due where you are. Your subscription renews automatically until you stop it.",
             "Prices may change, but never for a period you have already paid for, and we will email you at least 30 days before a change affects you.",
             "Prices are exclusive of any taxes we are required to charge.",
           ]}

@@ -32,8 +32,8 @@ const userSchema = new Schema(
     projectIds: [{ type: Schema.Types.ObjectId, ref: "Project" }],
     /**
      * Subscription plan (see @pagecraft/shared `PLANS`). Everyone starts on
-     * Free, which owns **no** websites — there is no trial. Razorpay's webhook
-     * is the only thing that moves an account off it, via `setSubscription`.
+     * Free: one website, capped at one page. The billing webhook
+     * is the only thing that moves an account off it, via `applySubscription`.
      */
     plan: { type: String, default: "free" },
     /**
@@ -41,23 +41,28 @@ const userSchema = new Schema(
      *
      * It is mirrored rather than fetched because every request that creates a
      * page or a website consults it, and a plan check that depends on a third
-     * party's uptime would take the CMS down with them. Razorpay's webhook is
-     * the writer; `subscription.websites` is the quantity that was paid for and
-     * is what `websiteAllowance()` turns into a ceiling.
+     * party's uptime would take the CMS down with them. The payment provider's
+     * webhook is the writer; `subscription.websites` is the quantity that was
+     * paid for and is what `websiteAllowance()` turns into a ceiling.
+     *
+     * The provider fields are named for the *role* rather than the vendor.
+     * They held Razorpay ids until 31 Aug 2026 and hold Dodo Payments ids now;
+     * a field called `razorpaySubscriptionId` containing a Dodo id is the same
+     * trap as an `amountPaise` holding cents.
      */
     subscription: {
       status: { type: String, default: "none" },
-      /** Websites paid for — the Razorpay subscription's `quantity`. */
+      /** Websites paid for — the subscription's `quantity` at the provider. */
       websites: { type: Number, default: 0 },
       period: { type: String, default: "monthly" },
-      razorpaySubscriptionId: { type: String, default: null },
-      razorpayCustomerId: { type: String, default: null },
-      razorpayPlanId: { type: String, default: null },
+      providerSubscriptionId: { type: String, default: null },
+      providerCustomerId: { type: String, default: null },
+      providerProductId: { type: String, default: null },
       /** End of the paid-for cycle; access survives until then after a cancel. */
       currentPeriodEnd: { type: Date, default: null },
       cancelAtPeriodEnd: { type: Boolean, default: false },
       /**
-       * Razorpay's event timestamp for the update we last applied. Webhooks
+       * The provider's event timestamp for the update we last applied. Webhooks
        * arrive out of order and are retried for days; without this, a stale
        * `cancelled` can land after a fresh `active` and lock a paying customer
        * out of their own websites.

@@ -15,7 +15,7 @@ import { business, commercials, subProcessors } from "@/lib/legal";
  *   - IPs live in memory for rate limiting  → middleware/rate-limit.ts
  *   - media URLs are public and guessable-  → lib/r2.ts (content-addressed keys)
  *     proof but not secret
- *   - card details never reach us           → lib/razorpay.ts (Checkout only)
+ *   - card details never reach us           → lib/dodo.ts (hosted checkout only)
  *
  * If any of those change, change this page in the same commit.
  */
@@ -86,10 +86,11 @@ export default function PrivacyPage() {
               This is your content; we hold it so the CMS can serve it.
             </>,
             <>
-              <strong className="font-semibold text-ink">Billing:</strong> your Razorpay subscription
-              and customer identifiers, which plan you are on, how many websites it covers, and when
-              the period ends. <strong className="font-semibold text-ink">Card numbers never reach
-              our servers</strong> — you enter them on Razorpay&rsquo;s own checkout.
+              <strong className="font-semibold text-ink">Billing:</strong> your Dodo Payments
+              subscription and customer identifiers, which plan you are on, how many websites it
+              covers, and when the period ends. <strong className="font-semibold text-ink">Card
+              numbers never reach our servers</strong> — you enter them on Dodo&rsquo;s own
+              checkout page, which is hosted on their domain, not ours.
             </>,
             <>
               <strong className="font-semibold text-ink">Email you send us.</strong> Support
@@ -121,9 +122,8 @@ export default function PrivacyPage() {
         </p>
         <p>
           There are no analytics cookies, no advertising cookies, and no third-party cookies on the
-          public pages. The one exception is the billing screen: when you open the payment window,
-          Razorpay&rsquo;s checkout sets its own cookies to process your payment, governed by their
-          privacy policy.
+          public pages. Paying takes you to Dodo Payments&rsquo; own checkout page, which sets its
+          own cookies under their privacy policy — we set none there, because it is not our site.
         </p>
       </Clause>
 

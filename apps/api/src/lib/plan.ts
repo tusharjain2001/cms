@@ -1,10 +1,11 @@
 import {
-  PRICE_PER_WEBSITE_MONTHLY_PAISE,
+  PRICE_PER_WEBSITE_MONTHLY_CENTS,
   type Plan,
   type QuotaUsageDTO,
-  formatInr,
+  formatMoney,
+  isEntitled,
   planFor,
-  pricePaise,
+  priceMinor,
   websiteAllowance,
 } from "@pagecraft/shared";
 import { User, type UserDoc, entitlementOf } from "../models/user.js";
@@ -22,8 +23,13 @@ import { paymentRequired, subscriptionRequired } from "./respond.js";
  * **The website ceiling is the one that carries money.** It is not a constant
  * on the plan — it is `websiteAllowance()`, computed from the quantity the
  * customer's Razorpay subscription was bought with. An account with no live
- * subscription is allowed **zero** websites: there is no free trial, so even
- * the first website has to be paid for.
+ * subscription is allowed `FREE_WEBSITES` — one, today.
+ *
+ * **So the wall that sells the product is `assertCanAddPage`, not
+ * `assertCanCreateProject`.** The free website is real and permanent; what it
+ * cannot do is hold a second page. Anyone changing the free tier should change
+ * `PLANS.free.maxPagesPerProject`, and expect that to be the number customers
+ * hit.
  *
  * THE PAYMENT BOUNDARY: `lib/razorpay.ts` and `routes/billing.ts` are the only
  * files that know a payment provider exists. They write the account's
@@ -64,31 +70,59 @@ export async function websiteCapacity(
 export async function assertCanCreateProject(owner: UserDoc): Promise<void> {
   const { allowed, used } = await websiteCapacity(owner);
 
+  // Only reachable if FREE_WEBSITES is ever set back to 0. Kept because that
+  // reversal should not also require writing a refusal message from scratch.
   if (allowed === 0) {
     throw subscriptionRequired(
-      `Pagecraft is ₹${formatInr(PRICE_PER_WEBSITE_MONTHLY_PAISE)} a month for one website. ` +
-        `Choose a plan to add your first one — there is no free trial.`
+      `Pagecraft is ${formatMoney(PRICE_PER_WEBSITE_MONTHLY_CENTS)} a month for one website. ` +
+        `Choose a plan to add your first one.`
     );
   }
 
   if (used >= allowed) {
     const next = used + 1;
+    const price = `${formatMoney(priceMinor(next, "monthly"))} a month`;
+
+    // The free account is at its ceiling too, but telling somebody their
+    // "plan covers 1 website" when they never chose a plan reads as a bug.
+    const e = entitlementOf(owner);
+    if (e.plan === "free" || !isEntitled(e.status)) {
+      throw subscriptionRequired(
+        `Your free website is the one you already have. ` +
+          `Choose a plan to run ${next} website${next === 1 ? "" : "s"} — ${price}.`
+      );
+    }
+
     throw subscriptionRequired(
       `Your plan covers ${allowed} website${allowed === 1 ? "" : "s"} and you already have ${used}. ` +
-        `Increase it to ${next} for ₹${formatInr(pricePaise(next, "monthly"))} a month.`
+        `Increase it to ${next} for ${price}.`
     );
   }
 }
 
-/** Refuses if this website is already at its page ceiling. */
+/**
+ * Refuses if this website is already at its page ceiling.
+ *
+ * **This is the upgrade prompt most customers will actually meet**, because
+ * the free website allows exactly one page. So the free case gets its own
+ * wording: "your Free plan includes 1 pages" is both ungrammatical and reads
+ * like a quota nobody chose, where a free single-page site is the offer.
+ */
 export async function assertCanAddPage(project: ProjectDoc): Promise<void> {
   const plan = await ownerPlanFor(project);
   const count = await Page.countDocuments({ projectId: project._id });
-  if (count >= plan.maxPagesPerProject) {
+  if (count < plan.maxPagesPerProject) return;
+
+  if (plan.id === "free") {
     throw paymentRequired(
-      `Your ${plan.name} plan includes ${plan.maxPagesPerProject} pages per website. Upgrade to add more.`
+      `Your free website can have one page. ` +
+        `Choose a plan — ${formatMoney(PRICE_PER_WEBSITE_MONTHLY_CENTS)} a month — to add as many as you like.`
     );
   }
+
+  throw paymentRequired(
+    `Your ${plan.name} plan includes ${plan.maxPagesPerProject} pages per website. Upgrade to add more.`
+  );
 }
 
 /**

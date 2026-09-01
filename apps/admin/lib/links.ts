@@ -33,7 +33,7 @@ export const links = {
   docs: "/docs",
 
   /**
-   * The policy pages. Razorpay will not verify a website for payments without
+   * The policy pages. A payment provider will not verify a website for payments without
    * all four, so these are load-bearing rather than decorative — see
    * `lib/legal.ts` for the one file that fills in the business details.
    *

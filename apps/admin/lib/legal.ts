@@ -8,7 +8,7 @@ import { ONE_MONTH, ONE_YEAR } from "./pricing";
  * address and phone number are written once rather than four times and left to
  * drift apart.
  *
- * WHY THESE PAGES EXIST AT ALL: Razorpay will not verify a website for
+ * WHY THESE PAGES EXIST AT ALL: a payment provider will not verify a website for
  * payments without Terms, a Privacy Policy, a Refund/Cancellation Policy, a
  * Contact page carrying a real address and phone number, and public pricing.
  * A missing one of these is the usual reason a verification request bounces.
@@ -26,7 +26,7 @@ import { ONE_MONTH, ONE_YEAR } from "./pricing";
  * Anything still set to this renders as a loud inline marker rather than
  * quietly shipping the word "undefined" to a payment provider's reviewer —
  * see `<Fill>` in `components/landing/legal.tsx`. Search the rendered pages
- * for "TO BE FILLED IN" before you submit anything to Razorpay.
+ * for "TO BE FILLED IN" before you submit anything to a payment provider.
  */
 export const FILL_ME = "__FILL_ME__" as const;
 
@@ -35,7 +35,7 @@ export const isFilled = (value: string) => value !== FILL_ME && value.trim() !==
 export const business = {
   /**
    * The legal entity that takes the money — exactly as registered, and exactly
-   * as it appears on the Razorpay account and the bank account. A sole
+   * as it appears on the payment provider's account and the bank account. A sole
    * proprietor puts their own name here, optionally as "Tushar Jain (sole
    * proprietor), trading as Pagecraft".
    */
@@ -45,7 +45,7 @@ export const business = {
   tradingName: "Pagecraft",
 
   /**
-   * The registered/operating address, as one line per array entry. Razorpay's
+   * The registered/operating address, as one line per array entry. A reviewer's
    * reviewer checks this against your KYC, and Indian consumer rules expect a
    * real, reachable postal address rather than a PO box.
    */
@@ -54,7 +54,7 @@ export const business = {
   /**
    * A phone number that a human answers, in international format
    * (+91 XXXXX XXXXX). A Contact page without one is the single most common
-   * reason Razorpay sends a website back.
+   * reason a reviewer sends a website back.
    */
   phone: FILL_ME,
 
@@ -107,10 +107,15 @@ export const refunds = {
 export const commercials = {
   pricePerWebsiteMonthly: ONE_MONTH,
   pricePerWebsiteYearly: ONE_YEAR,
-  currency: "Indian Rupees (INR)",
+  currency: "US Dollars (USD)",
   maxWebsites: 20,
-  /** Kept true by `websiteAllowance()` in packages/shared/src/plans.ts. */
+  /**
+    * Not a trial — a permanent free tier: one website of one page. Kept true by
+    * `FREE_WEBSITES` and `PLANS.free.maxPagesPerProject` in
+    * packages/shared/src/plans.ts.
+    */
   hasFreeTrial: false,
+  freeTier: "one website with one page, free permanently and with no card",
   /** Days a cancelled account's content stays readable before it may be removed. */
   contentRetentionDays: 30,
 } as const;
@@ -118,15 +123,21 @@ export const commercials = {
 /**
  * Third parties that necessarily see some customer data, and what each one is
  * for. Mirrors what the code actually calls — see `lib/r2.ts`, `lib/mailer.ts`,
- * `lib/razorpay.ts` and `db.ts`. Add a row here if you add a service; a privacy
+ * `lib/dodo.ts` and `db.ts`. Add a row here if you add a service; a privacy
  * policy that omits a processor is worse than none.
  */
 export const subProcessors = [
   {
-    name: "Razorpay Software Private Limited",
-    purpose: "Payments and subscriptions",
-    data: "Name, email address, payment details you enter on their checkout",
-    where: "India",
+    name: "Dodo Payments",
+    /**
+     * Not merely a processor: as **merchant of record** Dodo is the seller on
+     * the receipt, and the party that collects and remits sales tax. Saying
+     * only "payments" would understate its role and mislead a reader trying to
+     * work out who they actually bought from.
+     */
+    purpose: "Merchant of record — checkout, subscriptions, invoicing and sales tax",
+    data: "Name, email address, billing country, payment details you enter on their checkout",
+    where: "Processed internationally; see their privacy policy",
   },
   {
     name: "MongoDB Atlas",

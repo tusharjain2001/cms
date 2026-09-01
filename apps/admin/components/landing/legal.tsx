@@ -11,7 +11,7 @@ import { business, isFilled } from "@/lib/legal";
  * policy is looking for a fact, not a performance — and skipping
  * `components/landing/motion.tsx` keeps them **server components with zero
  * client JavaScript**, prerendered to static HTML. That matters beyond weight:
- * Razorpay's reviewer and any regulator must be able to read the text with
+ * A payment provider's reviewer and any regulator must be able to read the text with
  * scripts blocked.
  */
 

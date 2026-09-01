@@ -67,28 +67,36 @@ const schema = z.object({
    */
   R2_ENDPOINT: z.string().optional(),
 
-  // Razorpay, optional in exactly the same way as R2 and SMTP: without these
-  // the CMS runs, the billing screen explains what is missing instead of
-  // showing a checkout button that cannot work, and nobody can create a
-  // website (which is the honest outcome — the first one has to be paid for).
-  RAZORPAY_KEY_ID: z.string().optional(),
-  RAZORPAY_KEY_SECRET: z.string().optional(),
+  // Dodo Payments, optional in exactly the same way as R2 and SMTP: without
+  // these the CMS runs, the billing screen explains what is missing instead of
+  // showing a checkout button that cannot work, and nobody can buy a website.
+  // The free single-page website still works, so an unconfigured instance is
+  // usable rather than dead.
+  //
+  // Dodo replaced Razorpay because the product is priced in USD and Razorpay
+  // cannot bill USD recurring — see the header of `lib/dodo.ts`.
+  DODO_API_KEY: z.string().optional(),
   /**
-   * The webhook signing secret from the Razorpay dashboard. Without it the
+   * The webhook signing secret from Dodo → Developer → Webhooks. Without it the
    * webhook route refuses every request rather than trusting unsigned callers:
    * an unverified webhook is a public endpoint that grants paid access.
+   *
+   * It matters more here than it did under Razorpay. Dodo hosts the payment
+   * page, so there is no in-page signature to fall back on — the webhook is the
+   * ONLY thing that grants access, and without this secret a paying customer
+   * silently stays on the free plan.
    */
-  RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
+  DODO_WEBHOOK_SECRET: z.string().optional(),
   /**
-   * The two Razorpay Plan ids for "one website", monthly and yearly. The
-   * ladder is the subscription's `quantity` — 3 websites is quantity 3 of the
-   * same plan, never a third plan — so there are exactly two of these no
+   * The two Dodo product ids for "one website", monthly and yearly. The ladder
+   * is the subscription's `quantity` — 3 websites is quantity 3 of the same
+   * product, never a third product — so there are exactly two of these no
    * matter how far the ladder goes.
    */
-  RAZORPAY_PLAN_ID_MONTHLY: z.string().optional(),
-  RAZORPAY_PLAN_ID_YEARLY: z.string().optional(),
+  DODO_PRODUCT_ID_MONTHLY: z.string().optional(),
+  DODO_PRODUCT_ID_YEARLY: z.string().optional(),
   /** Overridable so tests can point the client at a local stub. */
-  RAZORPAY_API_BASE: z.string().default("https://api.razorpay.com/v1"),
+  DODO_API_BASE: z.string().default("https://live.dodopayments.com"),
 });
 
 const parsed = schema.safeParse(process.env);
@@ -143,12 +151,10 @@ export const isProd = env.NODE_ENV === "production";
 export const emailEnabled = Boolean(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASSWORD);
 
 /**
- * Checkout needs the API keys *and* at least one plan id — a key with no plan
- * behind it produces a subscription call that fails at Razorpay rather than
+ * Checkout needs the API key *and* at least one product id — a key with no
+ * product behind it produces a checkout call that fails at Dodo rather than
  * here, which is a much worse place to find out.
  */
 export const billingEnabled = Boolean(
-  env.RAZORPAY_KEY_ID &&
-    env.RAZORPAY_KEY_SECRET &&
-    (env.RAZORPAY_PLAN_ID_MONTHLY || env.RAZORPAY_PLAN_ID_YEARLY)
+  env.DODO_API_KEY && (env.DODO_PRODUCT_ID_MONTHLY || env.DODO_PRODUCT_ID_YEARLY)
 );

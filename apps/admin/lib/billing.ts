@@ -6,19 +6,16 @@ import type { BillingPeriod, CheckoutDTO, PaymentDTO, SubscriptionDTO } from "./
  *
  * THE MODEL: one price per website per month (see `lib/pricing.ts`). Three
  * websites is quantity 3 of one subscription, not a third plan. There is **no
- * free trial** — a new account may own zero websites until it pays.
+ * trial** — instead a new account gets one free website, capped at one page.
  *
- * Everything here is a thin wrapper over the API except `openCheckout`, which
- * owns the one genuinely fiddly bit: Razorpay's Checkout script is a global
- * that has to be injected, waited for, and then handed a callback.
+ * Everything here is a thin wrapper over the API. Checkout is hosted by Dodo,
+ * so paying is a whole-page navigation away and back — see `goToCheckout`.
  */
-
-const CHECKOUT_SRC = "https://checkout.razorpay.com/v1/checkout.js";
 
 export const getSubscription = () => api<SubscriptionDTO>("/api/billing");
 
 export interface StartResult {
-  /** True when an existing mandate was simply amended — no card needed. */
+  /** True when an existing subscription was amended — no checkout needed. */
   updated: boolean;
   subscription?: SubscriptionDTO | null;
   checkout?: CheckoutDTO;
@@ -27,9 +24,9 @@ export interface StartResult {
 /**
  * Buys, or changes, the number of websites this account covers.
  *
- * Returns `updated: true` when the account already had a live mandate and
- * Razorpay just changed its quantity — the customer is never asked for their
- * card again to add a fourth website.
+ * Returns `updated: true` when the account already had a live subscription and
+ * the provider just changed its quantity — the customer is never sent back
+ * through checkout to add a fourth website.
  */
 export const startSubscription = (websites: number, period: BillingPeriod) =>
   api<StartResult>("/api/billing/subscription", {
@@ -41,7 +38,7 @@ export const cancelSubscription = () =>
   api<SubscriptionDTO>("/api/billing/cancel", { method: "POST" });
 
 /**
- * Every charge Razorpay actually took, newest first.
+ * Every charge the provider actually took, newest first.
  *
  * Fetched separately from the subscription so a failure to load history never
  * blocks the screen that lets someone buy or cancel — the money matters more
@@ -50,112 +47,58 @@ export const cancelSubscription = () =>
 export const getPayments = () => api<PaymentDTO[]>("/api/billing/payments");
 
 /**
- * **Paise** → a rupee price: 99_900 → "₹999", 199_800 → "₹1,998".
+ * A **minor-unit** amount from the API → the string a customer reads:
+ * `money(799)` → "$7.99", `money(100, "INR")` → "₹1".
  *
- * The unit is in the name deliberately. `lib/pricing.ts` exports an `inr()`
- * that takes *rupees*, and two identically-named money formatters with
+ * The unit is in the name deliberately. `lib/pricing.ts` exports a `usd()`
+ * that takes *dollars*, and two identically-named money formatters with
  * different units is precisely how a bill ends up a hundredfold wrong.
- * Everything the API sends is in paise; everything in `lib/pricing.ts` is in
- * rupees.
+ * Everything the API sends is in minor units; everything in `lib/pricing.ts`
+ * is in whole dollars.
  *
- * `en-IN` grouping matters — rupees group as ₹1,00,000 rather than ₹100,000
- * past five digits, and the wrong grouping reads as a foreign site.
+ * **Always pass the currency a stored amount was recorded in** — every
+ * `PaymentDTO` carries its own. This product has already changed currency
+ * once, and formatting an old row with today's would misstate what a customer
+ * was actually billed. Only a price we are about to charge may take the
+ * default.
+ *
+ * This mirrors `formatMoney` in `packages/shared/src/plans.ts` rather than
+ * importing it, for the usual reason: that package pulls in Zod.
  */
-export function inrFromPaise(paise: number): string {
-  const rupees = paise / 100;
-  return `₹${rupees.toLocaleString("en-IN", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: Number.isInteger(rupees) ? 0 : 2,
+const CURRENCIES: Record<string, { symbol: string; locale: string; fixedDecimals: boolean }> = {
+  USD: { symbol: "$", locale: "en-US", fixedDecimals: true },
+  INR: { symbol: "₹", locale: "en-IN", fixedDecimals: false },
+};
+
+export function money(minor: number, currency = "USD"): string {
+  const c = CURRENCIES[currency] ?? CURRENCIES.USD;
+  const major = minor / 100;
+  const decimals = c.fixedDecimals || !Number.isInteger(major) ? 2 : 0;
+  return `${c.symbol}${major.toLocaleString(c.locale, {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
   })}`;
 }
 
 // ------------------------------------------------------------- checkout
 
-interface RazorpayHandlerResponse {
-  razorpay_payment_id: string;
-  razorpay_subscription_id: string;
-  razorpay_signature: string;
-}
-
-declare global {
-  interface Window {
-    Razorpay?: new (options: Record<string, unknown>) => { open: () => void };
-  }
-}
-
 /**
- * Loads Razorpay's Checkout script once and resolves when the global exists.
+ * Sends the customer to Dodo's hosted payment page.
  *
- * Injected on demand rather than in the layout: it is a third-party script on
- * every page load otherwise, and only the billing screen ever needs it.
+ * **This is a whole-page navigation, not a modal**, and that is the biggest
+ * user-visible change from the Razorpay integration it replaces. There is no
+ * script to inject, no global to wait for, and no ad blocker to work around —
+ * but also no callback: the customer leaves the app entirely and comes back to
+ * `/billing?checkout=done` when they are finished.
+ *
+ * The consequence the billing screen has to handle: **returning proves
+ * nothing**. That URL is a plain redirect anyone can visit, so access is
+ * granted only when Dodo's webhook reaches the API, a second or two later. The
+ * return handler waits for that rather than trusting the redirect.
+ *
+ * Never render `checkoutUrl` in an iframe — card pages set frame-ancestors and
+ * will refuse to load.
  */
-function loadCheckout(): Promise<void> {
-  if (typeof window === "undefined") return Promise.reject(new Error("no window"));
-  if (window.Razorpay) return Promise.resolve();
-
-  return new Promise((resolve, reject) => {
-    const existing = document.querySelector<HTMLScriptElement>(`script[src="${CHECKOUT_SRC}"]`);
-    if (existing) {
-      existing.addEventListener("load", () => resolve(), { once: true });
-      existing.addEventListener("error", () => reject(new Error("checkout-blocked")), {
-        once: true,
-      });
-      return;
-    }
-    const el = document.createElement("script");
-    el.src = CHECKOUT_SRC;
-    el.async = true;
-    el.onload = () => resolve();
-    el.onerror = () => reject(new Error("checkout-blocked"));
-    document.head.appendChild(el);
-  });
-}
-
-export type CheckoutOutcome =
-  | { kind: "paid"; subscription: SubscriptionDTO }
-  | { kind: "dismissed" }
-  /** The script could not load — an ad blocker, usually. Send them to `url`. */
-  | { kind: "blocked"; url: string | null };
-
-/**
- * Opens Razorpay Checkout and settles when the customer has finished.
- *
- * The signature that comes back is posted to the API, which re-checks it with
- * the key secret. That is what lights the dashboard up immediately instead of
- * waiting on a webhook — but the webhook remains the source of truth, so a
- * customer who closes the tab mid-payment still ends up correctly subscribed.
- *
- * A blocked script is reported rather than thrown: Razorpay's own hosted page
- * (`shortUrl`) does the same job, and "your ad blocker ate the payment window"
- * is a fixable problem if we say so.
- */
-export async function openCheckout(checkout: CheckoutDTO): Promise<CheckoutOutcome> {
-  try {
-    await loadCheckout();
-  } catch {
-    return { kind: "blocked", url: checkout.shortUrl };
-  }
-  if (!window.Razorpay) return { kind: "blocked", url: checkout.shortUrl };
-
-  return new Promise<CheckoutOutcome>((resolve) => {
-    const rzp = new window.Razorpay!({
-      key: checkout.keyId,
-      subscription_id: checkout.subscriptionId,
-      name: "Pagecraft",
-      description: `${checkout.websites} website${checkout.websites === 1 ? "" : "s"} · ${
-        checkout.period === "yearly" ? "yearly" : "monthly"
-      }`,
-      prefill: { name: checkout.customerName, email: checkout.customerEmail },
-      theme: { color: "#b93f20" },
-      handler: (response: RazorpayHandlerResponse) => {
-        api<SubscriptionDTO>("/api/billing/verify", { method: "POST", body: response })
-          .then((subscription) => resolve({ kind: "paid", subscription }))
-          // A verification failure is not a lost payment — the webhook will
-          // still settle it — so this reads as "not yet", not as "it failed".
-          .catch(() => resolve({ kind: "dismissed" }));
-      },
-      modal: { ondismiss: () => resolve({ kind: "dismissed" }) },
-    });
-    rzp.open();
-  });
+export function goToCheckout(checkout: CheckoutDTO): void {
+  window.location.assign(checkout.checkoutUrl);
 }
