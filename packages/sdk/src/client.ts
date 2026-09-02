@@ -8,19 +8,44 @@ import type { SectionContent, SectionDTO } from "./content-types.js";
  * `{ next: { tags } }` and a Vite site can hand it nothing at all.
  */
 
+/**
+ * What a page says about itself to search engines and social networks.
+ *
+ * Every field is optional and every one has a fallback the SDK applies for
+ * you (`seo.ts`), so a site that never reads this object directly still gets
+ * correct tags. `noIndex` is the only field that changes behaviour rather than
+ * wording — see `pageMetadata`.
+ */
+export interface CmsSeo {
+  metaTitle?: string;
+  metaDescription?: string;
+  ogImage?: string;
+  canonicalUrl?: string;
+  noIndex?: boolean;
+}
+
 export interface CmsPageSummary {
   slug: string;
   title: string;
   order: number;
-  seo: { metaTitle?: string; metaDescription?: string };
+  seo: CmsSeo;
+  /**
+   * When the page last changed, for a sitemap's `<lastmod>`.
+   *
+   * Optional because a CMS older than this SDK does not send it, and a missing
+   * timestamp must degrade to "no lastmod" rather than to a wrong one.
+   */
+  updatedAt?: string;
+  publishedAt?: string;
 }
 
 export interface CmsPage {
   slug: string;
   title: string;
   order: number;
-  seo: { metaTitle?: string; metaDescription?: string; ogImage?: string };
+  seo: CmsSeo;
   sections: SectionDTO[];
+  updatedAt?: string;
   publishedAt?: string;
   preview: boolean;
 }

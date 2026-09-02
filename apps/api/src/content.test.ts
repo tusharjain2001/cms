@@ -469,6 +469,148 @@ describe("public content api", () => {
   });
 });
 
+/* --------------------------------------------------------------------- seo */
+
+describe("page seo", () => {
+  let seoPageId: string;
+
+  it("stores what the client typed and hands it back", async () => {
+    const res = await api(`/api/pages/${homeId}`, {
+      method: "PATCH",
+      token,
+      body: {
+        seo: {
+          metaTitle: "Halden Bakery — sourdough in Leeds",
+          metaDescription: "Baked every morning on the high street since 1994.",
+          ogImage: "https://cdn.example.com/card.png",
+          canonicalUrl: "https://halden.example.com/",
+          noIndex: false,
+        },
+      },
+    });
+    assert.equal(res.status, 200);
+    assert.equal(res.json.data.seo.metaTitle, "Halden Bakery — sourdough in Leeds");
+    assert.equal(res.json.data.seo.canonicalUrl, "https://halden.example.com/");
+    assert.equal(res.json.data.seo.noIndex, false);
+  });
+
+  it("patches one seo field without clearing the others", async () => {
+    const res = await api(`/api/pages/${homeId}`, {
+      method: "PATCH",
+      token,
+      body: { seo: { noIndex: true } },
+    });
+    assert.equal(res.json.data.seo.noIndex, true);
+    assert.equal(
+      res.json.data.seo.metaTitle,
+      "Halden Bakery — sourdough in Leeds",
+      "a partial seo patch must merge, not replace"
+    );
+  });
+
+  it("refuses a relative canonical, which every crawler would silently ignore", async () => {
+    const res = await api(`/api/pages/${homeId}`, {
+      method: "PATCH",
+      token,
+      body: { seo: { canonicalUrl: "/about" } },
+    });
+    assert.equal(res.status, 400);
+  });
+
+  it("accepts an empty canonical, which means 'this page's own address'", async () => {
+    const res = await api(`/api/pages/${homeId}`, {
+      method: "PATCH",
+      token,
+      body: { seo: { canonicalUrl: "" } },
+    });
+    assert.equal(res.status, 200);
+    assert.equal(res.json.data.seo.canonicalUrl, undefined);
+  });
+
+  it("carries seo on the page list, so the dashboard can flag an empty listing", async () => {
+    const res = await api(`/api/projects/${projectId}/pages`, { token });
+    const home = res.json.data.find((p: Json) => p.id === homeId);
+    assert.equal(home.seo.metaTitle, "Halden Bakery — sourdough in Leeds");
+  });
+
+  /**
+   * A page of its own, published cleanly, because the home page's draft is
+   * mid-experiment by this point in the file — and a publish that quietly
+   * fails validation would make every assertion below pass for the wrong
+   * reason.
+   */
+  it("gives the public page list everything a sitemap needs", async () => {
+    const created = await api(`/api/projects/${projectId}/pages`, {
+      method: "POST",
+      token,
+      body: { title: "Opening hours" },
+    });
+    seoPageId = created.json.data.id;
+
+    const added = await api(`/api/pages/${seoPageId}/sections`, {
+      method: "POST",
+      token,
+      body: { type: "hero" },
+    });
+    await api(`/api/pages/${seoPageId}/sections/${added.json.data.section.id}`, {
+      method: "PATCH",
+      token,
+      body: { content: { heading: "When we are open" } },
+    });
+    const published = await api(`/api/pages/${seoPageId}/publish`, { method: "POST", token });
+    assert.equal(published.status, 200);
+
+    const res = await api("/api/content/pages", { key: apiKey });
+    const row = res.json.data.find((p: Json) => p.slug === "opening-hours");
+    assert.equal(row.seo.noIndex, false);
+    assert.ok(row.updatedAt, "a sitemap's <lastmod> comes from here");
+    assert.ok(row.publishedAt);
+  });
+
+  it("keeps search settings out of the live site until publish", async () => {
+    await api(`/api/pages/${seoPageId}`, {
+      method: "PATCH",
+      token,
+      body: { seo: { metaTitle: "Not live yet", noIndex: true } },
+    });
+
+    const live = await api("/api/content/pages/opening-hours", { key: apiKey });
+    assert.equal(live.json.data.seo.metaTitle, undefined, "an unpublished title must not leak");
+    assert.equal(live.json.data.seo.noIndex, false);
+
+    const minted = await api(`/api/pages/${seoPageId}/preview-token`, { method: "POST", token });
+    const preview = await api(
+      `/api/content/pages/opening-hours?preview=${minted.json.data.token}`,
+      { key: apiKey }
+    );
+    assert.equal(preview.json.data.seo.metaTitle, "Not live yet", "a preview shows the draft");
+
+    assert.equal((await api(`/api/pages/${seoPageId}/publish`, { method: "POST", token })).status, 200);
+    const after = await api("/api/content/pages/opening-hours", { key: apiKey });
+    assert.equal(after.json.data.seo.metaTitle, "Not live yet");
+  });
+
+  it("tells a website that a page is hidden from search", async () => {
+    const list = await api("/api/content/pages", { key: apiKey });
+    const row = list.json.data.find((p: Json) => p.slug === "opening-hours");
+    assert.equal(row.seo.noIndex, true, "a sitemap must be able to leave this page out");
+
+    const page = await api("/api/content/pages/opening-hours", { key: apiKey });
+    assert.equal(page.json.data.seo.noIndex, true, "noindex is not the same as unpublished");
+    assert.ok(page.json.data.sections.length > 0, "the page still serves");
+  });
+
+  it("discarding a draft puts the live search settings back", async () => {
+    await api(`/api/pages/${seoPageId}`, {
+      method: "PATCH",
+      token,
+      body: { seo: { metaTitle: "A mistake" } },
+    });
+    const res = await api(`/api/pages/${seoPageId}/discard-draft`, { method: "POST", token });
+    assert.equal(res.json.data.seo.metaTitle, "Not live yet");
+  });
+});
+
 /* --------------------------------------------------- rate limiting the public api */
 
 describe("public content api rate limit", () => {

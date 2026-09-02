@@ -15,6 +15,15 @@ import {
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { links } from "@/lib/links";
+import {
+  faqSchema,
+  graph,
+  jsonLd,
+  organizationSchema,
+  pageMeta,
+  productSchema,
+  websiteSchema,
+} from "@/lib/site-meta";
 import { ONE_MONTH } from "@/lib/pricing";
 
 /**
@@ -34,9 +43,12 @@ import { ONE_MONTH } from "@/lib/pricing";
 const description =
   "Build client websites in React and let the owner edit the words and photos. They change text and images in a dashboard a bakery owner can use; they never touch a colour, a font or a layout.";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta({
+  // Absolute rather than templated: the root template would make this
+  // "Pagecraft — … · Pagecraft".
   title: "Pagecraft — a content-only CMS for React and Next.js sites",
   description,
+  path: "/",
   keywords: [
     "headless CMS",
     "Next.js CMS",
@@ -45,9 +57,7 @@ export const metadata: Metadata = {
     "content-only CMS",
     "WordPress alternative for developers",
   ],
-  openGraph: { type: "website", siteName: "Pagecraft", description },
-  twitter: { card: "summary_large_image", description },
-};
+});
 
 const STATS = [
   {
@@ -181,6 +191,23 @@ function OwnerPhone() {
 export default function LandingPage() {
   return (
     <div id="top" className="min-h-screen">
+      {/*
+        One `@graph` rather than four scripts, so the nodes can point at each
+        other by `@id` instead of each restating the publisher.
+
+        The FAQ node is built from the same `FAQS` array the page renders, so
+        the structured data and the visible answers can never disagree — which
+        matters beyond tidiness: Google treats an FAQ marked up but not shown
+        on the page as a manual-action offence.
+      */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: jsonLd(
+            graph(organizationSchema(), websiteSchema(), productSchema(), faqSchema(FAQS))
+          ),
+        }}
+      />
       <SiteNav />
 
       <StageController>

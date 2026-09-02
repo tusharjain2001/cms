@@ -88,11 +88,34 @@ const projectIdArg = {
 
 const seoArg = z
   .object({
-    metaTitle: z.string().max(70).optional(),
-    metaDescription: z.string().max(200).optional(),
+    metaTitle: z
+      .string()
+      .max(70)
+      .optional()
+      .describe("Shown as the result's title. Blank falls back to the page title. Aim for 30-60 characters."),
+    metaDescription: z
+      .string()
+      .max(200)
+      .optional()
+      .describe("The snippet under the result. Aim for 70-160 characters. Blank means Google writes its own."),
     ogImage: z.string().max(500).optional().describe("Absolute URL of the social sharing image."),
+    canonicalUrl: z
+      .string()
+      .max(500)
+      .optional()
+      .describe(
+        "Absolute URL this page should be credited as, when the same content lives at more than one address. Leave blank for the page's own address, which is almost always right."
+      ),
+    noIndex: z
+      .boolean()
+      .optional()
+      .describe(
+        "Keep this page out of search results. It stays published and readable — this is noindex, not unpublishing."
+      ),
   })
-  .describe("Search-engine and social-sharing fields. Only the keys you pass are changed.");
+  .describe(
+    "Search-engine and social-sharing fields. Only the keys you pass are changed, and like every other edit they are a DRAFT until the page is published."
+  );
 
 /* ------------------------------------------------------------------------- */
 /* Published content — the read-only key                                      */

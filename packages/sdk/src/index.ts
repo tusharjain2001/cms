@@ -1,6 +1,7 @@
 export * from "./client.js";
 export * from "./image.js";
 export * from "./revalidate.js";
+export * from "./seo.js";
 
 // Content types, re-exported so a website has one import.
 export type {

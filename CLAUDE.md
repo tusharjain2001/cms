@@ -60,7 +60,7 @@ cms/
 | **`npm run dev`** | **The usual one.** Rebuilds shared, then runs the API (:4000) and the dashboard (:3000) together, output prefixed `[api]` / `[admin]` |
 | `npm run dev:api` | Just the API on :4000, with watch |
 | `npm run dev:admin` | Just the dashboard on :3000 |
-| `npm test` | 286 tests: registry/validation (15), API integration against a real in-memory MongoDB (150 — including self-service accounts, the per-website billing ladder against a stubbed Dodo Payments, and a contract test that walks the dashboard's exact request sequence), SDK (43) and MCP server (77, against a stub API — no live keys) |
+| `npm test` | 339 tests: registry/validation (15), API integration against a real in-memory MongoDB (170 — including self-service accounts, the per-website billing ladder against a stubbed Dodo Payments, draft-vs-live search settings, and a contract test that walks the dashboard's exact request sequence), SDK (75, of which 32 cover the SEO helpers) and MCP server (79, against a stub API — no live keys) |
 | `npm run build` | Builds shared → sdk → mcp → api → admin |
 | `npm run typecheck` | Type-checks every workspace |
 | `npm run seed` | Creates the first developer account and a demo website |
@@ -78,7 +78,9 @@ cms/
 
 An earlier version had `role: 'admin' | 'client'` on the user, where `admin` meant "sees every project in the database". That was safe only while the sole admin was the developer who owned the server. It could not survive open signup and was replaced.
 - **projects** (one per website): `{ ownerId, name, slug, apiKey, revalidateUrl?, revalidateSecret?, allowedSectionTypes: string[], createdAt }`. `ownerId` is what every access decision hangs off. `allowedSectionTypes` limits a site to the section types the developer actually built for it. **`slug` is unique per owner, not globally** — two unrelated developers must both be able to call a website "portfolio", and a shared namespace would leak that someone else had taken the name.
-- **pages**: `{ projectId, slug, title, order, seo: { metaTitle?, metaDescription?, ogImage? }, sections: Section[], draftSections: Section[], status: 'draft' | 'published', updatedAt, publishedAt }`. `draftSections` is the editing copy; **publish copies draft → sections**. The public API serves only `sections`.
+- **pages**: `{ projectId, slug, title, order, seo, draftSeo?, sections: Section[], draftSections: Section[], status: 'draft' | 'published', updatedAt, publishedAt }`. `draftSections` is the editing copy; **publish copies draft → sections**. The public API serves only `sections`.
+- **The SEO block is draft/live separated too**, for the same reason sections are — "nothing is visible until you press Publish" cannot have an exception. `seo` is live and `draftSeo` is what the dashboard edits: `{ metaTitle?, metaDescription?, ogImage?, canonicalUrl?, noIndex? }`. Publish copies draft → live, discard copies live → draft, and a preview token serves the draft block so a preview does not show the live description. **`draftSeo` absent means "the same as live"**, not "empty" — every page written before search settings existed has none, and `draftSeoOf()` in `models/page.ts` is the single place that resolves it. Without that, adding the field would have blanked the meta title of every page already in the database on its next save.
+- `canonicalUrl` must be absolute or empty (a relative canonical is silently ignored by every crawler, which is worse than a rejected one), and `noIndex` is *not* unpublishing — the page still serves, it is simply not listed.
 - **Section** (embedded): `{ id: uuid, type, name?, order, visible, content: Record<string, unknown> }`. Stored as Mongoose `Mixed`; Zod (via the registry) is the real validator. `name` is an optional client-entered nickname ("Main Banner", "Why Choose Us") shown on the section card in the admin section list to identify sections at a glance — it is never rendered on the website (falls back to the type's label when blank).
 - **media**: `{ projectId, publicId, url, resourceType: 'image'|'raw', format, width, height, bytes, originalName, alt, createdAt }` — per-project reusable library, unique on `(projectId, publicId)`.
 
@@ -143,7 +145,7 @@ Before running it: copy `apps/api/.env.example` to `apps/api/.env` and fill in `
 **Publish**: `POST /api/pages/:pageId/publish` validates every draft section in **publish** mode, copies draft → live, stamps `publishedAt`, clears the dirty flag, then calls the project's `revalidateUrl` with `{ secret, paths }`. A webhook failure never fails the publish — the content is already live in the CMS — and the response carries a `revalidated: { attempted, ok, message }` the dashboard can show. `POST /api/pages/:pageId/discard-draft` copies live back over the draft. `POST /api/pages/:pageId/preview-token` mints a 30-minute token scoped to that one page.
 
 **Public content API** (read-only, `x-api-key` header or `?key=`, published content only) — what client websites call:
-- `GET /api/content/pages` → nav-ready list of published pages
+- `GET /api/content/pages` → nav-ready list of published pages, carrying each page's `seo` (including `noIndex`), `updatedAt` and `publishedAt` — one request is also everything a `sitemap.xml` needs
 - `GET /api/content/pages/:slug` → page with ordered, **visible** sections (`:slug` = `index` for the home page)
 - `GET /api/content/home` → convenience for the root page
 - `?preview=<token>` swaps in the draft, and is served `no-store`; everything else is `s-maxage=60, stale-while-revalidate=600`
@@ -183,10 +185,14 @@ Where things live:
 | `lib/auth.tsx` | Session: sign up, confirm, sign in/out, forgotten passwords, and restoring a session from the refresh cookie on reload. |
 | `lib/store.tsx` | All dashboard state, backed by real API calls. |
 | `lib/dto.ts` | Type-only re-exports from `@pagecraft/shared`, plus small display helpers. |
+| `lib/seo.ts` | **The customer's** SEO: search-result truncation, the checks behind the score, and the word/alt/heading analysis. Pure functions over the draft, so the panel updates as they type. |
+| `components/editor/seo-panel.tsx` | The Search & sharing panel — result preview, length meters, sharing picture, checklist. |
+| `lib/site-meta.ts` | **This site's** SEO: `SITE_URL`, `pageMeta()` and the JSON-LD builders every public route uses. Unrelated to `lib/seo.ts` despite the neighbouring names. |
+| `lib/og.tsx` | The generated sharing cards, and `OG_CARDS` — the one place a card's words live. |
 | `lib/media.tsx` | Library state, direct-to-R2 presigned uploads with progress, and the promise-based `pick()` that image/file fields await. |
 | `components/media-picker.tsx` | The modal `pick()` opens. |
 
-Routes — public: `/` (the landing page) · `/pricing` · **`/docs`** · the four policy pages `/terms` `/privacy` `/refunds` `/contact` · `/login` · `/signup` · `/verify-email?token=` · `/forgot-password` · `/reset-password?token=`. Signed in: `/projects` → **`/billing`** → `/projects/[projectId]/pages` → `/projects/[projectId]/pages/[pageId]` (editor) → `/projects/[projectId]/media` → **`/projects/[projectId]/integration`** → `/projects/[projectId]/settings`.
+Routes — public: `/` (the landing page) · `/pricing` · **`/docs`** · the four policy pages `/terms` `/privacy` `/refunds` `/contact` · `/login` · `/signup` · `/verify-email?token=` · `/forgot-password` · `/reset-password?token=`. Generated alongside them: `/robots.txt`, `/sitemap.xml`, `/manifest.webmanifest` and the sharing cards at `/og/<card>`. Signed in: `/projects` → **`/billing`** → `/projects/[projectId]/pages` → `/projects/[projectId]/pages/[pageId]` (editor) → `/projects/[projectId]/media` → **`/projects/[projectId]/integration`** → `/projects/[projectId]/settings`.
 
 **The four policy pages are a payment requirement, not decoration.** A payment provider will not verify a website for payments without Terms, a Privacy Policy, a Refund/Cancellation Policy, a Contact page carrying a **real postal address and phone number**, and public pricing. A missing one is the usual reason a verification request bounces — an email-only contact page being the most common single cause.
 
@@ -225,7 +231,7 @@ Two terminals, from the repo root:
 
 CORS and the refresh cookie are already configured for this pair; `ADMIN_ORIGIN` in the API's `.env` must match the dashboard's origin. Without SMTP set, signing up is refused — but the seeded account signs in normally, and any verification link the CMS would have emailed is printed to the API's log.
 
-Screens: Sign up → confirm email → Sign in → Projects (someone invited to exactly one website lands straight in it; owners stay on the list) → **Pages** (drag-reorder, add with auto-slug, delete w/ confirm, draft/published chips) → **Page editor** (left: section cards titled by the client-entered section `name` — falling back to the type label — drag-reorder, show/hide, delete, "+ Add section" limited to `allowedSectionTypes`; right: form auto-generated from the registry, with a "Section name (for your reference)" field at the top of every section form — repeatable rows for list fields, image picker backed by media library + R2 upload; top: Preview / **Publish** / Discard draft) → **Media library** → **Settings** (owner-only: API key, revalidate URL/secret, enabled section types, who else has access, and a danger zone that **deletes the website** — guarded by typing its name, since the API cascades pages, media, tokens and the stored R2 objects with no undo. Deleting frees the slot on the plan, which is how someone swaps one website for another.).
+Screens: Sign up → confirm email → Sign in → Projects (someone invited to exactly one website lands straight in it; owners stay on the list) → **Pages** (drag-reorder, add with auto-slug, delete w/ confirm, draft/published chips) → **Page editor** (left: section cards titled by the client-entered section `name` — falling back to the type label — drag-reorder, show/hide, delete, "+ Add section" limited to `allowedSectionTypes`; right: form auto-generated from the registry, with a "Section name (for your reference)" field at the top of every section form; above the section list, **Search & sharing** — this page's search settings — repeatable rows for list fields, image picker backed by media library + R2 upload; top: Preview / **Publish** / Discard draft) → **Media library** → **Settings** (owner-only: API key, revalidate URL/secret, enabled section types, who else has access, and a danger zone that **deletes the website** — guarded by typing its name, since the API cascades pages, media, tokens and the stored R2 objects with no undo. Deleting frees the slot on the plan, which is how someone swaps one website for another.).
 
 Drafts autosave (debounced). Publish is the single action that pushes content live.
 
@@ -364,6 +370,7 @@ What a client website installs. Two entry points so a non-React site never pulls
   - **A plain R2 URL carries no clue that its host can resize**, so a site must say so once: `configureCmsImages({ provider: "cloudflare" })`. Until it does, `cmsImageUrl` is a no-op and `cmsSrcSet` returns `""` — slower, never broken. That is the right default, because a wrong guess turns every photo on a live site into a 404. A srcset is omitted rather than faked for the same reason: four identical URLs with different width descriptors make a phone download the full original believing it chose the small one.
   - `imageProps` **omits `width`/`height` when the library never measured the file** (registration defaults both to `0`). `width={0}` is not "unknown" to a browser — it is an instruction to render nothing.
 - **`@pagecraft/sdk`** also exports `checkRevalidateRequest(body, secret)`, which validates the publish webhook with a constant-time secret comparison and strips path traversal.
+- **`@pagecraft/sdk`** also exports the SEO helpers — `pageMetadata`, `metaTags`, `sitemapEntries`, `robotsTxt` and the JSON-LD builders. See the SEO section above; the short version is that they need nothing from the site's owner to produce correct tags, and they derive structured data from the sections that already exist.
 - **`@pagecraft/sdk/react`** — `<SectionRenderer sections components fallback />`. You map section types to your own components; a type with no component renders nothing rather than crashing a live page.
 
 ### The website recipe
@@ -376,10 +383,58 @@ This is the pattern for each client website, which lives in **its own repo** —
 2. `app/[[...slug]]/page.tsx` — a catch-all with `dynamic = "force-static"` and `generateStaticParams()` from `getPages()`, rendering `<SectionRenderer>`. **Pages the client adds after the build still work**: Next generates them on first request, so a new page needs no deploy.
 3. `app/api/revalidate/route.ts` — about fifteen lines: `checkRevalidateRequest`, then `revalidatePath` for each path plus `revalidatePath("/", "layout")` so the navigation refreshes too.
 4. `components/sections/index.tsx` — **your design, in code**. One component per section type. Nothing about layout, colour or spacing ever comes from the CMS.
+5. `lib/seo.ts` + `app/sitemap.ts` — `pageMetadata(page, seo)` returned from `generateMetadata`, `<JsonLd data={pageJsonLd(page, seo)} />` in the page, and `sitemapEntries(await getPages(), seo)` for the sitemap. About fifteen lines for the whole search surface, and the Integration screen prints them with the site's own origin already filled in.
 
 A CMS outage must not fail a deploy: catch `CmsError` with status `0` in the catch-all page, warn in the build log, and render a holding page that regenerates on the next publish. Any other error (bad key, 500) should still fail the build, because that is a real misconfiguration you want to hear about.
 
 **Plain React (Vite) recipe**: same client, no `fetchOptions`; fetch at runtime and let the CDN cache headers do the work. Edits appear on the next page load instead of instantly.
+
+## SEO — BUILT
+
+SEO here means two separate things that share a word and nothing else. Keeping them apart is the first thing to know:
+
+1. **The customer's website ranking** — the CMS's job, since it holds the content. `lib/seo.ts` (dashboard), the `seo` block on a page, and `packages/sdk/src/seo.ts`.
+2. **mypagecraft.com ranking** — the marketing site's own tags. `lib/site-meta.ts`, `lib/og.tsx`, `app/robots.ts`, `app/sitemap.ts`.
+
+They sit next to each other in `apps/admin/lib/` with confusingly similar names. `seo.ts` is theirs, `site-meta.ts` is ours.
+
+### 1. The customer's SEO
+
+**The rule the whole design rests on: a client who never opens the SEO panel must still get a page that indexes correctly.** The person editing a bakery's website will not read an article about meta descriptions, and their site still has to rank. So every field has a real fallback and the SDK applies it: a blank `metaTitle` falls back to the page title, a blank description is **written from the page's own first real sentence** (never from a heading — a description wants prose), a blank sharing image falls back to the first photo on the page, and the canonical falls back to the page's own address. The panel exists to let someone *improve* on those defaults, never as a precondition for them.
+
+**Structured data is derived, never asked for.** This is the part that makes the product worth more than a meta-tag box:
+
+- an **`faq`** section becomes a `FAQPage` — the answers can appear expanded directly in the search result
+- a **`contact`** section becomes a `LocalBusiness` with its address, phone and opening hours; for a shop or a tradesperson this is the highest-value markup there is, and the one they would never have added by hand
+- a **`productGrid`** becomes an `ItemList` of `Product`
+- everything else gets a `WebPage` node, plus a `BreadcrumbList` from the slug
+
+The owner already typed all of it. Asking them to type an address a second time into an "SEO settings" form is how that data ends up wrong in one of the two places.
+
+**Opening hours are dropped rather than guessed.** `parseDays`/`parseTimes` in the SDK map "Mon – Fri" and "9am – 5.30pm" onto schema.org's `Mo-Fr 09:00-17:30`. Anything they cannot parse with confidence is left out entirely: a wrong opening time in a search result sends someone to a closed shop, which is materially worse for that business than showing no hours.
+
+**`GET /api/content/pages` carries `updatedAt`, `publishedAt` and each page's `noIndex`**, so that one request is also everything a site needs for a correct `sitemap.xml` — a `<lastmod>` per URL, and the ability to leave out the pages their owner hid. Listing a `noindex` URL in a sitemap is a direct contradiction and Search Console reports it as an error against the whole file, so `sitemapEntries()` filters them out rather than listing and disallowing.
+
+`packages/sdk/src/seo.ts` is the whole surface, framework-agnostic and dependency-free: `pageMetadata()` (hand it straight back from Next's `generateMetadata`), `metaTags()`/`renderMetaTags()` for everything that is not Next, `sitemapEntries()`/`renderSitemap()`, `robotsTxt()`, the JSON-LD builders, and `<JsonLd>` in `@mypagecraft/sdk/react`. A **preview is never indexable** whatever the page says — `pageMetadata` forces `index: false` when `page.preview` is true.
+
+**The dashboard panel shows the result, not the fields.** A meta description is an abstraction nobody outside this industry has heard of; a Google result is something everybody has looked at. So the search preview sits at the top and moves as they type, the inputs read as "what it says in Google", and the length meters show the *ideal band* rather than a remaining count — "113 characters left" tells someone nothing about whether to keep typing. The checklist is scored out of 100 and includes a duplicate-title check across the website, which is the one problem a client cannot see from inside one page.
+
+**Nothing in the panel can block a publish.** A page scoring 30 still goes live. The alternative is a CMS that refuses to publish a shop's opening hours because its description is 60 characters, and that is a CMS people work around rather than with.
+
+### 2. The marketing site's own SEO
+
+`pageMeta()` in `lib/site-meta.ts` is what every public route exports, so a new page cannot forget a tag. It emits the canonical, the robots directives, `og:*` and `twitter:*` together.
+
+- **`SITE_URL` is load-bearing and fails silently.** Canonicals, `og:url`, the sitemap and every JSON-LD `@id` are built from it, and a wrong value does not break a build — it quietly tells Google the real site lives at localhost. Set `NEXT_PUBLIC_SITE_URL` on the deploy.
+- **The home page is the bare origin with no trailing slash, everywhere.** Next strips it from the canonical, so `abs("/")` returns `https://mypagecraft.com` and the sitemap and `@id`s match. A sitemap that spells the home page differently from its own canonical is what Search Console reports as "alternate page with proper canonical tag".
+- **There is deliberately no default canonical in the root layout.** It would be inherited by the dashboard screens, telling a crawler that `/projects` is really the home page. A missing canonical is neutral; a wrong one is not.
+- **`opengraph-image.tsx` was tried and abandoned.** Next resolves that file convention for the exact segment it sits in and **not for child segments**: a copy at the app root gave `/` a card and left `/contact`, `/login`, `/signup` and the three policy pages with none — a blank grey box everywhere the link was pasted. `app/og/[card]/route.tsx` replaces it: stable URLs (`/og/pricing`), prerendered to PNGs by `generateStaticParams`, named from `pageMeta({ card })` so no page can silently miss one. Stable also matters because Facebook and LinkedIn cache a card against its URL, and a build hash in it defeats that cache.
+- **Structured data never restates a price.** `productSchema()` reads `lib/pricing.ts`, the same two numbers the pricing page prints. Markup that disagrees with the page it sits on is a manual-action risk.
+- The landing page's `FAQPage` is built from the same `FAQS` array the page renders, for the same reason — Google treats FAQ markup that is not visible on the page as an offence.
+- The dashboard is `noindex` from a thin **server** layout wrapping the client shell (`(app)/layout.tsx` → `app-shell.tsx`), and the token-bearing auth screens are `noindex` **and** disallowed in `robots.txt` — `noindex` needs the page fetched before it counts, whereas `Disallow` stops the request, and a password-reset link should never be requested by a crawler at all.
+- The five signed-out screens each became a server `page.tsx` wrapping a client `<name>-form.tsx`, purely so they can export `metadata`. A `"use client"` module cannot, and they were shipping the marketing headline as their title.
+- `app/sitemap.ts` is **written by hand, not crawled from the route tree**: `app/` also holds the dashboard and the token screens. Adding a public page means adding a line, which is the smallest possible price for never listing a private one.
+- `/docs` gives every section type an `id` (`/docs#section-hero`) and an `h3`, so an answer in a support reply lands on the one block that answers it.
 
 ## MCP server (`packages/mcp`) — BUILT
 
@@ -422,7 +477,8 @@ Tests run every handler against `src/stub-api.ts` — a stand-in that enforces t
      DNS currently points at the VPS, so every stored media URL is unreachable).
    - ✅ **Per-account limits and payment.** Websites are capped at the number the subscription covers, over and above the one free single-page website — a public signup form can no longer run up an open-ended bill. Pages, storage and content-API calls are metered per website too. See "Pricing & billing" above.
    - ⬜ Dodo Payments admin jobs remain: finish identity + bank verification, then fill `DODO_API_KEY`, `DODO_WEBHOOK_SECRET` and the two `DODO_PRODUCT_ID_*` vars. Until then `billingEnabled` is false and nobody but the seeded admin can own more than the free website.
-   - ⬜ SEO fields surfaced in the dashboard, and the deployment run-through.
+   - ✅ **SEO, end to end.** Search settings are edited in the dashboard, stored draft-first, served by the content API, turned into tags and structured data by the SDK, and the CMS's own marketing pages carry the full set. See "SEO" below.
+   - ⬜ The deployment run-through.
 
 **No invite flow, shared sign-ins — decided, do not rebuild.** Whoever owns a website shares those sign-in details with the other party directly. (The *other* half of this rule — "one account is one website" — was **reversed** on 30 Aug 2026: per-website pricing means an account owns as many websites as it pays for. Sharing a login is still how a second person gets in.) `ProjectRole` and `user.projectIds` still model an `editor` who was added to someone else's website, and `requireProjectAccess` honours it, so the model does not need changing if invites are ever wanted — but nothing currently creates that relationship, and `AuthToken.kind: "invite"` plus `sendProjectInviteEmail` are unused scaffolding.
 

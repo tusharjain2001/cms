@@ -152,6 +152,14 @@ export function CommandPalette() {
       run: () => s.openModal("picker"),
     });
     commands.push({
+      id: "action:seo",
+      group: "Actions",
+      icon: "⌕",
+      label: "Search & sharing for this page",
+      keywords: "seo google meta title description share social noindex",
+      run: () => s.showSeo(),
+    });
+    commands.push({
       id: "action:publish",
       group: "Actions",
       icon: "◉",

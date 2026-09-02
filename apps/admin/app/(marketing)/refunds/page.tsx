@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMeta } from "@/lib/site-meta";
 import { Clause, Fill, Highlight, LegalPage, Points } from "@/components/landing/legal";
 import { business, commercials, refunds } from "@/lib/legal";
 
@@ -19,16 +20,12 @@ import { business, commercials, refunds } from "@/lib/legal";
 const description =
   "Cancel any time and keep what you have paid for. A full refund on your first payment within seven days, no questions asked.";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta({
   title: "Refunds and cancellation",
   description,
-  openGraph: {
-    type: "website",
-    siteName: "Pagecraft",
-    title: "Refunds and cancellation · Pagecraft",
-    description,
-  },
-};
+  path: "/refunds",
+  card: "legal",
+});
 
 export default function RefundsPage() {
   return (

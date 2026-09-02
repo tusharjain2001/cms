@@ -163,6 +163,16 @@ describe("page tools", () => {
     assert.deepEqual(call.body, { seo: { metaTitle: "Home page" } });
   });
 
+  it("carries the canonical and noindex search settings through", async () => {
+    await run("pagecraft_update_page", {
+      pageId: PAGE_ID,
+      seo: { canonicalUrl: "https://acme.com/", noIndex: true },
+    });
+    assert.deepEqual(lastApiCall().body, {
+      seo: { canonicalUrl: "https://acme.com/", noIndex: true },
+    });
+  });
+
   it("deletes a page", async () => {
     assert.deepEqual(await run("pagecraft_delete_page", { pageId: PAGE_ID }), { deleted: true });
     assert.equal(lastApiCall().method, "DELETE");

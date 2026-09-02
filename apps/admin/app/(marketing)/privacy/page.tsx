@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMeta } from "@/lib/site-meta";
 import { Clause, Fill, Highlight, LegalPage, Points } from "@/components/landing/legal";
 import { business, commercials, subProcessors } from "@/lib/legal";
 
@@ -23,16 +24,12 @@ import { business, commercials, subProcessors } from "@/lib/legal";
 const description =
   "What Pagecraft stores, why, who else sees it, and how to get it back or have it deleted. No tracking, no advertising, no selling data.";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta({
   title: "Privacy policy",
   description,
-  openGraph: {
-    type: "website",
-    siteName: "Pagecraft",
-    title: "Privacy policy · Pagecraft",
-    description,
-  },
-};
+  path: "/privacy",
+  card: "legal",
+});
 
 export default function PrivacyPage() {
   return (

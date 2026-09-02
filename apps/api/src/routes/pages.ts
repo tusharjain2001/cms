@@ -9,6 +9,7 @@ import {
 } from "@pagecraft/shared";
 import {
   Page,
+  draftSeoOf,
   newSectionId,
   setDraftSections,
   toPageDTO,
@@ -34,10 +35,28 @@ const router = Router();
 const slugify = (s: string) =>
   s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 
+/**
+ * The SEO block a client may edit.
+ *
+ * The maximums are deliberately a little past what Google will show (about 60
+ * characters of title and 160 of description): the dashboard warns at the
+ * ideal length, and refusing to *store* a slightly long title would mean
+ * throwing away someone's work mid-sentence. `canonicalUrl` must be absolute
+ * or empty — a relative canonical is silently ignored by every crawler, which
+ * is worse than a rejected one.
+ */
 const seoSchema = z.object({
   metaTitle: z.string().max(70).optional(),
   metaDescription: z.string().max(200).optional(),
   ogImage: z.string().max(500).optional(),
+  canonicalUrl: z
+    .string()
+    .max(500)
+    .refine((v) => v === "" || /^https?:\/\/\S+$/i.test(v), {
+      message: "A canonical address must start with http:// or https://.",
+    })
+    .optional(),
+  noIndex: z.boolean().optional(),
 });
 
 /* ------------------------------------------------------- pages in a website */
@@ -150,7 +169,10 @@ router.patch(
         page.slug = slug;
       }
       if (body.title !== undefined) page.title = body.title;
-      if (body.seo) page.set("seo", { ...page.seo, ...body.seo });
+      // Search settings are draft-first like everything else: what the client
+      // types here is not live until they press Publish. `draftSeoOf` is what
+      // makes a page written before this field existed merge correctly.
+      if (body.seo) page.set("draftSeo", { ...draftSeoOf(page), ...body.seo });
 
       page.draftDirty = true;
       await page.save();
@@ -326,6 +348,7 @@ router.post("/pages/:pageId/publish", requireActor, requirePageAccess, async (re
         content: s.content,
       }))
     );
+    page.set("seo", draftSeoOf(page));
     page.status = "published";
     page.publishedAt = new Date();
     page.draftDirty = false;
@@ -344,6 +367,7 @@ router.post("/pages/:pageId/discard-draft", requireActor, requirePageAccess, asy
   try {
     const page = req.page!;
     setDraftSections(page, toSectionDTOs(page.sections));
+    page.set("draftSeo", page.seo);
     page.draftDirty = false;
     await page.save();
     return ok(res, toPageDTO(page));

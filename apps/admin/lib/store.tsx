@@ -19,6 +19,7 @@ import type {
   ProjectDTO,
   SectionContent,
   SectionDTO,
+  SeoDTO,
   SectionTypeDef,
 } from "./dto";
 import type { PageTemplate } from "./templates";
@@ -91,6 +92,18 @@ interface Store {
   /** Live content for the selected section, ahead of the debounced save. */
   draftContent: SectionContent;
   setFieldValue: (key: string, value: unknown) => void;
+
+  /**
+   * Which panel the editor's middle column is showing: the selected section's
+   * fields, or this page's search settings. One page-level panel does not
+   * justify a router, and keeping it in the store means the section list and
+   * the command palette can both open it.
+   */
+  pane: "section" | "seo";
+  showSeo: () => void;
+  /** Live search settings for the open page, ahead of the debounced save. */
+  seoDraft: SeoDTO;
+  setSeoField: <K extends keyof SeoDTO>(key: K, value: SeoDTO[K]) => void;
   previewFor: (section: SectionDTO) => string;
   /** Undo/redo over the selected section's field edits (client-only, per section). */
   undo: () => void;
@@ -153,7 +166,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [page, setPage] = useState<PageDTO | null>(null);
   const [loadingPage, setLoadingPage] = useState(false);
   const [selected, setSelected] = useState("");
+  const [pane, setPane] = useState<"section" | "seo">("section");
   const [draftContent, setDraftContent] = useState<SectionContent>({});
+  /**
+   * Search settings are edited and saved exactly like section content —
+   * debounced, sequence-guarded, and against the *draft* copy — because they
+   * are typed the same way and must obey the same "nothing is live until you
+   * press Publish" promise.
+   */
+  const [seoDraft, setSeoDraft] = useState<SeoDTO>({});
   // Kept fresh every render (same pattern as Modal's onCloseRef) so undo/redo
   // and the coalescing check can read the latest draft without being a dep
   // of setFieldValue's useCallback.
@@ -180,6 +201,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Guards against a slow save overwriting a newer one. */
   const saveSeq = useRef(0);
+  // Its own timer and sequence, so typing a meta description cannot cancel a
+  // pending section save (or the other way round) — they are separate requests
+  // to separate endpoints.
+  const seoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const seoSeq = useRef(0);
+  const seoRef = useRef<SeoDTO>(seoDraft);
+  seoRef.current = seoDraft;
 
   const pushToast = useCallback((msg: string, kind: Toast["kind"] = "ok") => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -220,6 +248,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setPages([]);
     setPage(null);
     setSelected("");
+    setSeoDraft({});
+    // Cancel anything still sitting in the 600ms debounce. A save that fires
+    // after the session ends is a request with a dead token, which surfaces as
+    // an error toast on the sign-in screen the person has just landed on.
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    if (seoTimer.current) clearTimeout(seoTimer.current);
+    saveTimer.current = null;
+    seoTimer.current = null;
   }, [status]);
 
   useEffect(() => {
@@ -286,6 +322,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const applyPage = useCallback((next: PageDTO, keepSelection = true) => {
     setPage(next);
+    setSeoDraft(next.seo ?? {});
     setSelected((current) => {
       const sections = next.draftSections ?? [];
       if (keepSelection && sections.some((s) => s.id === current)) return current;
@@ -392,6 +429,55 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setSaving("saving");
     },
     [selectedSection, flushSave]
+  );
+
+  /* --------------------------------------------------- search settings */
+
+  const selectSection = useCallback((id: string) => {
+    setSelected(id);
+    setPane("section");
+  }, []);
+
+  const showSeo = useCallback(() => setPane("seo"), []);
+
+  const flushSeo = useCallback(
+    async (pageId: string, seo: SeoDTO) => {
+      const seq = ++seoSeq.current;
+      setSaving("saving");
+      try {
+        const next = await api<PageDTO>(`/api/pages/${pageId}`, { method: "PATCH", body: { seo } });
+        // A newer keystroke already started saving — let it win.
+        if (seq !== seoSeq.current) return;
+        // setPage, not applyPage: applyPage would overwrite seoDraft with the
+        // response and undo anything typed while the request was in flight.
+        setPage(next);
+        setPages((current) =>
+          current.map((p) => (p.id === next.id ? { ...p, seo: next.seo } : p))
+        );
+        setSaving("saved");
+        setPublishedNow(false);
+      } catch (err) {
+        if (seq !== seoSeq.current) return;
+        setSaving("error");
+        reportError(err);
+      }
+    },
+    [reportError]
+  );
+
+  const setSeoField = useCallback(
+    <K extends keyof SeoDTO>(key: K, value: SeoDTO[K]) => {
+      const pageId = page?.id;
+      if (!pageId) return;
+      setSeoDraft((current: SeoDTO) => {
+        const next = { ...current, [key]: value };
+        if (seoTimer.current) clearTimeout(seoTimer.current);
+        seoTimer.current = setTimeout(() => void flushSeo(pageId, next), SAVE_DEBOUNCE_MS);
+        return next;
+      });
+      setSaving("saving");
+    },
+    [page?.id, flushSeo]
   );
 
   /**
@@ -676,10 +762,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const publish = useCallback(async () => {
     if (!page) return;
-    // Make sure the last keystroke is saved before going live.
+    // Make sure the last keystroke is saved before going live — in either
+    // panel. Publishing a page whose meta description is still sitting in a
+    // 600ms debounce would put the previous one live.
     if (saveTimer.current) {
       clearTimeout(saveTimer.current);
+      saveTimer.current = null;
       if (selectedSection) await flushSave(selectedSection.id, draftContent);
+    }
+    if (seoTimer.current) {
+      clearTimeout(seoTimer.current);
+      seoTimer.current = null;
+      await flushSeo(page.id, seoRef.current);
     }
     try {
       const res = await api<{
@@ -710,6 +804,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     selectedSection,
     draftContent,
     flushSave,
+    flushSeo,
     applyPage,
     refreshPages,
     projectId,
@@ -870,11 +965,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     loadingPage,
     openPage,
     selected,
-    selectSection: setSelected,
+    selectSection: selectSection,
     selectedSection,
     selectedDef,
     draftContent,
     setFieldValue,
+    pane,
+    showSeo,
+    seoDraft,
+    setSeoField,
     previewFor,
     undo,
     redo,

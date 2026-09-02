@@ -7,6 +7,7 @@ import { useStore } from "@/lib/store";
 import { ContentPreview } from "@/components/editor/content-preview";
 import { FieldView } from "@/components/editor/field-renderer";
 import { SectionList } from "@/components/editor/section-list";
+import { SeoPanel } from "@/components/editor/seo-panel";
 import { Button, Input, cx } from "@/components/ui";
 
 /** Keep in sync with the inline read below — this is the only place the key lives. */
@@ -232,7 +233,9 @@ export default function EditorScreen() {
             tab === "content" ? "block" : "hidden"
           )}
         >
-          {section && def ? (
+          {s.pane === "seo" ? (
+            <SeoPanel />
+          ) : section && def ? (
             <div className="max-w-[660px] px-5 pt-6 pb-16 lg:px-[30px]">
               <div className="mb-1 flex flex-wrap items-baseline gap-2.5">
                 <h1 className="text-panel font-bold">{section.name || def.name}</h1>

@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { ApiError, API_URL, api } from "@/lib/api";
 import type { FieldDef, ProjectTokenDTO, QuotaUsageDTO, SectionTypeDef } from "@/lib/dto";
 import { useStore } from "@/lib/store";
+import { needsSeoAttention } from "@/lib/seo";
 import { Button, Card, CardTitle, Input, Modal, ModalActions, cx } from "@/components/ui";
 
 /**
@@ -532,6 +533,18 @@ export default function IntegrationScreen() {
   const isLocalApi = /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(:|\/|$)/.test(API_URL);
   const enabled = s.sectionTypes.filter((t) => project.allowedSectionTypes.includes(t.type));
   const published = s.pages.filter((p) => p.status === "published");
+  const missingDescriptions = s.pages.filter(needsSeoAttention).length;
+  /**
+   * Where the client's own website is served — not where this API is.
+   *
+   * Falls back to a placeholder rather than to `API_URL`: pasting the CMS's
+   * address in as a site origin would put a canonical on every page of their
+   * website pointing at our API, which is a worse failure than an obvious
+   * placeholder somebody edits.
+   */
+  const siteOrigin = project.domain
+    ? `https://${project.domain.replace(/^https?:\/\//, "").replace(/\/$/, "")}`
+    : "https://your-website.com";
 
   const envFile = `PAGECRAFT_API_URL=${API_URL}
 PAGECRAFT_API_KEY=${key}
@@ -570,6 +583,43 @@ export function ${componentName(enabled[0]?.type ?? "hero")}({ content }) {
 export const components = {
 ${enabled.map((t) => `  ${t.type}: ${componentName(t.type)},`).join("\n")}
 };`;
+
+  /**
+   * The search tags, with this website's own origin already filled in.
+   *
+   * `siteUrl` is the one value a developer cannot guess from the CMS: it is
+   * where *their* site is served, not where this API is. Prefilling it from
+   * the domain on the project is the difference between a snippet that works
+   * on paste and one that silently emits `undefined` into every canonical.
+   */
+  const seoFile = `import { pageMetadata, pageJsonLd } from "@mypagecraft/sdk";
+import { JsonLd } from "@mypagecraft/sdk/react";
+import { cms } from "@/lib/cms";
+
+export const seo = {
+  siteUrl: "${siteOrigin}",
+  siteName: "${project.name.replace(/"/g, '\\"')}",
+};
+
+// In app/[[...slug]]/page.jsx, beside the component you already have:
+export async function generateMetadata({ params }) {
+  const { slug } = await params;
+  const page = await cms(\`pages/\${(slug ?? []).join("/") || "index"}\`);
+  return pageMetadata(page, seo);
+}
+
+// …and inside the page itself, above <SectionRenderer>:
+//   <JsonLd data={pageJsonLd(page, seo)} />`;
+
+  const sitemapFile = `import { sitemapEntries } from "@mypagecraft/sdk";
+import { cms } from "@/lib/cms";
+import { seo } from "@/lib/seo";
+
+export default async function sitemap() {
+  // The same page list your navigation already fetches. Pages your client
+  // hid from search are left out for you.
+  return sitemapEntries(await cms("pages"), seo);
+}`;
 
   const pageFile = `import { cms } from "@/lib/cms";
 import { components } from "@/components/sections";
@@ -871,6 +921,41 @@ export async function POST(req) {
                   Website settings → Publish webhook
                 </Link>
                 , and use the same secret in the file above.
+              </>
+            )}
+          </div>
+        </Step>
+
+        {/* ---------------------------------------------------------- step 6 */}
+        <Step
+          n={6}
+          title="Give every page its search tags"
+          sub="Titles, descriptions, sharing cards, a canonical and a sitemap — from content your client has already typed."
+        >
+          <CodeBlock file="lib/seo.js" code={seoFile} />
+          <CodeBlock file="app/sitemap.js" code={sitemapFile} />
+          <div
+            className={cx(
+              "rounded-lg border px-4 py-3 text-label leading-[1.55]",
+              missingDescriptions === 0
+                ? "border-published-line bg-published-bg text-slate"
+                : "border-line-mid bg-rail text-quiet"
+            )}
+          >
+            {missingDescriptions === 0 ? (
+              <>
+                <strong>Every page has a search description.</strong> Nothing is left for Google to
+                invent.
+              </>
+            ) : (
+              <>
+                <strong>
+                  {missingDescriptions} of {s.pages.length}{" "}
+                  {s.pages.length === 1 ? "page has" : "pages have"} no search description.
+                </strong>{" "}
+                The tags above still work — the SDK writes one from the page&apos;s own opening
+                sentence — but a description written on purpose wins more clicks. Open a page and
+                choose <span className="font-semibold">Search &amp; sharing</span>.
               </>
             )}
           </div>

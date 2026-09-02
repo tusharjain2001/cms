@@ -10,8 +10,55 @@ export function SectionList() {
   const drag = useDragList((from, to) => void s.moveSection(from, to));
   const sections = s.page?.draftSections ?? [];
 
+  const seoOpen = s.pane === "seo";
+  const needsDescription = !s.seoDraft.metaDescription?.trim();
+
   return (
     <div className="flex flex-col">
+      {/*
+        Search settings sit above the sections rather than behind a gear icon,
+        because a thing nobody can see is a thing nobody fills in. The amber
+        dot is the whole nudge: it costs no words and it goes away when the
+        description is written.
+      */}
+      <button
+        type="button"
+        data-tour="page-seo"
+        onClick={() => s.showSeo()}
+        aria-pressed={seoOpen}
+        className={cx(
+          "mb-4 flex w-full cursor-pointer items-center gap-2.5 rounded-[10px] border p-3 text-left transition-colors",
+          seoOpen
+            ? "border-accent bg-surface shadow-[0_0_0_3px_#eaeff9]"
+            : "border-line bg-surface hover:border-[#cfccc4]"
+        )}
+      >
+        <span
+          className={cx(
+            "grid h-[30px] w-[30px] shrink-0 place-items-center rounded-[7px] text-[15px]",
+            seoOpen ? "bg-accent-soft text-accent" : "bg-chip-hover text-quiet"
+          )}
+        >
+          ⌕
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-body font-semibold">Search &amp; sharing</span>
+          <span className="mt-px block truncate text-micro text-muted">
+            {s.seoDraft.noIndex
+              ? "Hidden from Google"
+              : needsDescription
+                ? "No description written yet"
+                : "How this page looks on Google"}
+          </span>
+        </span>
+        {needsDescription && !s.seoDraft.noIndex && (
+          <span
+            title="This page has no search description"
+            className="h-2.5 w-2.5 shrink-0 rounded-full bg-draft"
+          />
+        )}
+      </button>
+
       <p className="mb-1 text-helper font-semibold tracking-[.08em] text-muted uppercase">
         Sections on this page
       </p>

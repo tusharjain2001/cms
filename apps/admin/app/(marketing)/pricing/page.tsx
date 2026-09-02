@@ -6,6 +6,7 @@ import { SiteNav } from "@/components/landing/site-nav";
 import { Band, ButtonLink } from "@/components/landing/bits";
 import { Print, Stagger, StageController } from "@/components/landing/motion";
 import { links } from "@/lib/links";
+import { breadcrumbSchema, graph, jsonLd, pageMeta, productSchema } from "@/lib/site-meta";
 import { ONE_MONTH, ONE_YEAR, price } from "@/lib/pricing";
 
 /**
@@ -30,11 +31,13 @@ import { ONE_MONTH, ONE_YEAR, price } from "@/lib/pricing";
 
 const description = `Start free with a one-page website. ${ONE_MONTH} a month per website after that — edit your own words and photos, and your site updates itself. No tiers, no surprises.`;
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta({
   title: "Pricing",
   description,
-  openGraph: { type: "website", siteName: "Pagecraft", title: "Pricing · Pagecraft", description },
-};
+  path: "/pricing",
+  card: "pricing",
+  keywords: ["headless CMS pricing", "CMS per website pricing", "client website CMS cost"],
+});
 
 /**
  * The ladder written out. Not a feature comparison — there is nothing to
@@ -124,6 +127,20 @@ function SectionHead({ children }: { children: React.ReactNode }) {
 export default function PricingPage() {
   return (
     <div className="min-h-screen bg-canvas">
+      {/*
+        The priced offers, read from `lib/pricing.ts` — the same two numbers
+        this page prints. Structured data that quotes a different price from
+        the page it sits on is a manual-action risk, so it is never typed out
+        a second time.
+      */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: jsonLd(
+            graph(productSchema(), breadcrumbSchema([{ name: "Pricing", path: "/pricing" }]))
+          ),
+        }}
+      />
       <SiteNav active="pricing" />
 
       <StageController>

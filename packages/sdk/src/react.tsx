@@ -1,5 +1,6 @@
 import { Fragment, createElement, type ComponentType, type ReactNode } from "react";
 import type { SectionDTO } from "./content-types.js";
+import { jsonLdScript, type JsonLd as JsonLdInput } from "./seo.js";
 
 /**
  * Maps section types to YOUR React components.
@@ -52,4 +53,25 @@ export function SectionRenderer({
       });
     })
   );
+}
+
+/**
+ * A `<script type="application/ld+json">` for one or more structured-data
+ * nodes — normally whatever `pageJsonLd(page, seo)` returned.
+ *
+ * ```tsx
+ * <JsonLd data={pageJsonLd(page, seo)} />
+ * ```
+ *
+ * It renders inside the body rather than the head on purpose: Google reads
+ * JSON-LD from either, and a script in the body needs no framework-specific
+ * head API, so this one component works in Next, Remix, Vite and Astro alike.
+ */
+export function JsonLd({ data }: { data: JsonLdInput | JsonLdInput[] }): ReactNode {
+  return createElement("script", {
+    type: "application/ld+json",
+    // Pre-escaped by jsonLdScript: a `</script>` inside an FAQ answer would
+    // otherwise close this tag early and spill JSON into the page as markup.
+    dangerouslySetInnerHTML: { __html: jsonLdScript(data) },
+  });
 }

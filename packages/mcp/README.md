@@ -111,7 +111,7 @@ website sees: published pages only, no drafts.
 | `pagecraft_list_pages` | All pages, drafts included |
 | `pagecraft_get_page` | One page: live `sections` and editable `draftSections` |
 | `pagecraft_create_page` | New draft page |
-| `pagecraft_update_page` | Title, web address, SEO fields |
+| `pagecraft_update_page` | Title, web address, and the search settings — meta title, description, sharing image, canonical, and `noIndex`. Like every other edit these are a **draft** until the page is published. |
 | `pagecraft_delete_page` | ⚠ removes the page and its content |
 | `pagecraft_reorder_pages` | Menu order |
 

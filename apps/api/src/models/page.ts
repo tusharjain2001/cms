@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Schema, model, type HydratedDocument, type InferSchemaType } from "mongoose";
-import type { PageDTO, PageSummaryDTO, SectionDTO } from "@pagecraft/shared";
+import type { PageDTO, PageSummaryDTO, SectionDTO, SeoDTO } from "@pagecraft/shared";
 
 /**
  * A page holds TWO copies of its sections:
@@ -27,6 +27,17 @@ const sectionSchema = new Schema(
   { _id: false }
 );
 
+const seoSchema = new Schema(
+  {
+    metaTitle: { type: String, default: "" },
+    metaDescription: { type: String, default: "" },
+    ogImage: { type: String, default: "" },
+    canonicalUrl: { type: String, default: "" },
+    noIndex: { type: Boolean, default: false },
+  },
+  { _id: false }
+);
+
 const pageSchema = new Schema(
   {
     projectId: { type: Schema.Types.ObjectId, ref: "Project", required: true, index: true },
@@ -35,11 +46,23 @@ const pageSchema = new Schema(
     slug: { type: String, default: "", lowercase: true, trim: true },
     title: { type: String, required: true, trim: true },
     order: { type: Number, required: true, default: 0 },
-    seo: {
-      metaTitle: { type: String, default: "" },
-      metaDescription: { type: String, default: "" },
-      ogImage: { type: String, default: "" },
-    },
+    // What the page tells search engines and social networks about itself.
+    // All optional with real fallbacks (see SeoDTO) — a client who never opens
+    // the SEO panel still gets a page that indexes correctly. `noIndex` is the
+    // only one that changes behaviour rather than wording.
+    //
+    // Live, exactly like `sections`. The public API serves this; the dashboard
+    // edits `draftSeo` and publish copies one over the other.
+    seo: { type: seoSchema, default: () => ({}) },
+    /**
+     * The editing copy.
+     *
+     * Absent on every page written before search settings existed, and absent
+     * means "the same as live" rather than "empty" — see `draftSeoOf`. Without
+     * that, adding this field would have silently blanked the meta titles of
+     * every page already in the database.
+     */
+    draftSeo: { type: seoSchema, default: undefined },
     sections: { type: [sectionSchema], default: () => [] },
     draftSections: { type: [sectionSchema], default: () => [] },
     status: { type: String, enum: ["draft", "published"], default: "draft" },
@@ -59,6 +82,39 @@ export type SectionSub = InferSchemaType<typeof sectionSchema>;
 export const Page = model("Page", pageSchema);
 
 export const newSectionId = () => randomUUID();
+
+/**
+ * The SEO block, mapped once.
+ *
+ * Empty strings become `undefined` so a caller can write
+ * `seo.metaTitle ?? page.title` and get the fallback rather than an empty
+ * <title>. `noIndex` is the exception: it is a real boolean either way, since
+ * "undefined" and "false" would mean the same thing to a site but read
+ * differently in a toggle.
+ */
+type SeoSub = InferSchemaType<typeof seoSchema>;
+
+function mapSeo(seo: SeoSub | undefined | null): SeoDTO {
+  return {
+    metaTitle: seo?.metaTitle || undefined,
+    metaDescription: seo?.metaDescription || undefined,
+    ogImage: seo?.ogImage || undefined,
+    canonicalUrl: seo?.canonicalUrl || undefined,
+    noIndex: seo?.noIndex === true,
+  };
+}
+
+/**
+ * The search settings the dashboard is editing.
+ *
+ * A page written before this field existed has no `draftSeo` at all, and that
+ * has to read as "whatever is live" — otherwise the first time such a page is
+ * opened the panel would show empty boxes over a perfectly good live listing,
+ * and the next save would publish that emptiness.
+ */
+export function draftSeoOf(page: PageDoc): SeoSub {
+  return (page.draftSeo ?? page.seo ?? {}) as SeoSub;
+}
 
 /** Plain objects, sorted, so callers never worry about Mongoose subdocuments. */
 export function toSectionDTOs(sections: SectionSub[], visibleOnly = false): SectionDTO[] {
@@ -84,11 +140,9 @@ export function toPageDTO(page: PageDoc): PageDTO {
     title: page.title,
     order: page.order,
     status: page.status as PageDTO["status"],
-    seo: {
-      metaTitle: page.seo?.metaTitle || undefined,
-      metaDescription: page.seo?.metaDescription || undefined,
-      ogImage: page.seo?.ogImage || undefined,
-    },
+    // The dashboard edits the draft, so this is the draft — the same reason
+    // `draftSections` is what the editor renders.
+    seo: mapSeo(draftSeoOf(page)),
     sections: toSectionDTOs(page.sections),
     draftSections: toSectionDTOs(page.draftSections),
     hasDraftChanges: page.draftDirty,
@@ -107,6 +161,7 @@ export function toPageSummaryDTO(page: PageDoc): PageSummaryDTO {
     status: page.status as PageSummaryDTO["status"],
     hasDraftChanges: page.draftDirty,
     updatedAt: (page.get("updatedAt") as Date).toISOString(),
+    seo: mapSeo(draftSeoOf(page)),
   };
 }
 
@@ -120,12 +175,11 @@ export function toPublicPageDTO(page: PageDoc, useDraft = false) {
     slug: page.slug,
     title: page.title,
     order: page.order,
-    seo: {
-      metaTitle: page.seo?.metaTitle || undefined,
-      metaDescription: page.seo?.metaDescription || undefined,
-      ogImage: page.seo?.ogImage || undefined,
-    },
+    // Live settings, unless this is a preview of the draft — a preview that
+    // showed the live meta description would defeat the point of previewing.
+    seo: mapSeo(useDraft ? draftSeoOf(page) : page.seo),
     sections: toSectionDTOs(source, true),
+    updatedAt: (page.get("updatedAt") as Date).toISOString(),
     publishedAt: page.publishedAt?.toISOString(),
   };
 }

@@ -1,5 +1,6 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque } from "next/font/google";
+import { SITE_NAME, SITE_TAGLINE, SITE_URL, abs } from "@/lib/site-meta";
 import "./globals.css";
 
 /**
@@ -27,9 +28,47 @@ const bricolage = Bricolage_Grotesque({
  * state management or fire an auth refresh they have no session for.
  */
 
+/**
+ * Site-wide metadata. Every public route narrows it with `pageMeta()`.
+ *
+ * `metadataBase` is the piece that has to be here rather than per page: it is
+ * what turns every relative `alternates.canonical` and `og:image` in the app
+ * into an absolute URL. Without it Next emits relative social URLs, which
+ * Facebook, WhatsApp and X all ignore — the cards simply come out blank, with
+ * nothing in the markup to suggest why.
+ */
 export const metadata: Metadata = {
-  title: { default: "Pagecraft", template: "%s · Pagecraft" },
-  description: "A content-only CMS for websites built in React and Next.js.",
+  metadataBase: new URL(SITE_URL),
+  title: { default: `${SITE_NAME} — ${SITE_TAGLINE}`, template: `%s · ${SITE_NAME}` },
+  description:
+    "Build client websites in React and let the owner edit the words and photos. A headless CMS where design stays in your code.",
+  applicationName: SITE_NAME,
+  // Deliberately NO default canonical here. Every public page sets its own via
+  // `pageMeta()`; a site-wide default would be inherited by the dashboard
+  // screens, telling a crawler that `/projects` is really the home page. A
+  // missing canonical is neutral, a wrong one is not.
+  openGraph: { type: "website", siteName: SITE_NAME, locale: "en_GB", url: abs("/") },
+  twitter: { card: "summary_large_image" },
+  // Phone numbers on the contact page are deliberate links; Safari turning
+  // every number-shaped string in the legal pages into a tel: link is not.
+  formatDetection: { telephone: false, address: false, email: false },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1 },
+  },
+};
+
+/**
+ * The app is light-only (see globals.css), so `themeColor` is a single value
+ * rather than a media-query pair. It paints the address bar on Android and the
+ * title bar of an installed window.
+ */
+export const viewport: Viewport = {
+  themeColor: "#f6f5f2",
+  colorScheme: "light",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

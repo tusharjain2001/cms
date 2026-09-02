@@ -29,10 +29,38 @@ export interface SectionDTO {
   content: SectionContent;
 }
 
+/**
+ * What a page tells a search engine and a social network about itself.
+ *
+ * Every field is optional and every one has a sensible fallback, because a
+ * client who never opens the SEO panel must still end up with a page that
+ * indexes correctly: `metaTitle` falls back to the page title, `ogImage` to
+ * whatever the site chooses, `canonicalUrl` to the page's own address. The
+ * panel exists to let someone *improve* on those defaults, never to make a
+ * page depend on being filled in.
+ *
+ * `noIndex` is the one field that changes behaviour rather than wording, which
+ * is why it is stored rather than inferred: a thank-you page or a private
+ * price list has to be publishable and unfindable at the same time.
+ */
 export interface SeoDTO {
+  /** Overrides the page title in the <title> tag and in search results. */
   metaTitle?: string;
+  /** The snippet under the result. Not a ranking factor; entirely a click factor. */
   metaDescription?: string;
+  /** Absolute URL of the sharing card image (1200x630 reads best). */
   ogImage?: string;
+  /**
+   * The address this page should be credited as, when the same content is
+   * reachable at more than one URL. Blank means "this page's own address",
+   * which is right almost always.
+   */
+  canonicalUrl?: string;
+  /**
+   * Keep this page out of search results. It still publishes and still serves
+   * — it is `noindex`, not unpublished.
+   */
+  noIndex?: boolean;
 }
 
 export interface PageDTO {
@@ -59,6 +87,11 @@ export interface PageSummaryDTO {
   status: PageStatus;
   hasDraftChanges: boolean;
   updatedAt: string;
+  /**
+   * Carried on the summary so the pages list can flag a page whose search
+   * listing is still empty, without fetching every page in full.
+   */
+  seo: SeoDTO;
 }
 
 export interface ProjectDTO {

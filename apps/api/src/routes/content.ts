@@ -42,7 +42,16 @@ function cacheable(res: import("express").Response) {
   res.set("Cache-Control", "public, s-maxage=60, stale-while-revalidate=600");
 }
 
-/** Navigation-ready list: every published page, in menu order. */
+/**
+ * Navigation-ready list: every published page, in menu order.
+ *
+ * It carries `updatedAt` and the page's `noIndex` flag as well as its titles,
+ * because this one request is also everything a site needs to emit a correct
+ * `sitemap.xml` — a `<lastmod>` per URL and the ability to leave out the pages
+ * their owner asked to keep out of search. Without those a site either ships a
+ * sitemap that lies about freshness or makes one request per page to build it.
+ * `sitemapEntries()` in the SDK consumes exactly this shape.
+ */
 router.get("/pages", async (req, res, next) => {
   try {
     const pages = await Page.find({ projectId: req.project!._id, status: "published" }).sort({
@@ -59,7 +68,12 @@ router.get("/pages", async (req, res, next) => {
         seo: {
           metaTitle: p.seo?.metaTitle || undefined,
           metaDescription: p.seo?.metaDescription || undefined,
+          ogImage: p.seo?.ogImage || undefined,
+          canonicalUrl: p.seo?.canonicalUrl || undefined,
+          noIndex: p.seo?.noIndex === true,
         },
+        updatedAt: (p.get("updatedAt") as Date).toISOString(),
+        publishedAt: p.publishedAt?.toISOString(),
       }))
     );
   } catch (err) {

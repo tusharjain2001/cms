@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { abs, graph, jsonLd, organizationSchema, pageMeta } from "@/lib/site-meta";
 import { Clause, Fill, LegalPage, Points } from "@/components/landing/legal";
 import { business, isFilled } from "@/lib/legal";
 
@@ -14,14 +15,48 @@ import { business, isFilled } from "@/lib/legal";
 const description =
   "How to reach the people who run Pagecraft — email, phone and our registered address.";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta({
   title: "Contact us",
   description,
-  openGraph: { type: "website", siteName: "Pagecraft", title: "Contact us · Pagecraft", description },
-};
+  path: "/contact",
+});
+
+/**
+ * The organisation, with whatever contact details are actually filled in.
+ *
+ * Every field is gated on `isFilled`, because `lib/legal.ts` ships the address
+ * and phone as `FILL_ME` sentinels until an operator supplies them — and
+ * publishing `"telephone": "__FILL_ME__"` to a search engine is worse than
+ * publishing no phone number at all. The visible page shouts about a missing
+ * value through `<Fill>`; the structured data simply omits it.
+ */
+function contactSchema() {
+  const node: Record<string, unknown> = {
+    ...organizationSchema(),
+    "@type": "Organization",
+    mainEntityOfPage: abs("/contact"),
+  };
+  if (isFilled(business.legalName)) node.legalName = business.legalName;
+  if (isFilled(business.phone)) node.telephone = business.phone;
+  const street = business.address.filter(isFilled);
+  if (street.length > 0) {
+    node.address = {
+      "@type": "PostalAddress",
+      streetAddress: street.join(", "),
+      addressCountry: business.country,
+    };
+  }
+  if (isFilled(business.gstin)) node.taxID = business.gstin;
+  return node;
+}
 
 export default function ContactPage() {
   return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: jsonLd(graph(contactSchema())) }}
+      />
     <LegalPage
       title="Contact us"
       intro="A real person reads every message. If something is broken or you are stuck mid-payment, say so in the subject line and it goes to the front of the queue."
@@ -115,5 +150,6 @@ export default function ContactPage() {
         </p>
       </Clause>
     </LegalPage>
+    </>
   );
 }

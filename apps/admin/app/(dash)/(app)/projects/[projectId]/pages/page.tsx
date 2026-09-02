@@ -8,6 +8,7 @@ import { useStore } from "@/lib/store";
 import { FREE_PAGES_PER_WEBSITE, ONE_MONTH } from "@/lib/pricing";
 import { useDragList } from "@/lib/use-drag-list";
 import { Button, Chip, DropLine, EmptyState, Grip, PageHeader } from "@/components/ui";
+import { needsSeoAttention } from "@/lib/seo";
 
 export default function PagesScreen() {
   const s = useStore();
@@ -108,6 +109,19 @@ export default function PagesScreen() {
                       /{p.slug}
                     </span>
                   </button>
+
+                  {/*
+                    A page with no search description is a page Google will
+                    write a snippet for on its own. One quiet marker in the
+                    list is how someone finds out; the panel behind the row is
+                    where they fix it.
+                  */}
+                  {needsSeoAttention(p) && (
+                    <span
+                      title="No search description written — open this page and choose “Search & sharing”."
+                      className="hidden h-2 w-2 shrink-0 rounded-full bg-draft sm:block"
+                    />
+                  )}
 
                   {p.hasDraftChanges ? (
                     <Chip tone="draft">Draft changes</Chip>

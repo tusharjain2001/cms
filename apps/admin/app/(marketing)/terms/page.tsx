@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMeta } from "@/lib/site-meta";
 import { Clause, Fill, Highlight, LegalPage, Points } from "@/components/landing/legal";
 import { business, commercials } from "@/lib/legal";
 
@@ -17,16 +18,12 @@ import { business, commercials } from "@/lib/legal";
 const description =
   "The agreement between you and Pagecraft: what we provide, what you pay, who owns what, and how either of us can end it.";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta({
   title: "Terms and conditions",
   description,
-  openGraph: {
-    type: "website",
-    siteName: "Pagecraft",
-    title: "Terms and conditions · Pagecraft",
-    description,
-  },
-};
+  path: "/terms",
+  card: "legal",
+});
 
 export default function TermsPage() {
   return (

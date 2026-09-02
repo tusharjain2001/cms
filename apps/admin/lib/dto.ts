@@ -25,6 +25,7 @@ export type {
   SectionContent,
   SectionDTO,
   SectionTypeDef,
+  SeoDTO,
   SubscriptionDTO,
   SubscriptionStatus,
   UserDTO,

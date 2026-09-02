@@ -6,6 +6,7 @@ import { Print } from "@/components/landing/motion";
 import { SiteFooter } from "@/components/landing/site-footer";
 import { SiteNav } from "@/components/landing/site-nav";
 import { links } from "@/lib/links";
+import { SITE_NAME, abs, breadcrumbSchema, graph, jsonLd, pageMeta } from "@/lib/site-meta";
 import { ONE_MONTH } from "@/lib/pricing";
 
 /**
@@ -37,22 +38,25 @@ const API = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "https://api.
 const description =
   "Connect any React or Next.js site to Pagecraft. Four read-only endpoints, one API key, and your client edits the words while you keep the design.";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta({
   title: "Developer docs",
   description,
-  openGraph: {
-    type: "website",
-    siteName: "Pagecraft",
-    title: "Developer docs · Pagecraft",
-    description,
-  },
-};
+  path: "/docs",
+  card: "docs",
+  keywords: [
+    "headless CMS API",
+    "Next.js content API",
+    "CMS SDK",
+    "on-demand revalidation webhook",
+  ],
+});
 
 const TOC: [string, string][] = [
   ["idea", "How it fits together"],
   ["start", "Quick start"],
   ["api", "The API"],
   ["sections", "Section types"],
+  ["seo", "Search & sharing"],
   ["notes", "Worth knowing"],
 ];
 
@@ -141,6 +145,34 @@ function flatten(fields: FieldDef[], depth = 0): { field: FieldDef; depth: numbe
 export default function DocsPage() {
   return (
     <div className="min-h-screen bg-canvas">
+      {/*
+        `TechArticle` rather than the generic `Article`: this is reference
+        material for developers, and the distinction is what puts it in the
+        right result set. `dateModified` comes from the build, since the page
+        is generated from the section registry and genuinely changes with it.
+      */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: jsonLd(
+            graph(
+              {
+                "@type": "TechArticle",
+                "@id": `${abs("/docs")}#article`,
+                headline: "Wire a Next.js site to the Pagecraft content API",
+                description,
+                url: abs("/docs"),
+                inLanguage: "en",
+                dateModified: new Date().toISOString(),
+                publisher: { "@id": `${abs("/")}#organization` },
+                articleSection: SECTION_REGISTRY.map((def) => def.name),
+                about: { "@type": "SoftwareApplication", name: SITE_NAME },
+              },
+              breadcrumbSchema([{ name: "Developer docs", path: "/docs" }])
+            )
+          ),
+        }}
+      />
       <SiteNav active="docs" />
 
       <main className="mx-auto max-w-[1160px] px-5 pb-24 sm:px-8">
@@ -319,7 +351,15 @@ export async function POST(req) {
   "data": {
     "slug": "",
     "title": "Home",
-    "seo": { "metaTitle": "…", "metaDescription": "…" },
+    "seo": {
+      "metaTitle": "…",
+      "metaDescription": "…",
+      "ogImage": "https://media.example.com/…",
+      "canonicalUrl": "",
+      "noIndex": false
+    },
+    "updatedAt": "2026-09-02T09:14:00.000Z",
+    "publishedAt": "2026-09-02T09:14:03.000Z",
     "sections": [
       {
         "id": "10134a79-b640-486f-8e2d-d1b05c924d59",
@@ -360,8 +400,20 @@ export async function POST(req) {
               </P>
 
               <div className="overflow-hidden rounded-xl border border-line bg-surface">
+                {/*
+                  Each type is addressable — /docs#section-hero — so an answer
+                  in a support reply or a search result can land on the one
+                  block that answers it rather than on 2,000 words of page.
+                  The `h3` is what makes that trail legible to a crawler; a
+                  reference list of nine things built from `span`s has no
+                  outline at all.
+                */}
                 {SECTION_REGISTRY.map((def) => (
-                  <details key={def.type} className="group border-b border-line-soft last:border-b-0">
+                  <details
+                    key={def.type}
+                    id={`section-${def.type}`}
+                    className="group scroll-mt-20 border-b border-line-soft last:border-b-0"
+                  >
                     <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 hover:bg-rail">
                       <span
                         aria-hidden
@@ -369,10 +421,10 @@ export async function POST(req) {
                       >
                         ▶
                       </span>
-                      <span className="font-mono text-mid font-semibold text-accent">
-                        {def.type}
+                      <h3 className="font-mono text-mid font-semibold text-accent">{def.type}</h3>
+                      <span className="text-label text-quiet">
+                        {def.name} — {def.description}
                       </span>
-                      <span className="text-label text-quiet">{def.description}</span>
                     </summary>
                     <div className="grid grid-cols-[auto_auto_1fr] gap-x-4 gap-y-1 border-t border-line-soft bg-sunken px-4 py-3">
                       {flatten(def.fields).map(({ field, depth }) => (
@@ -403,6 +455,96 @@ export async function POST(req) {
                   pricing
                 </Link>
                 .
+              </P>
+            </Section>
+
+            {/* ---------------------------------------------------------- seo */}
+            <Section id="seo" title="Search &amp; sharing">
+              <P>
+                Every page carries a{" "}
+                <code className="font-mono text-mid text-slate">seo</code> block the owner edits in
+                their dashboard, and the SDK turns it into tags for you. Nothing here needs the
+                owner to have filled anything in: a blank{" "}
+                <code className="font-mono text-mid text-slate">metaTitle</code> falls back to the
+                page title, a blank description is written from the page&apos;s own opening
+                sentence, and the canonical defaults to the page&apos;s own address.
+              </P>
+
+              <Code file="app/[[...slug]]/page.tsx">{`import { pageMetadata, pageJsonLd } from "@mypagecraft/sdk";
+import { JsonLd } from "@mypagecraft/sdk/react";
+
+const seo = { siteUrl: "https://acme.com", siteName: "Acme" };
+
+export async function generateMetadata({ params }) {
+  const { slug } = await params;
+  const page = await cms.getPage(slug?.join("/") ?? "");
+  return pageMetadata(page, seo);   // title, description, canonical,
+}                                   // robots, og:* and twitter:*
+
+export default async function Page({ params }) {
+  const page = await cms.getPage(/* … */);
+  return (
+    <>
+      <JsonLd data={pageJsonLd(page, seo)} />
+      <SectionRenderer sections={page.sections} components={components} />
+    </>
+  );
+}`}</Code>
+
+              <P>
+                <strong className="font-semibold text-ink">
+                  The structured data writes itself.
+                </strong>{" "}
+                <code className="font-mono text-mid text-slate">pageJsonLd</code> reads the
+                sections the owner already filled in — an{" "}
+                <a href="#section-faq" className="font-medium text-accent hover:underline">
+                  faq
+                </a>{" "}
+                section becomes a{" "}
+                <code className="font-mono text-mid text-slate">FAQPage</code> (the answers can
+                appear directly in the search result), a{" "}
+                <a href="#section-contact" className="font-medium text-accent hover:underline">
+                  contact
+                </a>{" "}
+                section becomes a{" "}
+                <code className="font-mono text-mid text-slate">LocalBusiness</code> with its
+                address, phone and opening hours, and a{" "}
+                <a href="#section-productGrid" className="font-medium text-accent hover:underline">
+                  productGrid
+                </a>{" "}
+                becomes an <code className="font-mono text-mid text-slate">ItemList</code> of
+                products. A page with none of those simply gets a{" "}
+                <code className="font-mono text-mid text-slate">WebPage</code> node. Nobody is
+                asked to type their address twice.
+              </P>
+
+              <P>
+                A sitemap and a robots.txt come from the same page list you already fetch for the
+                navigation, so neither costs an extra request. Pages the owner has hidden from
+                search are left out of the sitemap rather than listed and then disallowed — listing
+                a <code className="font-mono text-mid text-slate">noindex</code> URL is reported in
+                Search Console as an error against the whole file.
+              </P>
+
+              <Code file="app/sitemap.ts and app/robots.ts">{`import { sitemapEntries, robotsTxt } from "@mypagecraft/sdk";
+
+export default async function sitemap() {
+  return sitemapEntries(await cms.getPages(), seo);
+}
+
+// app/robots.ts
+export default function robots() {
+  return { rules: [{ userAgent: "*", allow: "/" }], sitemap: \`\${seo.siteUrl}/sitemap.xml\` };
+}`}</Code>
+
+              <P>
+                Not on Next.js? <code className="font-mono text-mid text-slate">metaTags(page,
+                seo)</code> returns the same facts as plain data and{" "}
+                <code className="font-mono text-mid text-slate">renderMetaTags</code> turns them
+                into HTML, while{" "}
+                <code className="font-mono text-mid text-slate">renderSitemap</code> and{" "}
+                <code className="font-mono text-mid text-slate">robotsTxt</code> return finished
+                strings you can serve from any framework.
               </P>
             </Section>
 
