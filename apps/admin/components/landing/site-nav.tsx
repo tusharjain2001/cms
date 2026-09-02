@@ -8,6 +8,10 @@ const NAV = [
   { label: "Section types", href: links.sections, key: "sections" },
   { label: "For owners", href: links.owners, key: "owners" },
   { label: "For developers", href: links.developers, key: "developers" },
+  // Labelled for the reader, not for the spec: half this nav's audience runs a
+  // shop and has never heard of MCP. The band and the docs both name the
+  // protocol loudly enough for the half who search for it.
+  { label: "AI agents", href: links.agent, key: "agent" },
   { label: "Docs", href: links.docs, key: "docs" },
   { label: "Pricing", href: links.pricing, key: "pricing" },
 ] as const;

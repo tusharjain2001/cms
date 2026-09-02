@@ -36,7 +36,7 @@ import { ONE_MONTH } from "@/lib/pricing";
 const API = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "https://api.mypagecraft.com";
 
 const description =
-  "Connect any React or Next.js site to Pagecraft. Four read-only endpoints, one API key, and your client edits the words while you keep the design.";
+  "Connect any React or Next.js site to Pagecraft. Four read-only endpoints, one API key, an MCP server so your coding agent can build the content, and your client edits the words while you keep the design.";
 
 export const metadata: Metadata = pageMeta({
   title: "Developer docs",
@@ -47,6 +47,9 @@ export const metadata: Metadata = pageMeta({
     "headless CMS API",
     "Next.js content API",
     "CMS SDK",
+    "CMS MCP server",
+    "MCP headless CMS",
+    "AI agent CMS",
     "on-demand revalidation webhook",
   ],
 });
@@ -57,6 +60,7 @@ const TOC: [string, string][] = [
   ["api", "The API"],
   ["sections", "Section types"],
   ["seo", "Search & sharing"],
+  ["agent", "Coding agents (MCP)"],
   ["notes", "Worth knowing"],
 ];
 
@@ -545,6 +549,108 @@ export default function robots() {
                 <code className="font-mono text-mid text-slate">renderSitemap</code> and{" "}
                 <code className="font-mono text-mid text-slate">robotsTxt</code> return finished
                 strings you can serve from any framework.
+              </P>
+            </Section>
+
+            {/* -------------------------------------------------------- mcp */}
+            <Section id="agent" title="Let a coding agent do it (MCP)">
+              <P>
+                Everything above describes what <em>you</em> build. This is the part you do not
+                have to. <code className="font-mono text-mid text-slate">@mypagecraft/mcp</code> is
+                an{" "}
+                <a
+                  href="https://modelcontextprotocol.io"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-accent hover:underline"
+                >
+                  MCP
+                </a>{" "}
+                server that hands a website to Claude, Cursor, Copilot or anything else that speaks
+                the protocol — 26 tools to read section types, draft pages, fill sections, upload
+                photos, write alt text and publish.
+              </P>
+
+              <P>
+                It is a <strong className="font-semibold text-ink">client of this same REST API</strong>{" "}
+                and nothing more: no database connection, no privileged path, no second set of
+                rules. The section registry, the field limits, the draft-until-Publish gate and
+                which website you may touch are all enforced by the API exactly as they are for the
+                dashboard. That is what makes it safe to hand an agent — it can only do what a
+                person with the same credentials could do.
+              </P>
+
+              <Code file="claude_desktop_config.json (or .cursor/mcp.json)">{`{
+  "mcpServers": {
+    "pagecraft": {
+      "command": "npx",
+      "args": ["-y", "@mypagecraft/mcp"],
+      "env": {
+        "PAGECRAFT_API_URL": "https://api.yoursite.com",
+        "PAGECRAFT_PROJECT_TOKEN": "pct_…",
+        "PAGECRAFT_PROJECT_ID": "…"
+      }
+    }
+  }
+}`}</Code>
+
+              <P>
+                <strong className="font-semibold text-ink">Use a project token, not a password.</strong>{" "}
+                Mint one on a website&apos;s Integration screen: it authorises writes to that one
+                website, reaches nothing else, never expires, and is revocable without a password
+                reset. An account email and password also works and unlocks every website that
+                account can reach — use it only when you genuinely need that, and then from an
+                account that owns only what you are happy for an assistant to edit. A website&apos;s
+                public API key is read-only by design, so it unlocks the four published-content
+                tools and no others.
+              </P>
+
+              <P>
+                <strong className="font-semibold text-ink">
+                  Tools that cannot be used are never advertised.
+                </strong>{" "}
+                A key-only config is offered four tools rather than 26 that fail, and{" "}
+                <code className="font-mono text-mid text-slate">PAGECRAFT_READ_ONLY=1</code> removes
+                all sixteen write tools from the list entirely. A model cannot reach for a tool it
+                cannot see, which is a stronger guarantee than a refusal.
+              </P>
+
+              <div className="overflow-x-auto rounded-xl border border-line bg-surface">
+                <table className="w-full min-w-[560px] border-collapse text-left">
+                  <tbody>
+                    {[
+                      ["Published content", "4 tools", "Live pages and sections, via the read-only key"],
+                      ["Websites", "3 tools", "Projects, and the section registry with every field and limit"],
+                      ["Pages", "6 tools", "Create, rename, re-address, reorder, delete — and the search settings"],
+                      ["Sections", "7 tools", "Add, edit, hide, reorder, delete, preview — all on the draft"],
+                      ["Media", "6 tools", "Upload a local file end to end, alt text, delete"],
+                    ].map(([group, count, what]) => (
+                      <tr key={group} className="border-b border-line-soft last:border-b-0">
+                        <td className="w-[26%] px-4 py-3 text-label font-semibold text-ink">
+                          {group}
+                        </td>
+                        <td className="w-[16%] px-4 py-3 font-mono text-mid text-accent">{count}</td>
+                        <td className="px-4 py-3 text-label text-quiet">{what}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <P>
+                <code className="font-mono text-mid text-slate">pagecraft_publish_page</code> is the
+                only tool that changes what a visitor sees. Everything else writes the draft, so an
+                agent that misunderstands you produces a draft you can read, correct or throw away
+                with{" "}
+                <code className="font-mono text-mid text-slate">pagecraft_discard_draft</code> —
+                never a live page you have to explain.
+              </P>
+
+              <P>
+                Signed in to the dashboard, the &ldquo;Connect your coding agent&rdquo; pill hands
+                you the same config with this website&apos;s real address, token and id already
+                filled in. The full reference — every tool, every variable and the known gaps —
+                lives in the package&apos;s README.
               </P>
             </Section>
 

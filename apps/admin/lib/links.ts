@@ -29,6 +29,8 @@ export const links = {
   sections: "/#sections",
   owners: "/#owners",
   developers: "/#code",
+  /** The MCP band — a coding agent building the site through the same API. */
+  agent: "/#agent",
 
   docs: "/docs",
 

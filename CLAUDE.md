@@ -278,7 +278,7 @@ Two deliberate deviations from the artboard, both inherited from when the mark w
 
 | Path | What it is |
 |---|---|
-| `app/(marketing)/page.tsx` | The whole page. Bands: hero → editor mock → stats → how it works → can't/can → section types → for developers → comparison → testimonials → FAQ → closing CTA. Its own `metadata` overrides the root title template. |
+| `app/(marketing)/page.tsx` | The whole page. Bands: hero → editor mock → stats → how it works → can't/can → for developers → **coding agents (MCP)** → section types → comparison → testimonials → FAQ → closing CTA. Its own `metadata` overrides the root title template. |
 | `components/landing/editor-mock.tsx` | The product screenshot, in markup rather than a PNG — it stays sharp, weighs nothing, and cannot silently go stale when the real editor changes. `aria-hidden`: it is decorative, and the surrounding copy carries the meaning. |
 | `components/landing/section-types.tsx` | The nine types as tinted mini-page tiles — the hero's sheets, landed in a grid. **Mirrors `SECTION_REGISTRY`** — add a section type there, add it here. |
 | `components/logo.tsx` | The p+c mark **and the `mypagecraft` wordmark**, drawn from the artboard's construction spec as ratios of its own height. Shared by marketing, the auth screens and the dashboard sidebar, so there is one mark, not four. |
@@ -440,14 +440,17 @@ The owner already typed all of it. Asking them to type an address a second time 
 
 `pagecraft-mcp`, a Model Context Protocol server so a customer can point an AI assistant at their own website: read the live content, build pages, fill sections from the registry, manage media, publish. 26 tools over stdio, using the official `@modelcontextprotocol/sdk`. **Full setup, the tool list and the known gaps live in [`packages/mcp/README.md`](packages/mcp/README.md)** — this section is only the decisions that constrain the rest of the repo.
 
+**It is sold as the biggest differentiator, and surfaced in three places** — the `#agent` band on the landing page (butter stage, between the plate code band and the section types), the "Coding agents (MCP)" section of `/docs`, and the "Connect your coding agent" pill in the dashboard (`components/mcp-widget.tsx`), which fills the config in with a real website's address, token and id. The pitch is not "AI in your CMS"; it is that **the registry makes an agent safe**: it can only fill fields you defined, on section types you enabled, within your limits, into a draft. Keep new copy on that line — the guardrail is the product, not the chat.
+
 **It is a client of the REST API and nothing more.** No Mongo connection, no shared code with `apps/api` beyond wire types from `@pagecraft/shared`. Every rule — registry validation, draft-versus-publish, who may touch which website — is enforced where it already was. This is why it can be a package a customer runs on their own machine rather than something we host.
 
-**Two credentials, not one, and this is the load-bearing bit.** The task was framed as "API-key auth for read/write", and half of that is not possible today: a website's API key is **read-only by design** (`middleware/api-key.ts` resolves it to one project and serves published content; no write route accepts it). So the server takes both:
+**Credentials, and this is the load-bearing bit.** A website's API key is **read-only by design** (`middleware/api-key.ts` resolves it to one project and serves published content; no write route accepts it). Do not "fix" that by teaching the key to write. Writing takes one of:
 
-- `PAGECRAFT_API_KEY` → the four published-content tools.
-- `PAGECRAFT_EMAIL` + `PAGECRAFT_PASSWORD` → the other 22, authenticating as an ordinary account exactly like the dashboard, including the 15-minute access token and the `/api/auth/refresh` rotation that renews it. Refresh is preferred over signing in again because login is rate limited to 10 per 15 minutes per email+IP.
+- `PAGECRAFT_PROJECT_TOKEN` → **the recommended one.** A write-scoped, never-expiring token for ONE website, minted on that website's Integration screen. It reaches that site and nothing else, needs no account login, and is revocable without a password reset. This is what an owner hands their developer. Pair it with `PAGECRAFT_PROJECT_ID`.
+- `PAGECRAFT_EMAIL` + `PAGECRAFT_PASSWORD` → every website the account can reach, authenticating exactly like the dashboard, including the 15-minute access token and the `/api/auth/refresh` rotation that renews it. Refresh is preferred over signing in again because login is rate limited to 10 per 15 minutes per email+IP.
+- `PAGECRAFT_API_KEY` → the four published-content tools, and only those.
 
-Do not "fix" this by teaching the API key to write. The right fix — if this matters enough — is a **scoped, revocable machine token** per project, which is an API change and does not exist. Until then, writing means a password in a config file, and the README says so plainly rather than hiding it.
+(The project token was the "scoped, revocable machine token" this file once listed as the right fix that did not exist yet. It exists; prefer it, and reach for the password pair only when the job genuinely spans several websites.)
 
 **Tools that cannot be performed are never advertised.** A key-only config is offered four tools, not 26 that fail; `PAGECRAFT_READ_ONLY=1` removes all 16 writes from `tools/list` entirely. A model cannot reach for a tool it cannot see, which is a stronger guarantee than a refusal.
 

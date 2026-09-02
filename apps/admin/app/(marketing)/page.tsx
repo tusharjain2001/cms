@@ -55,6 +55,8 @@ export const metadata: Metadata = pageMeta({
     "React CMS",
     "client website CMS",
     "content-only CMS",
+    "CMS MCP server",
+    "AI agent CMS",
     "WordPress alternative for developers",
   ],
 });
@@ -100,6 +102,41 @@ const OWNER_PROMISES = [
   },
 ];
 
+/**
+ * The MCP band's three claims.
+ *
+ * Each one answers the objection that actually stops a developer: "an AI will
+ * fill my client's site with rubbish", "it will publish something", "I am not
+ * putting my password in a config file". Every answer is a mechanism that
+ * already exists rather than a promise — which is the only kind of reassurance
+ * worth printing.
+ */
+const AGENT_GUARDS = [
+  {
+    title: "It cannot invent anything",
+    body:
+      "The section registry is the schema. An agent can only fill fields you defined, on section types you switched on, within the limits you set. The API refuses the rest — the same refusal a person gets.",
+  },
+  {
+    title: "Nothing goes live by accident",
+    body:
+      "Every write tool edits the draft. Publishing is one separate tool, and read-only mode removes all sixteen writes from the list entirely, so an assistant cannot reach for one.",
+  },
+  {
+    title: "A token, not your password",
+    body:
+      "Mint a write token for one website on its Integration screen. It reaches that site and nothing else, it never expires, and revoking it costs one click and no password reset.",
+  },
+];
+
+/** Things a developer actually types at it, in the order they would. */
+const AGENT_PROMPTS = [
+  "What section types is this website allowed to use?",
+  "Draft an About page from this PDF, then show me the draft.",
+  "Upload these six photos, write alt text, put them in the gallery.",
+  "Give every page a search description under 160 characters.",
+];
+
 const FAQS = [
   {
     q: "I run the website, not build it. Do I need to know any code?",
@@ -120,6 +157,10 @@ const FAQS = [
   {
     q: "Can I stop a client using a section I did not build for them?",
     a: "Yes. Each project has an allowed list, ticked in Settings. Anything unticked never appears in their Add section list, and the API rejects it too.",
+  },
+  {
+    q: "Can I let an AI assistant build the content?",
+    a: "Yes — that is what the MCP server is for. Claude, Cursor, Copilot and anything else that speaks MCP get 26 tools over the same REST API the dashboard uses, so the section registry, the field limits and the draft-until-Publish rule all still apply. An agent cannot invent a section type or change a colour any more than your client can.",
   },
   {
     q: "What happens to my client's site if they stop paying?",
@@ -406,6 +447,117 @@ export default function LandingPage() {
               </div>
             </div>
           </section>
+
+          {/* --------------------------------- coding agents · butter (MCP) */}
+          {/*
+            The band the plate one hands off to: having just shown a developer
+            the code they write, show them the part they do not have to.
+
+            It sits on butter — the one wash the band map keeps between plate
+            and lilac — so the ramp reads paper → sky → paper → plate → butter →
+            paper → lilac → mint and the stage lights still cross-fade in order.
+          */}
+          <Band stage="butter" id="agent" className="py-20 sm:py-24">
+            <div className="grid items-start gap-12 lg:grid-cols-[1.05fr_0.95fr]">
+              <div>
+                <Print>
+                  <Eyebrow>Model Context Protocol</Eyebrow>
+                </Print>
+                <Print delay={70}>
+                  <H2 className="mt-3">Your coding agent can build the site too.</H2>
+                </Print>
+                <Print delay={140}>
+                  <Lede className="mt-4">
+                    Point Claude, Cursor or Copilot at a Pagecraft website and it gets 26 tools:
+                    read the section types, draft pages, fill sections, upload photos, write alt
+                    text, publish. Not a chat box bolted onto a dashboard — the same REST API the
+                    dashboard itself calls.
+                  </Lede>
+                </Print>
+
+                <Print delay={200}>
+                  <ul className="mt-7 flex flex-col gap-3.5">
+                    {AGENT_GUARDS.map((item) => (
+                      <li
+                        key={item.title}
+                        className="rounded-xl border border-ink/12 bg-surface/70 p-4.5 transition-colors hover:border-accent-line"
+                      >
+                        <span className="flex items-center gap-2 font-mono text-[12px] font-semibold tracking-[0.06em] text-ink uppercase">
+                          <span aria-hidden className="text-published">✓</span>
+                          {item.title}
+                        </span>
+                        <p className="mt-1.5 text-[13.5px] leading-[1.55] text-quiet">
+                          {item.body}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                </Print>
+
+                <Print delay={260}>
+                  <div className="mt-7 flex flex-wrap items-center gap-4">
+                    <ButtonLink href={`${links.docs}#agent`}>Set it up</ButtonLink>
+                    <span className="text-[13.5px] text-quiet">
+                      One block of JSON in your MCP client. Nothing to install —{" "}
+                      <code className="font-mono text-[12.5px] text-slate">npx</code> fetches it.
+                    </span>
+                  </div>
+                </Print>
+              </div>
+
+              {/* The config, then what you say to it — the two halves of
+                  actually using this, in the order you meet them. */}
+              <Print delay={180}>
+                <div className="overflow-hidden rounded-xl border border-ink/15 bg-plate">
+                  <div className="border-b border-canvas/12 px-4 py-2.5 font-mono text-[11px] text-canvas/60">
+                    claude_desktop_config.json
+                  </div>
+                  <pre className="overflow-x-auto px-5 py-4.5 font-mono text-[12.5px] leading-[1.85] text-canvas/90">
+                    <code>
+                      <span className="text-canvas/60">{"// nothing to install — npx fetches it"}</span>
+                      {"\n{\n  "}
+                      <span className="text-canvas/70">&quot;mcpServers&quot;</span>
+                      {": {\n    "}
+                      <span className="text-canvas/70">&quot;pagecraft&quot;</span>
+                      {": {\n      command: "}
+                      <span className="text-mint-pop">&quot;npx&quot;</span>
+                      {",\n      args: ["}
+                      <span className="text-mint-pop">&quot;-y&quot;</span>
+                      {", "}
+                      <span className="text-mint-pop">&quot;@mypagecraft/mcp&quot;</span>
+                      {"],\n      env: {\n        "}
+                      <span className="text-sun">PAGECRAFT_API_URL</span>
+                      {": "}
+                      <span className="text-mint-pop">&quot;https://api.yoursite.com&quot;</span>
+                      {",\n        "}
+                      <span className="text-sun">PAGECRAFT_PROJECT_TOKEN</span>
+                      {": "}
+                      <span className="text-mint-pop">&quot;pct_…&quot;</span>
+                      {"\n      }\n    }\n  }\n}"}
+                    </code>
+                  </pre>
+
+                  <div className="border-t border-canvas/12 px-5 py-4">
+                    <p className="font-mono text-[11px] tracking-[0.08em] text-canvas/50 uppercase">
+                      Then just ask
+                    </p>
+                    <ul className="mt-3 flex flex-col gap-2.5">
+                      {AGENT_PROMPTS.map((prompt) => (
+                        <li key={prompt} className="flex items-start gap-2.5">
+                          <span aria-hidden className="mt-px shrink-0 font-mono text-mint-pop">
+                            ›
+                          </span>
+                          <span className="text-[13.5px] leading-[1.5] text-canvas/85">
+                            {prompt}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </Print>
+            </div>
+          </Band>
 
           {/* ------------------------- section types · paper (the sheets, landed) */}
           <Band

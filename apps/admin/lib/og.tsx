@@ -158,7 +158,7 @@ export const OG_CARDS = {
   docs: {
     eyebrow: "Docs",
     title: "Wire a Next.js site to the content API",
-    subtitle: "Four endpoints, one SDK, and a section registry that documents itself.",
+    subtitle: "Four endpoints, one SDK, and an MCP server your coding agent can build with.",
     alt: "Pagecraft developer documentation",
   },
   signup: {
