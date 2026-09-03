@@ -1,11 +1,11 @@
 import { ONE_MONTH, ONE_YEAR } from "./pricing";
 
 /**
- * The business behind Pagecraft, in one place.
+ * The business behind mypagecraft, in one place.
  *
  * **This is the only file you edit to complete the legal pages.** Terms,
  * Privacy, Refunds and Contact all read from here, so the registered name,
- * address and phone number are written once rather than four times and left to
+ * name and contact details are written once rather than four times and left to
  * drift apart.
  *
  * WHY THESE PAGES EXIST AT ALL: a payment provider will not verify a website for
@@ -21,9 +21,11 @@ import { ONE_MONTH, ONE_YEAR } from "./pricing";
  */
 
 /**
- * Stands in for a detail only the operator can supply.
+ * Stands in for a detail only the operator can supply. Nothing is set to it
+ * any more (everything was either filled in or deliberately omitted on
+ * 4 Sep 2026), but it stays as the safety net for any future field.
  *
- * Anything still set to this renders as a loud inline marker rather than
+ * Anything set to this renders as a loud inline marker rather than
  * quietly shipping the word "undefined" to a payment provider's reviewer —
  * see `<Fill>` in `components/landing/legal.tsx`. Search the rendered pages
  * for "TO BE FILLED IN" before you submit anything to a payment provider.
@@ -34,55 +36,53 @@ export const isFilled = (value: string) => value !== FILL_ME && value.trim() !==
 
 export const business = {
   /**
-   * The legal entity that takes the money — exactly as registered, and exactly
-   * as it appears on the payment provider's account and the bank account. A sole
-   * proprietor puts their own name here, optionally as "Tushar Jain (sole
-   * proprietor), trading as Pagecraft".
+   * Who operates the service, as the policies name them. Decided 4 Sep 2026:
+   * the team, not a registered entity or a person's name. If a payment
+   * provider's reviewer asks for the registered legal name behind the account,
+   * this is the line to change.
    */
-  legalName: FILL_ME,
+  legalName: "mypagecraft team",
 
-  /** The name customers know. Safe to leave as is. */
-  tradingName: "Pagecraft",
-
-  /**
-   * The registered/operating address, as one line per array entry. A reviewer's
-   * reviewer checks this against your KYC, and Indian consumer rules expect a
-   * real, reachable postal address rather than a PO box.
-   */
-  address: [FILL_ME],
+  /** The name customers know — the wordmark, lowercase. */
+  tradingName: "mypagecraft",
 
   /**
-   * A phone number that a human answers, in international format
-   * (+91 XXXXX XXXXX). A Contact page without one is the single most common
-   * reason a reviewer sends a website back.
+   * Postal address, one line per array entry. **Deliberately empty** (4 Sep
+   * 2026): no address is published. The Contact page and its structured data
+   * omit the block entirely when this is empty. Be aware a payment provider's
+   * website review usually wants one; add lines here if they ask.
    */
-  phone: FILL_ME,
+  address: [] as readonly string[],
 
   /** Where support mail actually lands. Must be a mailbox you read. */
-  supportEmail: "hello@mypagecraft.com",
+  supportEmail: "mypagecraft01@gmail.com",
 
   /** Where privacy requests go. The same mailbox is fine for a small operation. */
-  privacyEmail: "hello@mypagecraft.com",
+  privacyEmail: "mypagecraft01@gmail.com",
 
-  /** GSTIN, if you are registered. Leave as FILL_ME to omit the line entirely. */
-  gstin: FILL_ME,
+  /** GSTIN, if registered. Empty omits the line entirely. */
+  gstin: "",
 
   /**
-   * The city whose courts govern disputes — normally where you are registered.
-   * "Bengaluru", "Mumbai", "New Delhi".
+   * The city whose courts govern disputes. Empty means the Terms fall back to
+   * "the courts of India" with no city named.
    */
-  jurisdictionCity: FILL_ME,
+  jurisdictionCity: "",
 
   country: "India",
 
-  /** Hours a person is actually reachable. Do not promise more than you keep. */
+  /**
+   * Hours a person is actually reading the inbox. There is no phone number —
+   * decided 4 Sep 2026 — so these are email hours. Do not promise more than
+   * you keep.
+   */
   supportHours: "Monday to Friday, 10:00–18:00 IST",
 
   /**
    * Bump this whenever you change the wording of any policy page — it is shown
    * on all four, and a policy with a stale date reads as an abandoned one.
    */
-  lastUpdated: "30 August 2026",
+  lastUpdated: "4 September 2026",
 } as const;
 
 /**

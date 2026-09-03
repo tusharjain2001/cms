@@ -48,8 +48,10 @@ export const links = {
   privacy: "/privacy",
   refunds: "/refunds",
 
-  /** The mailbox itself, for the places that genuinely want to open a mail client. */
-  contactEmail: "mailto:hello@mypagecraft.com",
+  /** The support mailbox, as text. Mirrors `business.supportEmail` in lib/legal.ts. */
+  contactAddress: "mypagecraft01@gmail.com",
+  /** The same mailbox, for the places that genuinely want to open a mail client. */
+  contactEmail: "mailto:mypagecraft01@gmail.com",
 
   // Not written yet.
   sdkReference: TODO,

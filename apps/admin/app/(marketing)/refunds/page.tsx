@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { pageMeta } from "@/lib/site-meta";
-import { Clause, Fill, Highlight, LegalPage, Points } from "@/components/landing/legal";
+import { Clause, Highlight, LegalPage, Points } from "@/components/landing/legal";
 import { business, commercials, refunds } from "@/lib/legal";
 
 /**
@@ -31,7 +31,7 @@ export default function RefundsPage() {
   return (
     <LegalPage
       title="Refunds and cancellation"
-      intro="Pagecraft is a subscription. You can stop it whenever you like, from inside the dashboard, without emailing anyone or explaining yourself."
+      intro="mypagecraft is a subscription. You can stop it whenever you like, from inside the dashboard, without emailing anyone or explaining yourself."
     >
       <Highlight>
         <strong className="font-semibold text-ink">
@@ -92,7 +92,7 @@ export default function RefundsPage() {
             </>,
             <>
               <strong className="font-semibold text-ink">If we broke it:</strong> if a fault on our
-              side stopped you using Pagecraft for a meaningful stretch, tell us and we will refund
+              side stopped you using mypagecraft for a meaningful stretch, tell us and we will refund
               or credit that time. You should not pay for something that did not work.
             </>,
             <>
@@ -169,8 +169,7 @@ export default function RefundsPage() {
           >
             {business.supportEmail}
           </a>{" "}
-          or call <Fill value={business.phone} /> during {business.supportHours}. Full details on
-          the{" "}
+          — we read it {business.supportHours}. Full details on the{" "}
           <a href="/contact" className="font-semibold text-accent hover:underline">
             contact page
           </a>

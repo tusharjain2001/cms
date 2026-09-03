@@ -606,7 +606,7 @@ export default function LandingPage() {
                 <p className="max-w-[300px] text-[14.5px] leading-[1.55] text-quiet">
                   Anything else, mail{" "}
                   <a href={links.contactEmail} className="font-medium text-accent hover:underline">
-                    hello@mypagecraft.com
+                    {links.contactAddress}
                   </a>{" "}
                   and a human answers, usually the same day.
                 </p>

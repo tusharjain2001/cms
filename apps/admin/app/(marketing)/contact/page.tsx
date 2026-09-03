@@ -1,19 +1,20 @@
 import type { Metadata } from "next";
 import { abs, graph, jsonLd, organizationSchema, pageMeta } from "@/lib/site-meta";
-import { Clause, Fill, LegalPage, Points } from "@/components/landing/legal";
+import { Clause, LegalPage, Points } from "@/components/landing/legal";
 import { business, isFilled } from "@/lib/legal";
 
 /**
  * Contact us.
  *
- * A payment provider's website review checks this page specifically, and looks for a
- * **postal address and a working phone number** — an email-only contact page
- * is the most common single reason a verification request is sent back. The
- * details come from `lib/legal.ts`; fill them in there.
+ * A payment provider's website review checks this page specifically, and
+ * usually looks for a postal address and a phone number. **Neither is
+ * published** — decided 4 Sep 2026 — so this is an email-only contact page.
+ * If a reviewer sends the site back for that reason, add the address lines in
+ * `lib/legal.ts` and the block below renders again on its own.
  */
 
 const description =
-  "How to reach the people who run Pagecraft — email, phone and our registered address.";
+  "How to reach the people who run mypagecraft, and what to include so we can help quickly.";
 
 export const metadata: Metadata = pageMeta({
   title: "Contact us",
@@ -22,13 +23,11 @@ export const metadata: Metadata = pageMeta({
 });
 
 /**
- * The organisation, with whatever contact details are actually filled in.
+ * The organisation, with whatever contact details are actually set.
  *
- * Every field is gated on `isFilled`, because `lib/legal.ts` ships the address
- * and phone as `FILL_ME` sentinels until an operator supplies them — and
- * publishing `"telephone": "__FILL_ME__"` to a search engine is worse than
- * publishing no phone number at all. The visible page shouts about a missing
- * value through `<Fill>`; the structured data simply omits it.
+ * Every field is gated on `isFilled`, so an address or GSTIN left empty in
+ * `lib/legal.ts` is simply omitted from the structured data rather than
+ * published as an empty string.
  */
 function contactSchema() {
   const node: Record<string, unknown> = {
@@ -37,7 +36,6 @@ function contactSchema() {
     mainEntityOfPage: abs("/contact"),
   };
   if (isFilled(business.legalName)) node.legalName = business.legalName;
-  if (isFilled(business.phone)) node.telephone = business.phone;
   const street = business.address.filter(isFilled);
   if (street.length > 0) {
     node.address = {
@@ -63,16 +61,19 @@ export default function ContactPage() {
     >
       <Clause n={1} title="Who you are dealing with">
         <p>
-          Pagecraft is operated by <strong className="font-semibold text-ink"><Fill value={business.legalName} /></strong>.
+          {business.tradingName} is operated by the{" "}
+          <strong className="font-semibold text-ink">{business.legalName}</strong>, based in{" "}
+          {business.country}.
         </p>
-        <address className="not-italic">
-          {business.address.map((line, i) => (
-            <span key={i} className="block">
-              <Fill value={line} />
-            </span>
-          ))}
-          <span className="block">{business.country}</span>
-        </address>
+        {business.address.length > 0 && (
+          <address className="not-italic">
+            {business.address.map((line, i) => (
+              <span key={i} className="block">
+                {line}
+              </span>
+            ))}
+          </address>
+        )}
         {isFilled(business.gstin) && (
           <p className="font-mono text-label text-muted">GSTIN: {business.gstin}</p>
         )}
@@ -90,25 +91,16 @@ export default function ContactPage() {
           your personal data.
         </p>
         <p>
-          We answer within one working day. Include the email address on your account, because
-          that is how we find you.
-        </p>
-      </Clause>
-
-      <Clause n={3} title="Phone">
-        <p>
-          <strong className="font-semibold text-ink">
-            <Fill value={business.phone} />
-          </strong>
-          , {business.supportHours}.
+          We read the inbox {business.supportHours}, and answer within one working day. Include
+          the email address on your account, because that is how we find you.
         </p>
         <p>
-          Outside those hours, email is faster than a voicemail — it reaches the same people and
+          Email is the only channel, on purpose: it reaches the same people a phone would and
           leaves a written record of what you asked for.
         </p>
       </Clause>
 
-      <Clause n={4} title="What to send us">
+      <Clause n={3} title="What to send us">
         <Points
           items={[
             <>
@@ -140,10 +132,11 @@ export default function ContactPage() {
         />
       </Clause>
 
-      <Clause n={5} title="What we will never ask you for">
+      <Clause n={4} title="What we will never ask you for">
         <p>
           We will never ask for your password, a one-time code, or your card number — not by email,
-          not on the phone. Nobody at Pagecraft needs any of them, and anyone who asks is not us.
+          not by any other channel. Nobody at mypagecraft needs any of them, and anyone who asks
+          is not us. We will never phone you.
         </p>
         <p>
           Card details are handled entirely by Dodo Payments and never reach our servers.

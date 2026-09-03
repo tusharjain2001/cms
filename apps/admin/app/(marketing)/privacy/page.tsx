@@ -22,7 +22,7 @@ import { business, commercials, subProcessors } from "@/lib/legal";
  */
 
 const description =
-  "What Pagecraft stores, why, who else sees it, and how to get it back or have it deleted. No tracking, no advertising, no selling data.";
+  "What mypagecraft stores, why, who else sees it, and how to get it back or have it deleted. No tracking, no advertising, no selling data.";
 
 export const metadata: Metadata = pageMeta({
   title: "Privacy policy",
@@ -35,7 +35,7 @@ export default function PrivacyPage() {
   return (
     <LegalPage
       title="Privacy policy"
-      intro="Pagecraft holds your account details and the content you write. That is nearly all of it. This page says exactly what we keep, who else touches it, and how to make us delete it."
+      intro="mypagecraft holds your account details and the content you write. That is nearly all of it. This page says exactly what we keep, who else touches it, and how to make us delete it."
     >
       <Highlight>
         We do not run analytics, advertising or tracking of any kind on this website, we set no
@@ -45,11 +45,11 @@ export default function PrivacyPage() {
 
       <Clause n={1} title="Who is responsible">
         <p>
-          {business.tradingName} is operated by{" "}
+          {business.tradingName} is operated by the{" "}
           <strong className="font-semibold text-ink">
             <Fill value={business.legalName} />
           </strong>, and we are the
-          data controller for everything described here. Our full address and phone number are on
+          data controller for everything described here. How to reach us is on
           the{" "}
           <a href="/contact" className="font-semibold text-accent hover:underline">
             contact page
@@ -126,7 +126,7 @@ export default function PrivacyPage() {
 
       <Clause n={5} title="Content you publish is public — by design">
         <p>
-          The point of Pagecraft is to serve your published content to your live website, over a
+          The point of mypagecraft is to serve your published content to your live website, over a
           public read-only API. Anything you publish is public. Drafts are not: the public API
           serves only published content, and previews need a short-lived token.
         </p>
@@ -223,7 +223,7 @@ export default function PrivacyPage() {
       <Clause n={9} title="How it is protected">
         <Points
           items={[
-            "Passwords are bcrypt hashes. Nobody at Pagecraft can read yours.",
+            "Passwords are bcrypt hashes. Nobody at mypagecraft can read yours.",
             "Everything travels over HTTPS.",
             "Sign-in tokens are short-lived, and changing your password invalidates every session on every device at once.",
             "Confirmation and reset links are single-use, and only a one-way hash of each is stored.",
@@ -262,7 +262,7 @@ export default function PrivacyPage() {
 
       <Clause n={11} title="If you are someone else's client">
         <p>
-          Whoever owns a Pagecraft account controls the websites on it, and often shares that
+          Whoever owns a mypagecraft account controls the websites on it, and often shares that
           sign-in with the developer who built the site. Anyone holding those details can see and
           change everything on those websites. Share your sign-in only with people you trust, and
           change your password when that stops being true — it signs every other device out at once.
@@ -271,7 +271,7 @@ export default function PrivacyPage() {
 
       <Clause n={12} title="Children">
         <p>
-          Pagecraft is a business tool and is not directed at children. We do not knowingly collect
+          mypagecraft is a business tool and is not directed at children. We do not knowingly collect
           data from anyone under 18. If you believe a child has given us personal data, tell us and
           we will remove it.
         </p>

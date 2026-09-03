@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { pageMeta } from "@/lib/site-meta";
 import { Clause, Fill, Highlight, LegalPage, Points } from "@/components/landing/legal";
-import { business, commercials } from "@/lib/legal";
+import { business, commercials, isFilled } from "@/lib/legal";
 
 /**
  * Terms and conditions.
@@ -16,7 +16,7 @@ import { business, commercials } from "@/lib/legal";
  */
 
 const description =
-  "The agreement between you and Pagecraft: what we provide, what you pay, who owns what, and how either of us can end it.";
+  "The agreement between you and mypagecraft: what we provide, what you pay, who owns what, and how either of us can end it.";
 
 export const metadata: Metadata = pageMeta({
   title: "Terms and conditions",
@@ -39,12 +39,12 @@ export default function TermsPage() {
 
       <Clause n={1} title="Who this agreement is with">
         <p>
-          These terms are between you and{" "}
+          These terms are between you and the{" "}
           <strong className="font-semibold text-ink">
             <Fill value={business.legalName} />
           </strong>{" "}
-          (&ldquo;we&rdquo;, &ldquo;us&rdquo;), who operate {business.tradingName}. Our address and
-          phone number are on the{" "}
+          (&ldquo;we&rdquo;, &ldquo;us&rdquo;), who operate {business.tradingName}. How to reach
+          us is on the{" "}
           <a href="/contact" className="font-semibold text-accent hover:underline">
             contact page
           </a>
@@ -56,10 +56,10 @@ export default function TermsPage() {
         </p>
       </Clause>
 
-      <Clause n={2} title="What Pagecraft is">
+      <Clause n={2} title="What mypagecraft is">
         <p>
-          Pagecraft is a content management system. You or your developer build a website in your
-          own code; Pagecraft stores the words and images that go into it and serves them to that
+          mypagecraft is a content management system. You or your developer build a website in your
+          own code; mypagecraft stores the words and images that go into it and serves them to that
           website over an API. When you press Publish, we notify your website so it can rebuild
           itself.
         </p>
@@ -76,7 +76,7 @@ export default function TermsPage() {
             "Keep your password to yourself, and pick one you do not use elsewhere.",
             <>
               <strong className="font-semibold text-ink">
-                Pagecraft accounts are commonly shared
+                mypagecraft accounts are commonly shared
               </strong>{" "}
               between an owner and their developer. Anyone holding your sign-in can see and change
               everything on your websites, so share it only with people you trust. Everything done
@@ -129,12 +129,12 @@ export default function TermsPage() {
           items={[
             <>
               <strong className="font-semibold text-ink">Your content is yours.</strong> The words,
-              images and files you put into Pagecraft remain your property. We claim no ownership of
+              images and files you put into mypagecraft remain your property. We claim no ownership of
               them and no licence beyond what is needed to store them, serve them to your website,
               and back them up.
             </>,
             <>
-              <strong className="font-semibold text-ink">The software is ours.</strong> Pagecraft
+              <strong className="font-semibold text-ink">The software is ours.</strong> mypagecraft
               itself, its design and its name stay ours. Using the service does not transfer any of
               that to you.
             </>,
@@ -151,10 +151,10 @@ export default function TermsPage() {
         <Points
           items={[
             "Publish anything unlawful, or anything that infringes someone else's rights.",
-            "Use Pagecraft to store or distribute malware, or to deceive people about who you are.",
+            "Use mypagecraft to store or distribute malware, or to deceive people about who you are.",
             "Try to reach another customer's account, content or files.",
             "Attack the service — flooding it with requests, working around rate limits, or probing it for weaknesses without our written permission.",
-            "Resell access to Pagecraft as though it were your own product.",
+            "Resell access to mypagecraft as though it were your own product.",
           ]}
         />
         <p>
@@ -171,7 +171,7 @@ export default function TermsPage() {
 
       <Clause n={8} title="Keeping it running">
         <p>
-          We work to keep Pagecraft available and quick, but we do not promise a specific uptime
+          We work to keep mypagecraft available and quick, but we do not promise a specific uptime
           figure and we do not offer a service-level guarantee. Maintenance, third-party outages and
           faults happen.
         </p>
@@ -228,7 +228,7 @@ export default function TermsPage() {
         <p>
           We may update these terms. Minor corrections take effect when published; anything that
           materially affects you will be emailed to you at least 30 days beforehand, and continuing
-          to use Pagecraft after that means you accept it. If you do not, cancel — and if the change
+          to use mypagecraft after that means you accept it. If you do not, cancel — and if the change
           disadvantages you mid-period, we will refund the remainder.
         </p>
       </Clause>
@@ -236,8 +236,9 @@ export default function TermsPage() {
       <Clause n={13} title="Governing law">
         <p>
           These terms are governed by the laws of {business.country}, and the courts of{" "}
-          <Fill value={business.jurisdictionCity} /> have exclusive jurisdiction over any dispute —
-          except that consumers keep any right to bring a claim where they live.
+          {isFilled(business.jurisdictionCity) ? business.jurisdictionCity : business.country}{" "}
+          have exclusive jurisdiction over any dispute — except that consumers keep any right to
+          bring a claim where they live.
         </p>
         <p>
           If any part of these terms turns out to be unenforceable, the rest stands.
@@ -253,7 +254,7 @@ export default function TermsPage() {
           >
             {business.supportEmail}
           </a>{" "}
-          or call <Fill value={business.phone} /> during {business.supportHours}.
+          — we read it {business.supportHours}.
         </p>
       </Clause>
     </LegalPage>

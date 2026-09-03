@@ -300,7 +300,7 @@ export default function PricingPage() {
                 <p className="mt-3 text-[15px] leading-[1.6] text-quiet">
                   Anything unclear, mail{" "}
                   <a href={links.contactEmail} className="font-medium text-accent hover:underline">
-                    hello@mypagecraft.com
+                    {links.contactAddress}
                   </a>{" "}
                   before you pay, not after.
                 </p>
